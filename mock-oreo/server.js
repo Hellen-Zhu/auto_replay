@@ -154,7 +154,7 @@ const newTradePage = `${pageHead}
 </main>
 <sc-modal data-testid="trade-change-confirmation-dialog" hidden><div slot="header"><h2>Confirm Trade Changes</h2>
   <p>Review the changes and risk impact before saving</p></div>
-  <div><sc-button data-testid="trade-change-confirm-btn">Confirm &amp; Save</sc-button></div></sc-modal>
+  <div><h2>Updated Risk Calculation</h2><sc-button data-testid="trade-change-confirm-btn">Confirm &amp; Save</sc-button></div></sc-modal>
 <script>
 const $ = (id) => document.querySelector('[data-testid=' + id + ']');
 const err = document.getElementById('err'), dialog = $('trade-change-confirmation-dialog');
