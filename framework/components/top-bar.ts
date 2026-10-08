@@ -1,8 +1,8 @@
 import type { Target, Val } from '../ui';
-import { BasePage } from './base.page';
+import { BaseComponent } from './base.component';
 
-/** The top bar shown on every page after login (a shared component rather than a page) */
-export class TopBar extends BasePage {
+/** The top bar shown on every page after login */
+export class TopBar extends BaseComponent {
   protected readonly newTradeBtn: Target = { testId: 'layout-new-trade-btn' };
   protected readonly aiReaderBtn: Target = { testId: 'layout-ai-reader-btn' };
   protected readonly themeToggleBtn: Target = { testId: 'layout-theme-toggle-btn' };
@@ -12,7 +12,7 @@ export class TopBar extends BasePage {
     await this.ui.expectVisible(this.newTradeBtn);
   }
 
-  async openNewTrade() {
+  async clickNewTrade() {
     await this.ui.click(this.newTradeBtn);
   }
 

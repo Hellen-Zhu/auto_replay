@@ -1,9 +1,11 @@
-// Auto fixtures: inject ui (actions + recording) and app (the page objects) into every test, and export the case file to cases/ once the test passes
+// Auto fixtures: inject flows (business steps), app (pages and components) and ui (actions + recording)
+// into every test, and export the case file to cases/ once the test passes
 
 import { test as base, expect } from '@playwright/test';
 import path from 'path';
 import { UI } from './ui';
-import { App } from './pages';
+import { App } from './app';
+import { Flows } from './flows';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { loadConfig } = require('../core/config');
 
@@ -17,7 +19,7 @@ function caseIdOf(title: string): string {
   return title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 80);
 }
 
-export const test = base.extend<{ ui: UI; app: App }>({
+export const test = base.extend<{ ui: UI; app: App; flows: Flows }>({
   ui: async ({ page }, use, testInfo) => {
     const ui = new UI(page, loadConfig(ROOT), ROOT);
     await use(ui);
@@ -37,9 +39,14 @@ export const test = base.extend<{ ui: UI; app: App }>({
     }
   },
 
-  // Page objects, all acting through the same ui
+  // Pages and components, all acting through the same ui
   app: async ({ ui }, use) => {
     await use(new App(ui));
+  },
+
+  // Business steps; this is what a case normally uses
+  flows: async ({ app }, use) => {
+    await use(new Flows(app));
   },
 });
 

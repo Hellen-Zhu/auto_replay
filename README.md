@@ -16,10 +16,12 @@ A case file contains **no server address and no password**, only relative paths 
 |---|---|
 | `core/actions.js` | Execution core. QA runs and PO replays go through the same code |
 | `core/config.js` | Reads `config.local.json` |
-| `framework/pages/` | Page objects: one class per page or shared component, holding its locators (`data-testid` throughout) and what a user can do and check there |
+| `framework/components/` | Component objects: controls and regions shared by several pages (`TopBar`, `Combobox`, `ConfirmDialog`), atomic operations only |
+| `framework/pages/` | Page objects: one class per page, holding its locators (`data-testid` throughout) and its atomic operations |
+| `framework/app.ts` | `App`: one instance of every page and shared component |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values and passwords automatically |
-| `framework/fixtures.ts` | Provides `ui` and `app` (all page objects) to every test; exports to `cases/` automatically after a test passes |
-| `framework/flows.ts` | Reusable business flows (`login`, `createTrade`): Given / When / Then steps composed from page objects |
+| `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/` automatically after a test passes |
+| `framework/flows.ts` | Flow layer (`Flows`): business steps (`login`, `createTrade`, ...) reported as Given / When / Then, composed from atomic operations |
 | `tests/` | Test cases: `login.spec.ts`, `trade-creation.spec.ts` (products x normal / StepIn full / StepIn partial) |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
@@ -57,15 +59,15 @@ To add a product, add it to `PRODUCTS` in the spec and put its `.dat` file in `d
 
 ## QA: writing a new case
 
-The framework follows the Page Object Model, in three layers:
+The framework follows the Page Object Model, in three layers. Each layer only calls the one below it:
 
-| Layer | Where | Contains |
-|---|---|---|
-| Test | `tests/*.spec.ts` | The scenario: which steps, in which order, with which data. No locators |
-| Flow (optional) | `framework/flows.ts` | A sequence of steps reused by several tests (`login`, `createTrade`) |
-| Page object | `framework/pages/*.ts` | The locators of one page and its actions / checks, built on `ui.xxx` |
+| Layer | Where | Contains | Example |
+|---|---|---|---|
+| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.createTrade('FX_TRF')` |
+| Flow | `framework/flows.ts` | Business steps: a Given / When / Then line of the report and the atomic operations behind it | `I book the trade and confirm` |
+| Page / component | `framework/pages/`, `framework/components/` | Locators and **atomic operations**: one thing a user does (fill one field, click one button, pick one dropdown value) or one check | `newTrade.clickBook()` |
 
-**1. Describe the page** (once per page). Locators stay inside the class; tests only see its methods:
+**1. Page / component: atomic operations.** Locators stay inside the class (`protected`); the outside only sees methods:
 
 ```ts
 // framework/pages/trades.page.ts
@@ -74,44 +76,49 @@ export class TradesPage extends BasePage {
   protected readonly searchBox: Target = { testId: 'trades-search-input', inner: 'input' };
   protected readonly firstRowId: Target = { testId: 'trades-row-trade-id', nth: 0 };
 
-  async search(tradeId: Val) {
-    await this.ui.fill(this.searchBox, tradeId);
-    await this.ui.press(this.searchBox, 'Enter');
-  }
-  async expectFirstRow(tradeId: Val) {
-    await this.ui.expectText(this.firstRowId, tradeId);
-  }
+  async fillSearch(tradeId: Val) { await this.ui.fill(this.searchBox, tradeId); }
+  async submitSearch() { await this.ui.press(this.searchBox, 'Enter'); }
+  async expectFirstRow(tradeId: Val) { await this.ui.expectText(this.firstRowId, tradeId); }
 }
 ```
 
-A new page object is registered in `framework/pages/index.ts` (`App`), which makes it available as `app.<name>`.
+A control used on several pages is a component (`framework/components/`) that a page exposes as a field, e.g. `readonly counterparty = new Combobox(this.ui, { testId: '...', inner: 'input' })`, used as `newTrade.counterparty.select(value)`. A new page is registered in `framework/app.ts` (`App`).
 
-**2. Write the test** with the `app` fixture (page objects) and `ui` (the Given / When / Then grouping):
+**2. Flow: business steps.** A method of `Flows` wraps atomic operations in the Given / When / Then line the PO reads in the report:
 
 ```ts
-test('Checker finds a new trade @case:trade_search', async ({ ui, app }) => {
-  await login(app, 'maker');                                  // Given I log in as maker
-  const tradeId = await createTrade(app, 'FX_TRF');           // When ... Then ... (reads the new trade ID)
-  await login(app, 'checker', 'And');                         // And I log in as checker
-  await ui.When('I search for the trade', async () => {
-    await app.trades.search(tradeId);                         // becomes ${var:createdTradeId} automatically
+// framework/flows.ts, inside class Flows
+async searchTrade(tradeId: string, keyword: Keyword = 'When') {
+  const { trades } = this.app;
+  await this.ui[keyword]('I search for the trade', async () => {
+    await trades.fillSearch(tradeId);          // becomes ${var:createdTradeId} automatically
+    await trades.submitSearch();
   });
-  await ui.Then('the trade is listed first', async () => {
-    await app.trades.expectFirstRow(tradeId);
-  });
+}
+```
+
+**3. Case: the scenario.** A case uses the `flows` fixture and nothing else:
+
+```ts
+test('Checker finds a new trade @case:trade_search', async ({ flows }) => {
+  await flows.login('maker');                                 // Given I log in as maker
+  const tradeId = await flows.createTrade('FX_TRF');          // When ... Then ... (returns the new trade ID)
+  await flows.login('checker', 'And');                        // And I log in as checker
+  await flows.searchTrade(tradeId);                           // When I search for the trade
+  await flows.expectTradeListedFirst(tradeId);                // Then the trade is listed first
 });
 ```
 
 Key points:
 
-- Tests and flows contain no locators and no `ui.click / ui.fill`: they call page object methods. A page object method is one thing a user does or checks on that page (`selectBasicInfo`, `bookAndConfirm`, `expectStatus`), not one click.
-- Page objects do not contain Given / When / Then; those belong to the test or the flow, so the same page method can serve different scenarios.
-- Inside a page object every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
-- `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
+- Cases hold no locators, no `ui.xxx` and no page calls: only flows and data. Flows hold no locators and no `ui.click / ui.fill`: only page / component operations. Pages and components hold no Given / When / Then and no multi-step sequences.
+- Each flow has a default keyword (`login` is `Given`); pass another one when the step sits elsewhere in the scenario (`flows.login('checker', 'And')`).
+- Inside a page or component every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
+- `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
 - OREO inputs are web components and the real `<input>` sits in the shadow DOM, so input targets need `inner: 'input'`; buttons can be clicked on the host element directly.
-- In a page object, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
+- In a page or component, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
 - Text fields of a target can reference config too: `{ role: 'option', name: cfg('tradeData.direction') }`.
 - Only **passing** cases are exported.
 

@@ -1,4 +1,4 @@
-import { cfg, type Target, type Val } from '../ui';
+import type { Target, Val } from '../ui';
 import { BasePage } from './base.page';
 
 export class LoginPage extends BasePage {
@@ -12,18 +12,21 @@ export class LoginPage extends BasePage {
 
   async open() {
     await this.ui.goto(LoginPage.path);
+  }
+
+  async expectDialogVisible() {
     await this.ui.expectVisible(this.dialog);
   }
 
-  async signIn(email: Val, password: Val) {
+  async fillEmail(email: Val) {
     await this.ui.fill(this.email, email);
-    await this.ui.fill(this.password, password, { secret: true });
-    await this.ui.click(this.signInBtn);
   }
 
-  /** Open the page and sign in with accounts.<role> of the local config.local.json */
-  async loginAs(role: string) {
-    await this.open();
-    await this.signIn(cfg(`accounts.${role}.email`), cfg(`accounts.${role}.password`));
+  async fillPassword(password: Val) {
+    await this.ui.fill(this.password, password, { secret: true });
+  }
+
+  async clickSignIn() {
+    await this.ui.click(this.signInBtn);
   }
 }
