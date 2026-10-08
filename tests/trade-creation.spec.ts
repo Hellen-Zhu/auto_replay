@@ -52,15 +52,15 @@ test.describe('Trade creation', () => {
     });
   }
 
-  // The direction comes from this case's row in testdata/trade-creation.json
-  for (const product of productsWith('sell')) {
-    test(`[TC-TRADE-CREATION-${product}-UI-004] Maker creates a new ${product} trade with direction Sell`, async ({ flows, testData }) => {
-      prepare(product, 'trade with direction Sell');
-      const data = testData<TradeCreationData>();
+  // A data variation of one product, so a single test outside the loops; the direction comes from this case's
+  // row in testdata/trade-creation.json
+  test('[TC-TRADE-CREATION-FX_TRF-UI-004] Maker creates a new FX_TRF trade with direction Sell', async ({ flows, testData }) => {
+    const product = 'FX_TRF';
+    prepare(product, 'trade with direction Sell');
+    const data = testData<TradeCreationData>();
 
-      await flows.auth.login('maker');
-      const tradeId = await flows.tradeCreation.createTrade(product, data);
-      await flows.tradeCreation.expectPendingApproval(tradeId);
-    });
-  }
+    await flows.auth.login('maker');
+    const tradeId = await flows.tradeCreation.createTrade(product, data);
+    await flows.tradeCreation.expectPendingApproval(tradeId);
+  });
 });

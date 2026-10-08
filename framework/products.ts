@@ -2,17 +2,19 @@
 // To add a product: add a line here with the capabilities it supports and put its data/<PRODUCT>.dat in place.
 // Every spec that loops productsWith(...) then gets the product's cases, with their case IDs, by itself.
 
-/** What a product can be tested for; one capability per scenario that not every product supports */
+/**
+ * What a product can be tested for; one capability per scenario that not every product supports.
+ * A variation in data only (e.g. direction Sell) is not a capability: it is a single test with its testdata row.
+ */
 export type Capability =
   | 'create' // book a normal trade
   | 'stepInFull'
-  | 'stepInPartial'
-  | 'sell'; // book a normal trade with direction Sell
+  | 'stepInPartial';
 
 /** Product type (also what is typed as the Product ID, and the name of the dat file) -> supported capabilities */
 export const PRODUCTS: Record<string, readonly Capability[]> = {
   FX_PSCRIPT: ['create', 'stepInFull', 'stepInPartial'],
-  FX_TRF: ['create', 'stepInFull', 'stepInPartial', 'sell'],
+  FX_TRF: ['create', 'stepInFull', 'stepInPartial'],
   FX_PSCRIPT_FSKO: ['create', 'stepInFull', 'stepInPartial'],
 };
 

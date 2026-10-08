@@ -66,7 +66,7 @@ npm run replay                         # replay with the runner, exactly what th
 1. Copy the product `.dat` files into `data/` (`FX_PSCRIPT.dat`, `FX_TRF.dat`, `FX_PSCRIPT_FSKO.dat`); a case whose product has no file is skipped.
 2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
-To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`, `sell`) and put its `.dat` file in `data/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
+To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`) and put its `.dat` file in `data/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
 
 ## QA: test data
 
