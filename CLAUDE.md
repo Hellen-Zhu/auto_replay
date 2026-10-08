@@ -28,13 +28,15 @@
 ## 3. Architecture
 
 ```
-QA:  tests/*.spec.ts ──acts through ui.xxx──► framework/ui.ts (execute + record)
-                                                 │ calls
-                                                 ▼
-                                           core/actions.js  ◄── shared execution core
-                                                 ▲
-PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by step┘
+QA:  tests/*.spec.ts ─► framework/flows.ts ─► framework/pages/*.ts ──ui.xxx──► framework/ui.ts (execute + record)
+     (scenario)         (reusable BDD steps)   (page objects: locators + actions)   │ calls
+                                                                                    ▼
+                                                                              core/actions.js  ◄── shared execution core
+                                                                                    ▲
+PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by step──────┘
 ```
+
+- Page Object Model (QA side only; the case format and the runner know nothing about it): a page object (`framework/pages`, base class `BasePage`) owns the locators of one page or shared component as `protected readonly` fields and exposes user-level actions and checks built on `this.ui.xxx`. `App` (`pages/index.ts`) holds one instance of each and is injected as the `app` fixture. Flows and tests call page object methods and add the Given / When / Then grouping; they hold no locators. The refactoring was verified by exporting all ten cases on the mock before and after: the steps are identical.
 
 - After a test **passes**, `framework/fixtures.ts` exports `cases/<caseId>.json` automatically.
 - The runner lists the cases under `cases/`; the PO types a number (plain Enter = the first one) or drags a json onto the bat.
@@ -50,10 +52,10 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 |---|---|
 | `core/actions.js` | Execution core: `resolveTarget`, `resolveValue` (placeholders), `executeStep`, `describeStep`. **Keep it CommonJS and dependent only on `@playwright/test`** (it is bundled into the runner) |
 | `core/config.js` | Reads `config.local.json` (overridable with `OREO_UAT_CONFIG` / `OREO_BASE_URL`), `launchOptions`, `secretEntries` |
-| `framework/targets.ts` | Page element locator table `T` |
-| `framework/ui.ts` | `UI` class: `goto / fill / click / press / read / expectVisible / expectText / expectUrl / step / Given / When / Then / And / But`; automatic variables, password safety net, `exportCase` |
-| `framework/fixtures.ts` | Injects `ui`, exports after the test passes; `@case:xxx` in the title sets the file name |
-| `framework/flows.ts` | Reusable flows: `login(ui, role)`, `createTrade(ui, product, kind)`; `LOGIN_PATH = '/'`; `CREATE_TRADE_API`, `PENDING_APPROVAL_TEXT = 'PARV'` (both confirmed on the real system) |
+| `framework/pages/` | Page objects: `base.page.ts` (`BasePage`: `pick` for comboboxes, `dropdownItem`), `login.page.ts` (`LoginPage.path = '/'`), `top-bar.ts` (shared component), `trades.page.ts`, `new-trade.page.ts` (`NewTradePage.createApi`), `trade-detail.page.ts` (`TradeDetailPage.status.pendingApproval = 'PARV'`), `index.ts` (`App`). The create API and `PARV` are confirmed on the real system |
+| `framework/ui.ts` | `Target` type; `UI` class: `goto / fill / click / press / read / expectVisible / expectText / expectUrl / step / Given / When / Then / And / But`; automatic variables, password safety net, `exportCase` |
+| `framework/fixtures.ts` | Injects `ui` and `app`, exports after the test passes; `@case:xxx` in the title sets the file name |
+| `framework/flows.ts` | Reusable flows composed from page objects: `login(app, role)`, `createTrade(app, product, kind)`; `datFile(product)` |
 | `tests/login.spec.ts` | Login example case |
 | `tests/trade-creation.spec.ts` | Trade creation: loops `PRODUCTS` x {normal, StepIn full, StepIn partial}, mirroring `trade_creation.feature` of the Java + Cucumber E2E project; skips a product whose `.dat` is missing |
 | `data/` | Files the cases upload (`<PRODUCT>.dat`, copied by the user from the E2E project); packaged for the PO. Only `data/README.md` is in the repo so far |
@@ -96,7 +98,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 - Known testids:
   - Login: `login-dialog`, `login-email-input`, `login-password-input`, `login-sign-in-to-portal-btn`
   - Top bar: `layout-new-trade-btn`, `layout-ai-reader-btn`, `layout-theme-toggle-btn`, `layout-user-menu-btn` (contains `<span>maker</span>`), `layout-topnav-c…` (truncated in the screenshot)
-- New Trade: all testids in `framework/targets.ts` (`newTrade`, `tradeDetail`) were supplied by the user from the E2E project's element JSON. The create-trade request is `POST .../api/v1/trades/create?tradeAction=SUBMIT` (multipart, on a different origin than the page), answered with `{ code, status: 'PENDING APPROVAL', data: { trade: { id } } }`. The detail header shows the status as the badge `PARV`. Comboboxes: fill the inner input, then click the dropdown entry, which is not a native option but `<sl-menu-item role="menuitem">` with the typed text highlighted in `<b>` (`dropdownItem` in `flows.ts` = `{ role: 'menuitem', name, exact: true }`). The confirmation dialog is an `sc-modal` whose host is 0 x 0 (the panel is in its shadow root), so `expectVisible` on the host fails; assert the slotted header instead (`inner: '[slot="header"]'`; `h2` resolves to two elements). `upload` accepts either the file input or a zone wrapping it. The New Trade page path is `/trade/new`. Test data lives in `tradeData.*` of `config.local.json`; the product type is typed as the Product ID.
+- New Trade: all testids in `framework/pages/new-trade.page.ts` and `trade-detail.page.ts` were supplied by the user from the E2E project's element JSON. The create-trade request is `POST .../api/v1/trades/create?tradeAction=SUBMIT` (multipart, on a different origin than the page), answered with `{ code, status: 'PENDING APPROVAL', data: { trade: { id } } }`. The detail header shows the status as the badge `PARV`. Comboboxes: fill the inner input, then click the dropdown entry, which is not a native option but `<sl-menu-item role="menuitem">` with the typed text highlighted in `<b>` (`dropdownItem` in `BasePage` = `{ role: 'menuitem', name, exact: true }`). The confirmation dialog is an `sc-modal` whose host is 0 x 0 (the panel is in its shadow root), so `expectVisible` on the host fails; assert the slotted header instead (`inner: '[slot="header"]'`; `h2` resolves to two elements). `upload` accepts either the file input or a zone wrapping it. The New Trade page path is `/trade/new`. Test data lives in `tradeData.*` of `config.local.json`; the product type is typed as the Product ID.
 - Trades page path is `/trades`; the page has blotters such as Validation Blotter / Pending Approval / Expires Today, and a search box "Search by Trade ID..." (testid unknown).
 - Example test account: `maker@test.com` (display name `maker`). **The login page path is unconfirmed**; `/` is currently assumed.
 
@@ -131,7 +133,7 @@ npx tsc -p .                      # type check
 
 ## 10. Suggested next steps
 
-1. **Connect to the real system**: confirm the login page path (change `LOGIN_PATH` in `flows.ts`) and get `login.spec.ts` passing against the real `baseUrl`.
+1. **Connect to the real system**: confirm the login page path (change `LoginPage.path`) and get `login.spec.ts` passing against the real `baseUrl`.
 2. **Trade creation on the real system**: confirm what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; extend `PRODUCTS` to all 18 products.
 3. **Approval case**: maker books a TARF through New Trade → `read` the trade ID → checker logs in → finds the trade in Pending Approval and approves it → verify the status. This validates automatic trade-ID variables. Needs the testids of the booking form, search box, approve button and status field.
 4. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).
@@ -140,8 +142,9 @@ npx tsc -p .                      # type check
 ## 11. Coding conventions
 
 - Reports read as BDD without any BDD framework (playwright-bdd / Cucumber were rejected by the user): the test title is the Scenario, and steps are grouped with `ui.Given / When / Then / And / But(text, fn)` (capitalized, since a lowercase `then` would make `UI` a thenable). `login(ui, role, keyword)` defaults to `Given`. The runner emphasizes the keyword in the report.
-- Every page action must go through `ui.xxx`; do not use `page` directly, or it will not be recorded.
-- Add new elements to `framework/targets.ts` first, preferring `data-testid`; when a testid is missing, ask the developers to add one rather than writing brittle CSS/XPath.
+- Page Object Model: locators live only in page objects; tests and flows call page object methods (one user-level action or check each) and never `ui.click / ui.fill` with a locator. Page objects contain no Given / When / Then. A new page gets its own class extending `BasePage` and is registered in `App`.
+- Every page action must go through `ui.xxx` (inside a page object: `this.ui.xxx`); do not use `page` directly, or it will not be recorded.
+- Add new elements to the page object that owns them, preferring `data-testid`; when a testid is missing, ask the developers to add one rather than writing brittle CSS/XPath.
 - Accounts and passwords always use `cfg('accounts.<role>.password')`; never put a real server address, IP or password into any committed file.
 - Everything in the repo is written in English: code, comments, console and report text, test titles, step titles, docs.
 - Language for talking with the user: Chinese.

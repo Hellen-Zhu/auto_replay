@@ -5,12 +5,29 @@ import { Page, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import type { Target } from './targets';
 // Shares the same execution core as the runner
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const core = require('../core/actions');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { secretEntries } = require('../core/config');
+
+/**
+ * How an element is found. data-testid is preferred. OREO inputs are web components (sc-text-input) whose real
+ * <input> sits in the shadow DOM, so inner: 'input' locates one level further inside the host element.
+ * Targets are declared in the page object that owns the element (framework/pages), not in tests.
+ */
+export type Target = {
+  testId?: string;
+  role?: string;
+  name?: string;
+  label?: string;
+  placeholder?: string;
+  text?: string;
+  css?: string;
+  inner?: string;
+  nth?: number;
+  exact?: boolean;
+};
 
 /** A value is either a plain string or a reference to local config: cfg('accounts.maker.email') */
 export type Val = string | { cfg: string };

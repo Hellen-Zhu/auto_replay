@@ -1,8 +1,9 @@
-// Auto fixture: injects ui into every test and exports the case file to cases/ once the test passes
+// Auto fixtures: inject ui (actions + recording) and app (the page objects) into every test, and export the case file to cases/ once the test passes
 
 import { test as base, expect } from '@playwright/test';
 import path from 'path';
 import { UI } from './ui';
+import { App } from './pages';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { loadConfig } = require('../core/config');
 
@@ -16,7 +17,7 @@ function caseIdOf(title: string): string {
   return title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 80);
 }
 
-export const test = base.extend<{ ui: UI }>({
+export const test = base.extend<{ ui: UI; app: App }>({
   ui: async ({ page }, use, testInfo) => {
     const ui = new UI(page, loadConfig(ROOT), ROOT);
     await use(ui);
@@ -34,6 +35,11 @@ export const test = base.extend<{ ui: UI }>({
       testInfo.annotations.push({ type: 'exported-case', description: path.relative(ROOT, file) });
       console.log(`  ✔ Exported case: ${path.relative(ROOT, file)}`);
     }
+  },
+
+  // Page objects, all acting through the same ui
+  app: async ({ ui }, use) => {
+    await use(new App(ui));
   },
 });
 

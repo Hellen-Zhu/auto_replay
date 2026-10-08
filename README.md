@@ -16,10 +16,10 @@ A case file contains **no server address and no password**, only relative paths 
 |---|---|
 | `core/actions.js` | Execution core. QA runs and PO replays go through the same code |
 | `core/config.js` | Reads `config.local.json` |
-| `framework/targets.ts` | Page element locators, `data-testid` throughout |
+| `framework/pages/` | Page objects: one class per page or shared component, holding its locators (`data-testid` throughout) and what a user can do and check there |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values and passwords automatically |
-| `framework/fixtures.ts` | Exports to `cases/` automatically after a test passes |
-| `framework/flows.ts` | Reusable flows (`login`, `createTrade`) |
+| `framework/fixtures.ts` | Provides `ui` and `app` (all page objects) to every test; exports to `cases/` automatically after a test passes |
+| `framework/flows.ts` | Reusable business flows (`login`, `createTrade`): Given / When / Then steps composed from page objects |
 | `tests/` | Test cases: `login.spec.ts`, `trade-creation.spec.ts` (products x normal / StepIn full / StepIn partial) |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
@@ -57,31 +57,61 @@ To add a product, add it to `PRODUCTS` in the spec and put its `.dat` file in `d
 
 ## QA: writing a new case
 
+The framework follows the Page Object Model, in three layers:
+
+| Layer | Where | Contains |
+|---|---|---|
+| Test | `tests/*.spec.ts` | The scenario: which steps, in which order, with which data. No locators |
+| Flow (optional) | `framework/flows.ts` | A sequence of steps reused by several tests (`login`, `createTrade`) |
+| Page object | `framework/pages/*.ts` | The locators of one page and its actions / checks, built on `ui.xxx` |
+
+**1. Describe the page** (once per page). Locators stay inside the class; tests only see its methods:
+
 ```ts
-test('Book a TARF @case:tarf_book', async ({ ui }) => {
-  let tradeId = '';
-  await login(ui, 'maker');                                   // Given I log in as maker
-  await ui.When('I book a TARF', async () => {
-    await ui.click(T.layout.newTradeBtn);
-    await ui.fill({ testId: 'trade-ccy-pair-input', inner: 'input' }, 'USDCNH');
-    await ui.click({ testId: 'trade-submit-btn' });
-    tradeId = await ui.read({ testId: 'trade-id' }, 'tradeId');   // read the trade ID
+// framework/pages/trades.page.ts
+export class TradesPage extends BasePage {
+  static readonly path = '/trades';
+  protected readonly searchBox: Target = { testId: 'trades-search-input', inner: 'input' };
+  protected readonly firstRowId: Target = { testId: 'trades-row-trade-id', nth: 0 };
+
+  async search(tradeId: Val) {
+    await this.ui.fill(this.searchBox, tradeId);
+    await this.ui.press(this.searchBox, 'Enter');
+  }
+  async expectFirstRow(tradeId: Val) {
+    await this.ui.expectText(this.firstRowId, tradeId);
+  }
+}
+```
+
+A new page object is registered in `framework/pages/index.ts` (`App`), which makes it available as `app.<name>`.
+
+**2. Write the test** with the `app` fixture (page objects) and `ui` (the Given / When / Then grouping):
+
+```ts
+test('Checker finds a new trade @case:trade_search', async ({ ui, app }) => {
+  await login(app, 'maker');                                  // Given I log in as maker
+  const tradeId = await createTrade(app, 'FX_TRF');           // When ... Then ... (reads the new trade ID)
+  await login(app, 'checker', 'And');                         // And I log in as checker
+  await ui.When('I search for the trade', async () => {
+    await app.trades.search(tradeId);                         // becomes ${var:createdTradeId} automatically
   });
-  await login(ui, 'checker', 'And');                          // And I log in as checker
-  await ui.Then('the trade can be found by its ID', async () => {
-    await ui.fill({ testId: 'trades-search-input', inner: 'input' }, tradeId); // becomes ${var:tradeId} automatically
+  await ui.Then('the trade is listed first', async () => {
+    await app.trades.expectFirstRow(tradeId);
   });
 });
 ```
 
 Key points:
 
-- Every page action goes through `ui.xxx`. Do not call `page` directly, or the action will not be recorded.
+- Tests and flows contain no locators and no `ui.click / ui.fill`: they call page object methods. A page object method is one thing a user does or checks on that page (`selectBasicInfo`, `bookAndConfirm`, `expectStatus`), not one click.
+- Page objects do not contain Given / When / Then; those belong to the test or the flow, so the same page method can serve different scenarios.
+- Inside a page object every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
 - `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
 - OREO inputs are web components and the real `<input>` sits in the shadow DOM, so input targets need `inner: 'input'`; buttons can be clicked on the host element directly.
-- `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
+- In a page object, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
 - Text fields of a target can reference config too: `{ role: 'option', name: cfg('tradeData.direction') }`.
 - Only **passing** cases are exported.
 
@@ -131,5 +161,5 @@ Notes:
 - To open Full replay in Playwright's official viewer instead of the bundled one, set `"evidence": { "traceViewer": "official" }` in `config.local.json`; the link then points to `https://trace.playwright.dev/?trace=...`. That site does not store traces: it runs in the browser and reads `trace.zip` from this computer, so the link still works only here and while the runner window is open, and it needs internet access to `trace.playwright.dev`.
 - The PO's computer needs Edge (default) or Chrome (set `browser.channel` to `"chrome"`).
 - The company must allow running `node.exe` and `.bat` from a shared drive or an unzipped folder; test on one PO machine first.
-- `LOGIN_PATH` defaults to `/`; if the real login page is elsewhere, change `framework/flows.ts`.
+- The login page path defaults to `/`; if the real login page is elsewhere, change `LoginPage.path` in `framework/pages/login.page.ts`.
 - A replay really operates in UAT (real bookings, real approvals); make sure the environment can take repeated runs.
