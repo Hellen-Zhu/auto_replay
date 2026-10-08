@@ -39,6 +39,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 - After a test **passes**, `framework/fixtures.ts` exports `cases/<caseId>.json` automatically.
 - The runner lists the cases under `cases/`; the PO types a number (plain Enter = the first one) or drags a json onto the bat.
 - When settings are already provided, the runner shows them and lets the PO type `C` to change `baseUrl` and the non-secret account fields for that run only; changing the address or an account clears the matching saved password so it is asked for again. Afterwards the runner offers to save the typed-in address and account to `config.local.json` (default No); it never writes a password, only blanks one that no longer matches.
+- Pausing is a runner-only feature (the case format has no pause action): before the run the PO can type `S` for step-by-step mode (stops before each titled group), and on a real console pressing `P` pauses after the current step; Enter resumes. Pauses only happen between steps, are recorded per step (`pausedSec`) and excluded from the reported duration. That prompt defaults to a normal run when input has ended, so older piped inputs keep working.
 - Every replay produces `evidence/<caseId>_<timestamp>/`: `report.html` (per-step result + screenshot), `result.json`, `step-XX.png`, `trace.zip`.
 
 ## 4. Layout and responsibilities
@@ -112,6 +113,7 @@ npx tsc -p .                      # type check
 ## 9. Pitfalls already fixed (do not regress)
 
 - The runner reads input through a line queue from `rl[Symbol.asyncIterator]()`; consecutive `rl.question` calls drop lines under piped input and exit silently.
+- While a case runs on a console, key echo is muted and lines typed during the run are discarded before the next prompt (`discardTyped`), so a stray Enter cannot skip a pause. This is skipped for piped input, where every buffered line is an intended answer.
 - When video initialization fails, **close the whole browser and launch again**; closing only the context makes the later `newPage` fail.
 - The "no browser found" hint is shown only when `browserType.launch` fails; otherwise it is a false alarm.
 - `${var:...}` inside a target must also be resolved in `executeStep` (needed to locate a trade that was just booked).

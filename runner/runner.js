@@ -19,21 +19,43 @@ const EVIDENCE_DIR = path.join(ROOT, 'evidence');
 // ---------------- Command-line interaction ----------------
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 let muted = false;
+// While the case is running on a real console, typed keys are not echoed (they would garble the step log)
+let quietKeys = false;
 rl._writeToOutput = (s) => { if (!muted) rl.output.write(s); };
+const interactive = !!process.stdin.isTTY;
 
 // Read line by line through the async iterator: input is buffered, so no line is lost to prompt timing
 const lines = rl[Symbol.asyncIterator]();
-async function readLine(q, hidden) {
+let typedLines = 0, readLines = 0;
+rl.on('line', () => { typedLines++; });
+async function readLine(q, hidden, optional) {
   rl.output.write(q);
   muted = hidden;
   const { value, done } = await lines.next();
-  muted = false;
+  readLines++;
+  muted = quietKeys;
   if (hidden) rl.output.write('\n');
-  if (done) throw new Error('Input ended before the required information was provided');
+  if (done) {
+    if (optional) { rl.output.write('\n'); return ''; }
+    throw new Error('Input ended before the required information was provided');
+  }
   return value;
 }
 const ask = async (q) => (await readLine(q, false)).trim();
 const askHidden = (q) => readLine(q, true);
+// For prompts that have a default: when the input has ended (piped input, closed window) the default is used
+const askOptional = async (q) => (await readLine(q, false, true)).trim();
+
+// Throw away whatever was typed while the case was running, so that a stray Enter cannot answer the next prompt.
+// Only on a real console: piped input is buffered up front and every line of it is an intended answer.
+async function discardTyped() {
+  if (!interactive) return;
+  while (readLines < typedLines) { await lines.next(); readLines++; }
+  rl.line = '';
+  rl.cursor = 0;
+}
+function setQuietKeys(on) { quietKeys = interactive && on; muted = quietKeys; }
+const fmtSec = (sec) => (sec >= 60 ? `${Math.floor(sec / 60)}m ${sec % 60}s` : `${sec}s`);
 
 // ---------------- Case selection ----------------
 function listCases() {
@@ -86,7 +108,7 @@ function writeReport(dir, run) {
     <tr class="${s.status}">
       <td>${i + 1}</td>
       <td>${bdd(s.title || '')}</td>
-      <td>${esc(s.desc)}${s.error ? `<pre>${esc(s.error)}</pre>` : ''}</td>
+      <td>${esc(s.desc)}${s.error ? `<pre>${esc(s.error)}</pre>` : ''}${s.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(s.pausedSec)} after this step</div>` : ''}</td>
       <td>${s.status === 'passed' ? 'Passed' : s.status === 'failed' ? 'Failed' : 'Not run'}</td>
       <td>${s.screenshot ? `<a href="${esc(s.screenshot)}" target="_blank"><img src="${esc(s.screenshot)}"></a>` : ''}</td>
     </tr>`).join('');
@@ -102,11 +124,12 @@ function writeReport(dir, run) {
   tr.failed td{background:#fef2f2} tr.skipped td{color:#9ca3af}
   img{max-width:240px;border:1px solid #e5e7eb;border-radius:4px}
   pre{white-space:pre-wrap;color:#b91c1c;font-size:12px;margin:6px 0 0}
+  .paused{color:#b45309;font-size:12px;margin-top:6px}
   video{max-width:100%;margin-top:16px;border:1px solid #e5e7eb}
 </style></head><body>
 <h1><span class="kw">Scenario:</span> ${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
 ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
-<div class="meta">Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${run.durationSec}s · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
+<div class="meta">Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
 <table><thead><tr><th>#</th><th>Step</th><th>Action</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
 <p class="meta">Full replay: trace.zip (QA can open it with npx playwright show-trace to inspect step by step)</p>
@@ -214,10 +237,16 @@ async function runCase({ file, doc }, config) {
     }
   }
 
-  console.log(`\n▶ Scenario: ${doc.name}\n  Evidence folder: ${dir}\n`);
+  // Step-by-step mode stops after each titled group (Given / When / Then ...), so the PO can look at the page
+  const stepByStep = /^s/i.test(await askOptional('\nPress Enter to run, or type S to run step by step (pause after each Given / When / Then): '));
+
+  console.log(`\n▶ Scenario: ${doc.name}\n  Evidence folder: ${dir}`);
+  if (stepByStep) console.log('  Mode: step by step');
+  if (interactive) console.log('  Tip: press P in this window at any time to pause after the current step.');
+  console.log('');
   const run = {
     caseName: doc.name, description: doc.description, caseFile: path.basename(file), source: doc.source, codeVersion: doc.codeVersion,
-    machine: require('os').hostname(), startedAt: new Date().toLocaleString(), status: 'passed', steps: [],
+    machine: require('os').hostname(), startedAt: new Date().toLocaleString(), status: 'passed', stepByStep, pausedSec: 0, steps: [],
   };
   const t0 = Date.now();
 
@@ -243,6 +272,34 @@ async function runCase({ file, doc }, config) {
   }
   await context.tracing.start({ screenshots: true, snapshots: true });
   const ctx = { config, vars: {}, askConfig };
+
+  // Pausing only ever happens between steps, never in the middle of an action.
+  // P is picked up as a single key press (console only); the run stops once the current step has finished.
+  let pauseRequested = false, pausing = false;
+  const onKey = (s, key) => {
+    if (pausing || pauseRequested || !key || key.ctrl || key.meta || key.name !== 'p') return;
+    pauseRequested = true;
+    console.log('\n    (Pause requested: the run will stop after the current step)');
+  };
+  if (interactive) process.stdin.on('keypress', onKey);
+  setQuietKeys(true);
+  let pausedMs = 0;
+  const pause = async (rec, n) => {
+    pausing = true;
+    await discardTyped();
+    setQuietKeys(false);
+    console.log(`\n  ⏸ Paused after step ${n}/${doc.steps.length}. The browser stays open so you can look at the page.`);
+    console.log('    Note: operating the page by hand, or waiting until the session expires, may make the remaining steps fail.');
+    const t = Date.now();
+    await askOptional('    Press Enter to continue: ');
+    const ms = Date.now() - t;
+    pausedMs += ms;
+    rec.pausedSec = Math.round(ms / 1000);
+    console.log('');
+    setQuietKeys(true);
+    pauseRequested = false;
+    pausing = false;
+  };
 
   let failed = false;
   for (let i = 0; i < doc.steps.length; i++) {
@@ -272,7 +329,12 @@ async function runCase({ file, doc }, config) {
       await page.screenshot({ path: path.join(dir, shot) });
       rec.screenshot = shot;
     } catch { /* ignore cases such as the page already being closed */ }
+
+    const next = doc.steps[i + 1];
+    if (!failed && next && (pauseRequested || (stepByStep && next.title))) await pause(rec, i + 1);
   }
+  if (interactive) process.stdin.off('keypress', onKey);
+  setQuietKeys(false);
 
   await context.tracing.stop({ path: path.join(dir, 'trace.zip') });
   const video = page.video();
@@ -286,7 +348,9 @@ async function runCase({ file, doc }, config) {
       run.video = 'video.webm';
     } catch { /* ignore */ }
   }
-  run.durationSec = Math.round((Date.now() - t0) / 1000);
+  // Time spent paused is reported separately, so the duration reflects the run itself
+  run.pausedSec = Math.round(pausedMs / 1000);
+  run.durationSec = Math.round((Date.now() - t0 - pausedMs) / 1000);
   writeReport(dir, run);
 
   console.log(run.status === 'passed' ? '\n✅ Run passed' : '\n❌ Run failed');
