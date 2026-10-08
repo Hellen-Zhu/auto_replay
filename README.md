@@ -24,6 +24,7 @@ A case file contains **no server address and no password**, only relative paths 
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
 | `portable/run-case.bat` | The launcher the PO double-clicks |
+| `portable/record-session.bat` | Records a manual session (no case): the PO works by hand with the trace on, e.g. to report a bug |
 | `portable/view-trace.bat` | Opens the list of earlier runs with their report and trace viewer links |
 | `scripts/build-portable.js` | Builds the portable runner |
 | `mock-oreo/` | Mock OREO pages, for local demos only |
@@ -105,6 +106,23 @@ This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, onl
 7. The console and the bottom of the report give two links: **Report** (the report as a URL) and **Full replay** (Playwright's trace viewer for this run: every action with before / after snapshots, console and network). They are `http://127.0.0.1:9400/...` addresses served by the runner itself, so they work only on this computer and only while the runner window stays open (press Enter in it to close).
 8. To open an earlier run later, double-click **view-trace.bat**: it opens a page listing every run with its Report and Full replay links.
 9. If something goes wrong, send the matching folder under `evidence/` to QA; they can drop it into their own `evidence/` folder and open it the same way.
+
+## PO: recording a bug by hand
+
+When something goes wrong outside a case, the PO can record what they do instead of describing it:
+
+1. Double-click **record-session.bat** and optionally type one line about the problem.
+2. Edge opens on the system address. Log in and work as usual; the console lists each click and each value entered as it is recorded.
+3. When done, press Enter in the console window (or close the browser window).
+4. A report opens: the actions done by hand, each with the time, page and a screenshot, plus the **Full replay** link (trace viewer: page snapshots, console and network of the whole session).
+5. Send the `evidence/recording_<time>/` folder to QA.
+
+Notes:
+
+- Password fields are shown as `******` in the report, but `trace.zip` records the page and network traffic as they are, **including the password that was typed**. Share the folder only inside the team, never on a public site.
+- Clicks, values entered and the Enter key are listed; scrolling, hovering and drag and drop are not, although they are still visible in the trace's screen recording.
+- A recording is evidence, not a case: it cannot be replayed by the runner. QA turns it into a case when it is worth repeating.
+- QA can do the same locally with `npm run record`.
 
 ## Known limitations
 

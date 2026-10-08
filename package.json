@@ -6,6 +6,7 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "replay": "node runner/runner.js",
+    "record": "node runner/runner.js --record",
     "build:portable": "node scripts/build-portable.js",
     "mock": "node mock-oreo/server.js"
   },

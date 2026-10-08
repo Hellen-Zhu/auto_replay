@@ -10,7 +10,7 @@
 //
 // Output layout:
 //   UAT-Runner/
-//     run-case.bat   view-trace.bat   node/node.exe   runner/   core/   cases/   data/   node_modules/
+//     run-case.bat   record-session.bat   view-trace.bat   node/node.exe   runner/   core/   cases/   data/   node_modules/
 //     config.local.json (or config.local.example.json)
 
 const fs = require('fs');
