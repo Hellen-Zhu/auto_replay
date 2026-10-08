@@ -1,18 +1,18 @@
-// 操作封装层：每个动作 = 真实执行 + 记录成可回放的步骤。
-// test 通过后由 fixture 调用 exportCase() 导出用例文件给 PO 回放。
+// Action wrapper: every action = real execution + recording as a replayable step.
+// After the test passes, the fixture calls exportCase() to export the case file for the PO to replay.
 
 import { Page, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import type { Target } from './targets';
-// 与运行器共用同一套执行核心
+// Shares the same execution core as the runner
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const core = require('../core/actions');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { secretEntries } = require('../core/config');
 
-/** 值可以是普通字符串，也可以引用本地配置：cfg('accounts.maker.email') */
+/** A value is either a plain string or a reference to local config: cfg('accounts.maker.email') */
 export type Val = string | { cfg: string };
 export const cfg = (p: string): Val => ({ cfg: p });
 
@@ -33,7 +33,7 @@ export class UI {
 
   constructor(readonly page: Page, readonly config: any) {}
 
-  // ---------- 业务步骤分组 ----------
+  // ---------- Business step grouping ----------
   async step<R>(title: string, fn: () => Promise<R>): Promise<R> {
     return test.step(title, async () => {
       this.pendingTitle = title;
@@ -45,7 +45,7 @@ export class UI {
     });
   }
 
-  // ---------- 动作 ----------
+  // ---------- Actions ----------
   goto(urlPath: string) {
     return this.run({ action: 'goto', value: urlPath });
   }
@@ -58,7 +58,7 @@ export class UI {
   press(target: Target, key: string) {
     return this.run({ action: 'press', target, value: key });
   }
-  /** 读取页面上的动态值（如交易号），后续步骤里出现这个值会自动替换成变量 */
+  /** Read a dynamic value from the page (e.g. a trade ID); later steps that use the value get it replaced with a variable automatically */
   async read(target: Target, saveAs: string): Promise<string> {
     return this.run({ action: 'read', target, saveAs });
   }
@@ -72,16 +72,16 @@ export class UI {
     return this.run({ action: 'expectUrl', value: urlPath });
   }
 
-  // ---------- 内部 ----------
+  // ---------- Internals ----------
   private toPlaceholder(v: Val): string {
     return typeof v === 'string' ? v : '${cfg:' + v.cfg + '}';
   }
 
   private async run(step: Step): Promise<any> {
-    // 动态值变量化：比如前面读到交易号 TRD-123，这里用到 TRD-123 就改写成 ${var:tradeId}
+    // Turn dynamic values into variables: if trade ID TRD-123 was read earlier, a later TRD-123 is rewritten to ${var:tradeId}
     const recorded: Step = this.variabilize(this.stripSecrets(step));
     const title = this.pendingTitle;
-    this.pendingTitle = undefined; // 标题只挂在该分组的第一个动作上
+    this.pendingTitle = undefined; // the title is attached only to the first action of the group
     const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars });
     this.steps.push(title ? { title, ...recorded } : recorded);
     return result;
@@ -99,7 +99,7 @@ export class UI {
     return { ...step, value: swap(step.value), target: target as Target };
   }
 
-  /** 防呆：如果有人把密码明文写进了测试代码，记录时自动替换成配置引用 */
+  /** Safety net: if someone hard-codes a password in test code, it is replaced with a config reference when recorded */
   private stripSecrets(step: Step): Step {
     if (typeof step.value !== 'string') return step;
     let value = step.value;
@@ -137,7 +137,7 @@ function gitVersion(): string {
   }
 }
 
-/** 列出用例需要的本地配置项，运行器据此提示 PO 补齐 */
+/** List the local config entries a case needs; the runner uses this to prompt the PO for missing ones */
 function requiredConfig(steps: Step[]): string[] {
   const set = new Set<string>();
   for (const s of steps) {

@@ -1,14 +1,14 @@
-// 可复用的业务流程
+// Reusable business flows
 
 import { UI, cfg } from './ui';
 import { T } from './targets';
 
-/** 登录页路径（相对 baseUrl）。如果真实系统的登录页不是根路径，改这里即可 */
+/** Login page path (relative to baseUrl). Change it here if the real system's login page is not at the root */
 export const LOGIN_PATH = '/';
 
-/** 以某个角色登录，账号密码来自本地 config.local.json 的 accounts.<role> */
+/** Log in as a role; the account and password come from accounts.<role> in the local config.local.json */
 export async function login(ui: UI, role: string) {
-  await ui.step(`以 ${role} 身份登录`, async () => {
+  await ui.step(`Log in as ${role}`, async () => {
     await ui.goto(LOGIN_PATH);
     await ui.expectVisible(T.login.dialog);
     await ui.fill(T.login.email, cfg(`accounts.${role}.email`));

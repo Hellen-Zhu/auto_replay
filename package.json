@@ -1,7 +1,7 @@
 {
   "name": "oreo-uat-replay",
   "version": "1.0.0",
-  "description": "OREO UAT：本地跑 case 自动导出用例文件，PO 用绿色版运行器回放",
+  "description": "OREO UAT: run cases locally to export case files automatically; the PO replays them with the portable runner",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",

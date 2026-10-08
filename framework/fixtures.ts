@@ -1,4 +1,4 @@
-// 自动 fixture：给每个 test 注入 ui，test 通过后自动导出用例文件到 cases/
+// Auto fixture: injects ui into every test and exports the case file to cases/ once the test passes
 
 import { test as base, expect } from '@playwright/test';
 import path from 'path';
@@ -9,7 +9,7 @@ const { loadConfig } = require('../core/config');
 const ROOT = path.resolve(__dirname, '..');
 const CASES_DIR = process.env.OREO_CASES_DIR || path.join(ROOT, 'cases');
 
-/** 用例 ID：写在标题里的 @case:xxx 标签，用作导出文件名；没写就用标题 */
+/** Case ID: the @case:xxx tag in the title, used as the export file name; falls back to the title */
 function caseIdOf(title: string): string {
   const m = title.match(/@case:([\w-]+)/);
   if (m) return m[1];
@@ -21,7 +21,7 @@ export const test = base.extend<{ ui: UI }>({
     const ui = new UI(page, loadConfig(ROOT));
     await use(ui);
 
-    // 只有通过的 case 才导出，避免把跑了一半的流程交给 PO
+    // Export only passing cases, so a half-finished flow never reaches the PO
     if (testInfo.status === 'passed') {
       const id = caseIdOf(testInfo.title);
       const name = testInfo.title.replace(/@case:[\w-]+/, '').trim();
@@ -32,7 +32,7 @@ export const test = base.extend<{ ui: UI }>({
         source: `${path.relative(ROOT, testInfo.file).replace(/\\/g, '/')} › ${testInfo.title}`,
       });
       testInfo.annotations.push({ type: 'exported-case', description: path.relative(ROOT, file) });
-      console.log(`  ✔ 已导出用例：${path.relative(ROOT, file)}`);
+      console.log(`  ✔ Exported case: ${path.relative(ROOT, file)}`);
     }
   },
 });

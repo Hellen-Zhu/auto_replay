@@ -1,16 +1,16 @@
-// 共享执行核心：QA 本地跑 case 和 PO 回放用例文件，走的都是这里的同一套逻辑，
-// 保证"录的时候怎么执行，回放时就怎么执行"。
-// 注意：本文件保持 CommonJS，并且只依赖 @playwright/test，便于打包进绿色版运行器。
+// Shared execution core: QA running a case locally and the PO replaying a case file both go through
+// this same logic, so that "what ran when it was recorded is exactly what runs on replay".
+// Note: keep this file CommonJS and dependent only on @playwright/test, so it can be bundled into the portable runner.
 
 const { expect } = require('@playwright/test');
 
 /**
- * 把 JSON 里的 target 描述转成 Playwright Locator。
- * 支持字段（按优先级）：testId / role(+name) / label / placeholder / text / css
- * 附加字段：inner（在宿主元素内再找，如 web component 的 shadow DOM 里的 input）、nth
+ * Turn a target description from the JSON into a Playwright Locator.
+ * Supported fields (in priority order): testId / role(+name) / label / placeholder / text / css
+ * Extra fields: inner (locate again inside the host element, e.g. the input in a web component's shadow DOM), nth
  */
 function resolveTarget(page, target) {
-  if (!target) throw new Error('步骤缺少 target');
+  if (!target) throw new Error('Step is missing a target');
   let loc;
   if (target.testId) loc = page.getByTestId(target.testId);
   else if (target.role) loc = page.getByRole(target.role, target.name ? { name: target.name, exact: !!target.exact } : {});
@@ -18,9 +18,9 @@ function resolveTarget(page, target) {
   else if (target.placeholder) loc = page.getByPlaceholder(target.placeholder, { exact: !!target.exact });
   else if (target.text) loc = page.getByText(target.text, { exact: !!target.exact });
   else if (target.css) loc = page.locator(target.css);
-  else throw new Error('无法识别的 target：' + JSON.stringify(target));
+  else throw new Error('Unrecognized target: ' + JSON.stringify(target));
 
-  // CSS 定位会自动穿透 open shadow root，所以 inner: 'input' 能找到 sc-text-input 里的原生 input
+  // CSS locators pierce open shadow roots automatically, so inner: 'input' finds the native input inside sc-text-input
   if (target.inner) loc = loc.locator(target.inner);
   if (target.nth !== undefined && target.nth !== null) loc = loc.nth(target.nth);
   return loc;
@@ -39,7 +39,7 @@ function describeTarget(target) {
   return base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : '');
 }
 
-/** 取对象的点路径值：get({a:{b:1}}, 'a.b') => 1 */
+/** Read a dotted path from an object: get({a:{b:1}}, 'a.b') => 1 */
 function getPath(obj, path) {
   return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
@@ -47,10 +47,10 @@ function getPath(obj, path) {
 const PLACEHOLDER = /\$\{(var|cfg):([^}]+)\}/g;
 
 /**
- * 解析值里的占位符：
- *   ${var:tradeId}                  运行时读取到的动态值（如交易号）
- *   ${cfg:accounts.maker.password}  本地配置里的值（账号、密码等，不进入用例文件）
- * ctx.askConfig(path) 可选：配置里缺值时询问用户（运行器用它在命令行里让 PO 输入密码）
+ * Resolve placeholders in a value:
+ *   ${var:tradeId}                  a dynamic value read at run time (e.g. a trade ID)
+ *   ${cfg:accounts.maker.password}  a value from local config (accounts, passwords, etc. - never stored in the case file)
+ * ctx.askConfig(path) is optional: ask the user when config is missing a value (the runner uses it to prompt the PO for passwords)
  */
 async function resolveValue(value, ctx) {
   if (typeof value !== 'string') return value;
@@ -62,11 +62,11 @@ async function resolveValue(value, ctx) {
     let v;
     if (kind === 'var') {
       v = ctx.vars[key];
-      if (v === undefined) throw new Error(`变量 ${key} 还没有被读取（检查前面是否有对应的 read 步骤）`);
+      if (v === undefined) throw new Error(`Variable ${key} has not been read yet (check that an earlier read step saves it)`);
     } else {
       v = getPath(ctx.config, key);
       if (v === undefined || v === '') {
-        if (!ctx.askConfig) throw new Error(`本地配置缺少 ${key}，请在 config.local.json 中补充`);
+        if (!ctx.askConfig) throw new Error(`Local config is missing ${key}; please add it to config.local.json`);
         v = await ctx.askConfig(key);
       }
     }
@@ -76,10 +76,10 @@ async function resolveValue(value, ctx) {
   return out + value.slice(last);
 }
 
-/** 拼接 baseUrl 和相对路径，用例文件里只存相对路径，不存服务器地址 */
+/** Join baseUrl and a relative path; case files store only relative paths, never the server address */
 function resolveUrl(baseUrl, path) {
   if (/^https?:\/\//i.test(path)) return path;
-  if (!baseUrl) throw new Error('未配置 baseUrl，请在 config.local.json 中设置');
+  if (!baseUrl) throw new Error('baseUrl is not configured; please set it in config.local.json');
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
@@ -88,13 +88,13 @@ function escapeRegExp(s) {
 }
 
 /**
- * 执行一个步骤。step 中的 value 可以带占位符，这里统一解析。
- * 返回值：read 步骤返回读到的文本，其余返回 undefined。
+ * Execute one step. The step's value may contain placeholders, which are resolved here.
+ * Returns the text that was read for a read step, undefined otherwise.
  */
 async function executeStep(page, step, ctx) {
   const timeout = step.timeout ?? ctx.config?.timeouts?.step ?? 15000;
   const value = await resolveValue(step.value, ctx);
-  // 定位器里也可能带变量，例如 { text: '${var:tradeId}' } 用来点击刚录入的那笔交易
+  // Locators may contain variables too, e.g. { text: '${var:tradeId}' } to click the trade that was just booked
   if (step.target) {
     const resolved = {};
     for (const [k, v] of Object.entries(step.target)) resolved[k] = await resolveValue(v, ctx);
@@ -132,36 +132,36 @@ async function executeStep(page, step, ctx) {
       else await expect(resolveTarget(page, step.target)).toContainText(value, { timeout });
       return;
     case 'expectUrl':
-      // 只比较路径部分，不关心服务器地址
+      // Compare only the path part; the server address does not matter
       await expect(page).toHaveURL(new RegExp(escapeRegExp(value) + '(\\?.*)?(#.*)?$'), { timeout });
       return;
     case 'wait':
       await page.waitForTimeout(Number(value) || 0);
       return;
     default:
-      throw new Error(`不支持的动作：${step.action}`);
+      throw new Error(`Unsupported action: ${step.action}`);
   }
 }
 
-/** 一行可读的步骤描述，用于日志和报告 */
+/** One-line readable description of a step, used in logs and reports */
 function describeStep(step) {
   const t = describeTarget(step.target);
   const v = step.secret
     ? '******'
     : typeof step.value === 'string'
-      ? step.value.replace(/\$\{cfg:([^}]+)\}/g, '〔配置 $1〕').replace(/\$\{var:([^}]+)\}/g, '〔变量 $1〕')
+      ? step.value.replace(/\$\{cfg:([^}]+)\}/g, '[config $1]').replace(/\$\{var:([^}]+)\}/g, '[variable $1]')
       : step.value;
   switch (step.action) {
-    case 'goto': return `打开页面 ${v}`;
-    case 'fill': return `在 ${t} 输入 ${v}`;
-    case 'click': return `点击 ${t}`;
-    case 'press': return `在 ${t} 按键 ${v}`;
-    case 'select': return `在 ${t} 选择 ${v}`;
-    case 'read': return `读取 ${t} 保存为 ${step.saveAs}`;
-    case 'expectVisible': return `校验 ${t} 可见`;
-    case 'expectText': return `校验 ${t} ${step.exact ? '等于' : '包含'} ${v}`;
-    case 'expectUrl': return `校验当前页面为 ${v}`;
-    case 'wait': return `等待 ${v} ms`;
+    case 'goto': return `Open page ${v}`;
+    case 'fill': return `Type ${v} into ${t}`;
+    case 'click': return `Click ${t}`;
+    case 'press': return `Press ${v} on ${t}`;
+    case 'select': return `Select ${v} in ${t}`;
+    case 'read': return `Read ${t} and save as ${step.saveAs}`;
+    case 'expectVisible': return `Verify ${t} is visible`;
+    case 'expectText': return `Verify ${t} ${step.exact ? 'equals' : 'contains'} ${v}`;
+    case 'expectUrl': return `Verify current page is ${v}`;
+    case 'wait': return `Wait ${v} ms`;
     default: return step.action;
   }
 }

@@ -1,6 +1,6 @@
-// OREO 页面元素定位（统一维护，优先 data-testid）
-// OREO 的输入框是 web component（sc-text-input），真正的 <input> 在 shadow DOM 里，
-// 所以用 inner: 'input' 在宿主元素内再定位一层。
+// OREO page element locators (maintained in one place, data-testid preferred)
+// OREO inputs are web components (sc-text-input) and the real <input> sits in the shadow DOM,
+// so inner: 'input' locates one level further inside the host element.
 
 export type Target = {
   testId?: string;

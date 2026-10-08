@@ -1,5 +1,5 @@
-// 读取本地配置 config.local.json（服务器地址、账号密码、浏览器设置）。
-// 这个文件只存在于各自电脑上，不进 Git、不进用例文件。
+// Reads the local config config.local.json (server address, accounts and passwords, browser settings).
+// The file exists only on each person's own computer; it never goes into Git or into case files.
 
 const fs = require('fs');
 const path = require('path');
@@ -8,14 +8,14 @@ const DEFAULTS = {
   baseUrl: '',
   accounts: {},
   browser: {
-    channel: 'msedge', // 用电脑自带的 Edge；也可填 "chrome"，或填 "" 并配合 executablePath
+    channel: 'msedge', // use the Edge already on the computer; "chrome" also works, or "" together with executablePath
     executablePath: '',
     args: [],
     headless: false,
-    slowMo: 300, // 每步放慢 300ms，PO 看得清
+    slowMo: 300, // slow every step by 300ms so the PO can follow along
   },
   timeouts: { step: 15000 },
-  evidence: { video: false }, // 录像需要 Playwright 的 ffmpeg（内网通常装不了），需要时在 config.local.json 里设为 true
+  evidence: { video: false }, // video needs Playwright's ffmpeg (usually not installable on the intranet); set to true in config.local.json when needed
 };
 
 function deepMerge(base, extra) {
@@ -30,7 +30,7 @@ function loadConfig(dir) {
   const file = process.env.OREO_UAT_CONFIG || path.join(dir, 'config.local.json');
   let user = {};
   if (fs.existsSync(file)) {
-    user = JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^﻿/, ''));
+    user = JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, ''));
   }
   if (process.env.OREO_BASE_URL) user.baseUrl = process.env.OREO_BASE_URL;
   const cfg = deepMerge(DEFAULTS, user);
@@ -38,7 +38,7 @@ function loadConfig(dir) {
   return cfg;
 }
 
-/** Playwright 启动参数 */
+/** Playwright launch options */
 function launchOptions(cfg) {
   const b = cfg.browser || {};
   const opts = { headless: !!b.headless, slowMo: Number(b.slowMo) || 0 };
@@ -48,7 +48,7 @@ function launchOptions(cfg) {
   return opts;
 }
 
-/** 列出配置里所有敏感值（key 含 password/secret/token），用于防止明文写进用例文件 */
+/** List every sensitive value in the config (keys containing password/secret/token), used to keep plain text out of case files */
 function secretEntries(cfg, prefix = '') {
   const out = [];
   for (const [k, v] of Object.entries(cfg || {})) {

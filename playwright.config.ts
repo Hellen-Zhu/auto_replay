@@ -8,7 +8,7 @@ const launch = launchOptions(cfg);
 export default defineConfig({
   testDir: './tests',
   timeout: 120_000,
-  workers: 1, // UAT 环境有状态，按顺序跑更稳
+  workers: 1, // the UAT environment is stateful, so running sequentially is more stable
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: cfg.baseUrl || undefined,

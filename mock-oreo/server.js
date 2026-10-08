@@ -1,7 +1,7 @@
-// 模拟 OREO 的登录页和 Trades 页（仅用于本地演示和验证框架，不是真实系统）。
-// 结构仿照真实页面：sc-text-input / sc-button 是带 open shadow root 的 web component，
-// data-testid 与真实系统一致。
-// 启动：npm run mock  →  http://localhost:4173
+// Mock of the OREO login page and Trades page (for local demos and framework validation only; not the real system).
+// The structure mirrors the real pages: sc-text-input / sc-button are web components with an open shadow root,
+// and the data-testid values match the real system.
+// Start: npm run mock  ->  http://localhost:4173
 
 const http = require('http');
 const PORT = Number(process.env.PORT || 4173);
@@ -46,7 +46,7 @@ document.querySelector('[data-testid=login-sign-in-to-portal-btn]').addEventList
   const r = await fetch('/api/login', { method: 'POST', body: JSON.stringify({ email, pwd }) });
   if (!r.ok) { document.getElementById('err').textContent = 'Invalid email or password'; return; }
   const u = await r.json();
-  setTimeout(() => { sessionStorage.setItem('user', u.name); location.href = '/trades'; }, 400); // 模拟登录耗时
+  setTimeout(() => { sessionStorage.setItem('user', u.name); location.href = '/trades'; }, 400); // simulate login latency
 });
 </script></body></html>`;
 
@@ -66,7 +66,7 @@ const tradesPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
 <script>
 const u = sessionStorage.getItem('user');
 if (!u) location.href = '/';
-// 模拟异步加载用户信息
+// simulate async loading of user info
 setTimeout(() => { document.getElementById('uname').textContent = u; }, 300);
 </script></body></html>`;
 
@@ -85,4 +85,4 @@ http.createServer((req, res) => {
   const html = req.url.startsWith('/trades') ? tradesPage : loginPage;
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
   res.end(html);
-}).listen(PORT, () => console.log(`模拟 OREO 已启动：http://localhost:${PORT}  （账号 maker@test.com / maker1）`));
+}).listen(PORT, () => console.log(`Mock OREO started: http://localhost:${PORT}  (account maker@test.com / maker1)`));
