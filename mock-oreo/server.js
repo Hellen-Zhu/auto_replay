@@ -31,11 +31,11 @@ class ScCombobox extends HTMLElement {
   connectedCallback() {
     const opts = (this.getAttribute('options') || '').split('|');
     const r = this.attachShadow({ mode: 'open' });
-    r.innerHTML = '<div part="base"><input part="input" role="combobox" type="text" placeholder="Type to search..."><div role="listbox" hidden></div></div>' +
+    r.innerHTML = '<div part="base"><input part="input" role="combobox" type="text" placeholder="Type to search..."><div role="menu" hidden></div></div>' +
       '<style>div[part]{position:relative}input{width:260px;padding:6px;border:none;border-bottom:1px solid #ccc;font-size:14px}' +
-      '[role=listbox]{position:absolute;z-index:5;background:#fff;border:1px solid #ccc;width:272px;max-height:160px;overflow:auto}' +
-      '[role=option]{padding:6px;font-size:13px;cursor:pointer}[role=option]:hover{background:#e0e7ff}</style>';
-    const input = r.querySelector('input'), list = r.querySelector('[role=listbox]');
+      '[role=menu]{position:absolute;z-index:5;background:#fff;border:1px solid #ccc;width:272px;max-height:160px;overflow:auto}' +
+      'sl-menu-item{display:block;padding:6px;font-size:13px;cursor:pointer}sl-menu-item:hover{background:#e0e7ff}</style>';
+    const input = r.querySelector('input'), list = r.querySelector('[role=menu]');
     let timer;
     const render = () => {
       clearTimeout(timer);
@@ -43,9 +43,12 @@ class ScCombobox extends HTMLElement {
         const q = input.value.toLowerCase();
         list.innerHTML = '';
         for (const o of opts.filter((x) => x.toLowerCase().includes(q))) {
-          const d = document.createElement('div');
-          d.setAttribute('role', 'option');
-          d.textContent = o;
+          // like the real dropdown: an sl-menu-item with a slotted label, the typed text highlighted in <b>
+          const d = document.createElement('sl-menu-item');
+          d.setAttribute('role', 'menuitem');
+          d.className = 'dropdown-item expanded-menu-item';
+          const at = o.toLowerCase().indexOf(q);
+          d.append(o.slice(0, at), Object.assign(document.createElement('b'), { textContent: o.slice(at, at + q.length) }), o.slice(at + q.length));
           d.addEventListener('mousedown', (e) => { e.preventDefault(); input.value = o; this.selected = o; list.hidden = true; });
           list.appendChild(d);
         }
@@ -58,6 +61,13 @@ class ScCombobox extends HTMLElement {
   }
   get value() { return this.selected || ''; }
 }
+class SlMenuItem extends HTMLElement {
+  connectedCallback() {
+    if (this.shadowRoot) return;
+    this.attachShadow({ mode: 'open' }).innerHTML = '<div id="anchor" part="base" class="menu-item"><slot name="prefix" part="prefix"></slot><slot part="label" class="menu-item__label"></slot></div>';
+  }
+}
+customElements.define('sl-menu-item', SlMenuItem);
 customElements.define('sc-combobox', ScCombobox);
 customElements.define('sc-text-input', ScTextInput);
 customElements.define('sc-button', ScButton);
@@ -120,7 +130,7 @@ const newTradePage = `${pageHead}
   <div class="row"><label>Portfolio</label><sc-combobox data-testid="create-trade-portfolio-combobox" options="ABS_CR_UK_ETFBB|MOCK_PORTFOLIO_2"></sc-combobox></div>
   <div class="row"><label>Product ID</label><sc-combobox data-testid="create-trade-product-id-input" options="FX_CO|FX_TRF|FX_FSB|FX_OPT"></sc-combobox></div>
   <div class="row"><label>Direction</label><sc-combobox data-testid="create-trade-direction-select" options="Buy|Sell"></sc-combobox></div>
-  <div class="row"><label>Trade file (.dat)</label><input type="file" accept=".dat" data-testid="trade-file-upload"></div>
+  <div class="row"><label>Trade file (.dat)</label><div data-testid="trade-file-upload" style="border:1px dashed #aaa;padding:12px;font-size:13px">Drag and drop or click to upload file <input type="file" accept=".dat"></div></div>
   <div class="row"><label>StepIn</label><input type="checkbox" data-testid="create-trade-stepin-toggle"></div>
   <div id="stepin" hidden>
     <div class="row"><label>StepIn type</label>
@@ -139,7 +149,7 @@ const $ = (id) => document.querySelector('[data-testid=' + id + ']');
 const err = document.getElementById('err'), dialog = $('trade-change-confirmation-dialog');
 $('create-trade-stepin-toggle').addEventListener('change', (e) => { document.getElementById('stepin').hidden = !e.target.checked; });
 function collect() {
-  const file = $('trade-file-upload').files[0];
+  const file = $('trade-file-upload').querySelector('input').files[0];
   const stepIn = $('create-trade-stepin-toggle').checked;
   return {
     counterparty: $('create-trade-counterparty-combobox').value, portfolio: $('create-trade-portfolio-combobox').value,

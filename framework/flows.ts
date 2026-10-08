@@ -37,10 +37,16 @@ export const PENDING_APPROVAL_TEXT = 'Pending Approval';
 /** The product's .dat file, shipped with the cases in data/ (same names as the E2E project's ProductDatFiles) */
 export const datFile = (product: string) => `data/${product}.dat`;
 
-/** Type into a combobox, then pick the matching option from its dropdown */
+/**
+ * An entry of an open OREO dropdown. The entries are not native options: each one is an
+ * <sl-menu-item role="menuitem"> whose label is slotted in, with the typed text highlighted in <b>.
+ */
+const dropdownItem = (name: Val): TargetIn => ({ role: 'menuitem', name, exact: true });
+
+/** Type into a combobox, then pick the matching entry from its dropdown */
 async function pick(ui: UI, box: TargetIn, value: Val) {
   await ui.fill(box, value);
-  await ui.click({ role: 'option', name: value, exact: true });
+  await ui.click(dropdownItem(value));
 }
 
 /**

@@ -175,9 +175,15 @@ async function executeStep(page, step, ctx) {
       if (step.capture) return clickAndCapture(page, resolveTarget(page, step.target), step.capture, ctx, timeout);
       await resolveTarget(page, step.target).click({ timeout });
       return;
-    case 'upload':
-      await resolveTarget(page, step.target).setInputFiles(resolveDataFile(ctx.rootDir, value), { timeout });
+    case 'upload': {
+      const file = resolveDataFile(ctx.rootDir, value);
+      // The target may be the file input itself or an upload zone (web component) that wraps it
+      let loc = resolveTarget(page, step.target);
+      await loc.waitFor({ state: 'attached', timeout });
+      if (!(await loc.evaluate((el) => el.tagName === 'INPUT'))) loc = loc.locator('input[type=file]');
+      await loc.setInputFiles(file, { timeout });
       return;
+    }
     case 'press':
       await resolveTarget(page, step.target).press(value, { timeout });
       return;
