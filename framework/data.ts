@@ -19,9 +19,10 @@ function readJson(file: string, label: string): unknown {
 
 /**
  * The rows of testdata/<name>.json, one per case:
- *   { "defaults": { ...shared by every row of this file... }, "cases": [ { "id": "my_case", ... }, ... ] }
+ *   { "defaults": { ...shared by every row of this file... }, "cases": [ { "id": "TC-XXX-001", ... }, ... ] }
  * Each row is completed with "defaults" and then with testdata/common.json (values shared by every file):
- * the row wins over defaults, defaults win over common. "id" is the case ID: the spec puts it in [ ] at the start of the title, and it names the exported file.
+ * the row wins over defaults, defaults win over common. "id" is the full case ID, the one in [ ] at the start
+ * of the test title.
  */
 export function loadCases<T extends object>(name: string): (T & { id: string })[] {
   const label = `testdata/${name}.json`;
@@ -44,4 +45,17 @@ export function loadCases<T extends object>(name: string): (T & { id: string })[
     seen.add(id);
     return { ...common, ...(doc.defaults as Row | undefined), ...row } as T & { id: string };
   });
+}
+
+/** The case ID of a test: the [xxx] at the start of its title */
+export function caseIdOf(title: string): string | undefined {
+  return title.match(/^\s*\[([\w-]+)\]/)?.[1];
+}
+
+/** The row of testdata/<name>.json whose id is the given case ID */
+export function findCase<T extends object>(name: string, id: string): T & { id: string } {
+  const rows = loadCases<T>(name);
+  const row = rows.find((r) => r.id === id);
+  if (!row) throw new Error(`testdata/${name}.json has no row with "id": "${id}" (it has: ${rows.map((r) => r.id).join(', ')})`);
+  return row;
 }

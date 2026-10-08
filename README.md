@@ -29,10 +29,10 @@ Two kinds of data are kept apart:
 | `framework/pages/` | Page objects: one class per page, holding its locators (`data-testid` throughout) and its atomic operations |
 | `framework/app.ts` | `App`: one instance of every page and shared component |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
-| `framework/data.ts` | `loadCases('<name>')`: the rows of `testdata/<name>.json`, one per case |
+| `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/` automatically after a test passes |
 | `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`) |
-| `tests/` | Test cases: `trade-creation.spec.ts` (one case per row of `testdata/trade-creation.json`) |
+| `tests/` | Test cases: `trade-creation.spec.ts` (products x normal / StepIn full / StepIn partial) |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
@@ -61,12 +61,12 @@ npm run replay                         # replay with the runner, exactly what th
 
 ### Trade creation cases
 
-`tests/trade-creation.spec.ts` generates one case per row of `testdata/trade-creation.json`: three per product (normal trade, StepIn full, StepIn partial), mirroring `trade_creation.feature` of the E2E project. Before running them:
+`tests/trade-creation.spec.ts` generates three cases per product (normal trade, StepIn full, StepIn partial), mirroring `trade_creation.feature` of the E2E project. Before running them:
 
 1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a case whose product has no file is skipped.
 2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
-To add a product, add its rows to `testdata/trade-creation.json` and put its `.dat` file in `data/`.
+To add a product, add it to `PRODUCTS` in the spec, add the rows of its three case IDs to `testdata/trade-creation.json` and put its `.dat` file in `data/`.
 
 ## QA: test data
 
@@ -80,8 +80,8 @@ Case data lives in `testdata/`, not in `config.local.json`:
 {
   "defaults": { "oldCounterpartyName": "10 AM JAK" },
   "cases": [
-    { "id": "TC-TRADE-CREATION-FX_TRF-UI-001", "product": "FX_TRF", "kind": "normal" },
-    { "id": "TC-TRADE-CREATION-FX_TRF-UI-004", "product": "FX_TRF", "kind": "normal", "direction": "Sell" }
+    { "id": "TC-TRADE-CREATION-FX_TRF-UI-001" },
+    { "id": "TC-TRADE-CREATION-FX_FSB-UI-001", "direction": "Sell" }
   ]
 }
 ```
@@ -89,10 +89,10 @@ Case data lives in `testdata/`, not in `config.local.json`:
 (The real files are plain JSON, without comments.)
 
 - A row is completed with `defaults` of its file, then with `common.json`: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once, and a case that needs something different just states it in its row.
-- `id` is the case ID. The spec puts it in `[ ]` at the start of the test title (`[${data.id}] ...`) and never builds it from other fields; it is also the exported file name (`cases/<id>.json`) and must be unique in the file. The same scenario with other data is one more row.
-- `loadCases<TradeCreationData>('trade-creation')` returns the completed rows; the spec loops over them and hands each row to the flow.
+- `id` is the full case ID. **The data is matched at run time**: a test title starts with its case ID in `[ ]` (the spec may build it, e.g. `[TC-TRADE-CREATION-${product}-UI-${no}]`), and the `testData` fixture looks that ID up in `testdata/<spec file name>.json` (`tests/trade-creation.spec.ts` → `testdata/trade-creation.json`). A case ID without a row fails with a message listing the ids of the file. The ID is also the exported file name (`cases/<id>.json`).
+- In the test: `const data = testData<TradeCreationData>()`, then hand it to the flow.
 - In the flow, `const p = this.params(data)` turns the data into parameters. `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value is written into the `params` block of the case file, so the PO sees it before the run and can change it for one run. Only the parameters a case really uses are written.
-- Read a field directly (`data.product`, `data.kind`) when it decides **what the scenario does** (which steps, which file, which title). It is recorded as it is and the PO cannot change it.
+- What decides **the scenario itself** (which steps, which file, which title: the product, the kind) stays in the spec and is passed to the flow as plain arguments. It is recorded as it is and the PO cannot change it.
 - `testdata/` and the exported case files are committed, so they hold business values only. A value that must not be committed is written as a reference to local config, e.g. `"counterpartyName": "${cfg:tradeData.counterpartyName}"`; the PO is then asked for it like any other setting. Passwords never go here (the run fails if a test data value contains one).
 - A missing value fails the case with the name of the field, e.g. `Test data "oldCounterpartyName" is not set`.
 
@@ -102,7 +102,7 @@ The framework follows the Page Object Model, in three layers. Each layer only ca
 
 | Layer | Where | Contains | Example |
 |---|---|---|---|
-| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.tradeCreation.createTrade(data)` |
+| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.tradeCreation.createTrade(product, kind, data)` |
 | Flow | `framework/flows/*.flow.ts` | Business steps: a Given / When / Then line of the report and the atomic operations behind it | `I book the trade and confirm` |
 | Page / component | `framework/pages/`, `framework/components/` | Locators and **atomic operations**: one thing a user does (fill one field, click one button, pick one dropdown value) or one check | `newTrade.clickBook()` |
 
@@ -142,27 +142,25 @@ A flow that needs case data takes it as one typed object and turns it into param
 
 ```ts
 // framework/flows/trade-creation.flow.ts
-async createTrade(data: TradeCreationData): Promise<string> {
-  const { product, kind } = data;   // decide the scenario: recorded as they are
-  const p = this.params(data);      // everything else: recorded as ${param:name}
+async createTrade(product: string, kind: TradeKind, data: TradeCreationData): Promise<string> {
+  const p = this.params(data);      // case data: recorded as ${param:name}; product and kind are recorded as they are
   ...
   await newTrade.counterparty.select(p.counterpartyName);
   await newTrade.productId.select(product);
 ```
 
-**3. Case: the scenario.** A case uses the `flows` fixture and nothing else; its data comes from `testdata/`, one case per row:
+**3. Case: the scenario.** A case uses the `flows` fixture and nothing else; its data comes from `testdata/`, matched by the case ID in the title:
 
 ```ts
-for (const data of loadCases<TradeCreationData>('trade-search')) {
-  test(`[${data.id}] Checker finds a new ${data.product} trade`, async ({ flows }) => {
-    await flows.auth.login('maker');                              // Given I log in as maker
-    const tradeId = await flows.tradeCreation.createTrade(data); // When I open the New Trade form ... And I book the trade and confirm
-    await flows.tradeCreation.expectPendingApproval(tradeId);    // Then the trade is created with pending approval status
-    await flows.auth.login('checker', 'And');                     // And I log in as checker
-    await flows.trades.searchTrade(tradeId);                      // When I search for the trade
-    await flows.trades.expectListedFirst(tradeId);                // Then the trade is listed first
-  });
-}
+test('[TC-TRADE-SEARCH-FX_TRF-UI-001] Checker finds a new FX_TRF trade', async ({ flows, testData }) => {
+  const data = testData<TradeCreationData>();                                      // row "TC-TRADE-SEARCH-FX_TRF-UI-001" of testdata/trade-search.json
+  await flows.auth.login('maker');                                                 // Given I log in as maker
+  const tradeId = await flows.tradeCreation.createTrade('FX_TRF', 'normal', data); // When I open the New Trade form ... And I book the trade and confirm
+  await flows.tradeCreation.expectPendingApproval(tradeId);                        // Then the trade is created with pending approval status
+  await flows.auth.login('checker', 'And');                                        // And I log in as checker
+  await flows.trades.searchTrade(tradeId);                                         // When I search for the trade
+  await flows.trades.expectListedFirst(tradeId);                                   // Then the trade is listed first
+});
 ```
 
 Key points:

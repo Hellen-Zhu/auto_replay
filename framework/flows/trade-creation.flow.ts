@@ -3,11 +3,8 @@ import { BaseFlow, type Keyword } from './base.flow';
 
 export type TradeKind = 'normal' | 'stepinFull' | 'stepinPartial';
 
-/** The data of one trade creation case: a row of testdata/trade-creation.json */
+/** The data of one trade creation case: its row of testdata/trade-creation.json */
 export interface TradeCreationData {
-  /** Product type: it is what is typed as the Product ID and it names the dat file */
-  product: string;
-  kind: TradeKind;
   counterpartyName: string;
   portfolioId: string;
   direction: string;
@@ -22,15 +19,14 @@ export const datFile = (product: string) => `data/${product}.dat`;
 export class TradeCreationFlow extends BaseFlow {
   /**
    * Maker creates a trade for a product, mirroring the E2E project's trade_creation snippets:
-   * a normal trade, or a StepIn full / StepIn partial trade. The product and the kind decide the scenario; the
-   * other fields of the data are recorded as case data (${param:name}), which the PO can change for a run.
+   * a normal trade, or a StepIn full / StepIn partial trade. The product (typed as the Product ID, and the name
+   * of the dat file) and the kind decide the scenario; the data is recorded as case data (${param:name}), which the PO can change for a run.
    * Ends when the booking is confirmed and returns the new trade ID (recorded as ${var:createdTradeId});
    * the outcome is asserted by the case, e.g. with expectPendingApproval(tradeId).
    */
-  async createTrade(data: TradeCreationData): Promise<string> {
+  async createTrade(product: string, kind: TradeKind, data: TradeCreationData): Promise<string> {
     const { ui } = this;
     const { topBar, newTrade } = this.app;
-    const { product, kind } = data;
     const p = this.params(data);
     const selectBasicInfo = () =>
       ui.And('I select the basic mandatory info', async () => {
