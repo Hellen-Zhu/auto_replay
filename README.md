@@ -111,6 +111,7 @@ This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, onl
 
 - No video by default (recording depends on Playwright's ffmpeg, which usually cannot be downloaded on the intranet); per-step screenshots and the trace are enough to reproduce. If needed, set `"evidence": { "video": true }` in `config.local.json` and install ffmpeg manually.
 - The report and trace viewer links are local (`127.0.0.1`), not shareable URLs; to show a run to someone else, send them the evidence folder. If port 9400 is taken, set `"evidence": { "viewPort": 9500 }` in `config.local.json`.
+- To open Full replay in Playwright's official viewer instead of the bundled one, set `"evidence": { "traceViewer": "official" }` in `config.local.json`; the link then points to `https://trace.playwright.dev/?trace=...`. That site does not store traces: it runs in the browser and reads `trace.zip` from this computer, so the link still works only here and while the runner window is open, and it needs internet access to `trace.playwright.dev`.
 - The PO's computer needs Edge (default) or Chrome (set `browser.channel` to `"chrome"`).
 - The company must allow running `node.exe` and `.bat` from a shared drive or an unzipped folder; test on one PO machine first.
 - `LOGIN_PATH` defaults to `/`; if the real login page is elsewhere, change `framework/flows.ts`.

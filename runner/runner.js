@@ -188,8 +188,13 @@ const VIEW_HOST = '127.0.0.1';
 const viewPort = (config) => Number(process.env.OREO_VIEW_PORT) || Number(config?.evidence?.viewPort) || 9400;
 const viewBase = (config) => `http://${VIEW_HOST}:${viewPort(config)}`;
 const reportUrl = (config, runDir) => `${viewBase(config)}/evidence/${encodeURIComponent(runDir)}/report.html`;
+// By default the viewer bundled with playwright-core is used, which needs no internet access. With
+// "evidence": { "traceViewer": "official" } the link opens https://trace.playwright.dev instead. Nothing is
+// uploaded either way: the viewer runs in the browser and reads trace.zip from this computer.
+const OFFICIAL_VIEWER = 'https://trace.playwright.dev';
+const officialViewer = (config) => config?.evidence?.traceViewer === 'official';
 const traceUrl = (config, runDir) =>
-  `${viewBase(config)}/trace/index.html?trace=${encodeURIComponent(`${viewBase(config)}/evidence/${encodeURIComponent(runDir)}/trace.zip`)}`;
+  `${officialViewer(config) ? OFFICIAL_VIEWER + '/' : viewBase(config) + '/trace/index.html'}?trace=${encodeURIComponent(`${viewBase(config)}/evidence/${encodeURIComponent(runDir)}/trace.zip`)}`;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml',
@@ -217,7 +222,12 @@ function evidenceIndex(config) {
 function startViewServer(config) {
   const viewerDir = path.join(path.dirname(require.resolve('playwright-core/package.json')), 'lib', 'vite', 'traceViewer');
   const roots = { trace: viewerDir, evidence: EVIDENCE_DIR };
+  // the official viewer is another origin, so it may read the evidence only when it has been chosen
+  const cors = officialViewer(config)
+    ? { 'access-control-allow-origin': OFFICIAL_VIEWER, 'access-control-allow-private-network': 'true', 'access-control-allow-methods': 'GET, HEAD, OPTIONS', 'access-control-allow-headers': '*' }
+    : {};
   const server = require('http').createServer((req, res) => {
+    if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
     let pathname;
     try { pathname = decodeURIComponent(new URL(req.url, viewBase(config)).pathname); } catch { res.writeHead(400); return res.end(); }
     if (pathname === '/') { res.writeHead(200, { 'content-type': MIME['.html'] }); return res.end(evidenceIndex(config)); }
@@ -226,7 +236,7 @@ function startViewServer(config) {
     const file = root && path.resolve(root, rest.join('/'));
     // never serve anything outside the viewer and evidence folders
     if (!file || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end('Not found'); }
-    res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store' });
+    res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store', ...(top === 'evidence' ? cors : {}) });
     fs.createReadStream(file).pipe(res);
   });
   return new Promise((resolve) => {
