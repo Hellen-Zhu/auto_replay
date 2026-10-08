@@ -420,7 +420,7 @@ async function runCase({ file, doc }, config) {
   let failed = false;
   for (let i = 0; i < doc.steps.length; i++) {
     const step = doc.steps[i];
-    const desc = describeStep(step);
+    const desc = describeStep(step, ctx.vars);
     const rec = { title: step.title, desc, status: 'skipped' };
     run.steps.push(rec);
     if (failed) continue;

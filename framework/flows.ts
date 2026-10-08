@@ -31,8 +31,8 @@ export type TradeKind = 'normal' | 'stepinFull' | 'stepinPartial';
  */
 export const CREATE_TRADE_API = { url: '/trades/create?tradeAction=SUBMIT', method: 'POST', field: 'data.trade.id' };
 
-/** UNCONFIRMED: status text shown on the trade detail header right after booking */
-export const PENDING_APPROVAL_TEXT = 'Pending Approval';
+/** Status badge shown on the trade detail header right after booking (confirmed on the real system) */
+export const PENDING_APPROVAL_TEXT = 'PARV';
 
 /** The product's .dat file, shipped with the cases in data/ (same names as the E2E project's ProductDatFiles) */
 export const datFile = (product: string) => `data/${product}.dat`;

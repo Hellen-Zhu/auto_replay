@@ -28,7 +28,17 @@ function resolveTarget(page, target) {
   return loc;
 }
 
-function describeTarget(target) {
+/**
+ * Make placeholders readable. A variable whose value is already known (vars) is shown as that value,
+ * e.g. "TRD-123 (variable createdTradeId)"; config values are never printed, only their names.
+ */
+function showPlaceholders(text, vars) {
+  return String(text)
+    .replace(/\$\{cfg:([^}]+)\}/g, '[config $1]')
+    .replace(/\$\{var:([^}]+)\}/g, (m, name) => (vars && vars[name] !== undefined ? `${vars[name]} (variable ${name})` : `[variable ${name}]`));
+}
+
+function describeTarget(target, vars) {
   if (!target) return '';
   const base =
     (target.testId && `testId=${target.testId}`) ||
@@ -38,8 +48,7 @@ function describeTarget(target) {
     (target.text && `text=${target.text}`) ||
     (target.css && `css=${target.css}`) ||
     '?';
-  return (base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : ''))
-    .replace(/\$\{cfg:([^}]+)\}/g, '[config $1]').replace(/\$\{var:([^}]+)\}/g, '[variable $1]');
+  return showPlaceholders(base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : ''), vars);
 }
 
 /** Read a dotted path from an object: get({a:{b:1}}, 'a.b') => 1 */
@@ -228,14 +237,10 @@ async function executeStep(page, step, ctx) {
   }
 }
 
-/** One-line readable description of a step, used in logs and reports */
-function describeStep(step) {
-  const t = describeTarget(step.target);
-  const v = step.secret
-    ? '******'
-    : typeof step.value === 'string'
-      ? step.value.replace(/\$\{cfg:([^}]+)\}/g, '[config $1]').replace(/\$\{var:([^}]+)\}/g, '[variable $1]')
-      : step.value;
+/** One-line readable description of a step, used in logs and reports; pass the variables read so far to show their values */
+function describeStep(step, vars) {
+  const t = describeTarget(step.target, vars);
+  const v = step.secret ? '******' : typeof step.value === 'string' ? showPlaceholders(step.value, vars) : step.value;
   switch (step.action) {
     case 'goto': return `Open page ${v}`;
     case 'fill': return `Type ${v} into ${t}`;

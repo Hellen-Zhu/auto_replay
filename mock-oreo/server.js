@@ -234,7 +234,7 @@ http.createServer((req, res) => {
       if (t.fileName !== t.productId + '.dat') return json(res, 400, { message: `The uploaded file does not match product ${t.productId}` });
       if (t.stepIn !== null && (!t.stepIn || !t.oldCounterparty)) return json(res, 400, { message: 'StepIn info is incomplete' });
       const id = 'TRD-' + Date.now() + Math.random().toString(16).slice(2, 10).toUpperCase();
-      TRADES[id] = { ...t, id, status: 'Pending Approval' };
+      TRADES[id] = { ...t, id, status: 'PARV' };
       json(res, 200, { data: { trade: TRADES[id] } });
     });
     return;
