@@ -1,9 +1,10 @@
 import type { Target, Val } from '../ui';
+import { element } from '../elements';
 import { BaseComponent } from './base.component';
 
 /** The top bar shown on every page after login */
 export class TopBar extends BaseComponent {
-  protected readonly newTradeBtn: Target = { testId: 'layout-new-trade-btn' };
+  protected readonly newTradeBtn = element('trade_portal.new_trade_btn');
   protected readonly aiReaderBtn: Target = { testId: 'layout-ai-reader-btn' };
   protected readonly themeToggleBtn: Target = { testId: 'layout-theme-toggle-btn' };
   protected readonly userMenuBtn: Target = { testId: 'layout-user-menu-btn' };

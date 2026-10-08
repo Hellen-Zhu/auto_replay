@@ -1,0 +1,86 @@
+[
+  {
+    "name": "new_trade.file_input",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "trade-file-upload"
+    }
+  },
+  {
+    "name": "new_trade.counterparty_select",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-counterparty-combobox"
+    }
+  },
+  {
+    "name": "new_trade.portfolio_select",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-portfolio-combobox"
+    }
+  },
+  {
+    "name": "new_trade.product_id_input",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-product-id-input"
+    }
+  },
+  {
+    "name": "new_trade.direction_select",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-direction-select"
+    }
+  },
+  {
+    "name": "new_trade.stepin_full_radio",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-stepin-full-radio"
+    }
+  },
+  {
+    "name": "new_trade.container",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-stepin-container"
+    }
+  },
+  {
+    "name": "new_trade.stepin_toggle",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-stepin-toggle"
+    }
+  },
+  {
+    "name": "new_trade.stepin_partial_radio",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-stepin-partial-radio"
+    }
+  },
+  {
+    "name": "new_trade.stepin_old_counterparty_select",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-old-counterparty-combobox"
+    }
+  },
+  {
+    "name": "new_trade.save_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-save-btn"
+    }
+  },
+  {
+    "name": "new_trade.book_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "create-trade-book-btn"
+    }
+  }
+]

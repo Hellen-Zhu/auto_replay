@@ -26,7 +26,8 @@ Two kinds of data are kept apart:
 | `core/actions.js` | Execution core. QA runs and PO replays go through the same code |
 | `core/config.js` | Reads `config.local.json` |
 | `framework/components/` | Component objects: controls and regions shared by several pages (`TopBar`, `Combobox`, `ConfirmDialog`), atomic operations only |
-| `framework/pages/` | Page objects: one class per page, holding its locators (`data-testid` throughout) and its atomic operations |
+| `framework/pages/` | Page objects: one class per page, holding its locators (by element name, see `elements/`) and its atomic operations |
+| `framework/elements.ts` | `element('<name>')`: looks a locator up in `elements/` by the name the E2E project gives it |
 | `framework/app.ts` | `App`: one instance of every page and shared component |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
 | `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
@@ -34,12 +35,14 @@ Two kinds of data are kept apart:
 | `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`) |
 | `tests/` | Test cases: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it) |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
+| `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
 | `portable/run-case.bat` | The launcher the PO double-clicks |
 | `portable/record-session.bat` | Records a manual session (no case): the PO works by hand with the trace on, e.g. to report a bug |
 | `portable/view-trace.bat` | Opens the list of earlier runs with their report and trace viewer links |
 | `scripts/build-portable.js` | Builds the portable runner |
+| `scripts/sync-elements.js` | Refreshes `elements/` from the E2E project and checks it against the page objects |
 | `mock-oreo/` | Mock OREO pages, for local demos only |
 
 ## QA: first-time setup
@@ -95,6 +98,33 @@ Case data lives in `testdata/`, not in `config.local.json`:
 - `testdata/` and the exported case files are committed, so they hold business values only. A value that must not be committed is written as a reference to local config, e.g. `"counterpartyName": "${cfg:tradeData.counterpartyName}"`; the PO is then asked for it like any other setting. Passwords never go here (the run fails if a test data value contains one).
 - A missing value fails the case with the name of the field, e.g. `Test data "oldCounterpartyName" is not set`.
 
+## QA: element locators
+
+Locators are not written again in this project: they are the element files of the Java + Cucumber E2E project, copied as they are into `elements/` (same `pages/` and `components/` folders, same file names):
+
+```json
+[
+  { "name": "new_trade.book_btn", "lookupDetails": { "findBy": "testId", "value": "create-trade-book-btn" } }
+]
+```
+
+A page object or component refers to an element by that name: `element('new_trade.book_btn')`. The element files only know the control itself, so what is specific to how this project operates it is added at the place of use, e.g. the real `<input>` inside a web component: `element('new_trade.portfolio_select', { inner: 'input' })`.
+
+To refresh `elements/` after the E2E project changed:
+
+```bash
+npm run sync:elements -- "C:\path\to\the-e2e-project"    # or set OREO_E2E_DIR once
+npm run sync:elements                                      # no path: only checks elements/ against the page objects
+```
+
+- It copies every `*.json` under `src/test/resources/elements`, removes the ones that no longer exist there, and lists what was added / changed / removed. Then run the cases and commit `elements/`.
+- It fails when a page object uses a name that is not defined (e.g. renamed in the E2E project), and it lists the testids that are still hand-written in `framework/` although an element defines them, with the `element('...')` to use instead.
+- A wrong name also fails the case at run time, with the names that do exist for that page.
+- Never edit `elements/` by hand: the next sync overwrites it. **A new element is added in the E2E project** and synced. Until it exists there, a hand-written `{ testId: '...' }` works as before.
+- Only `findBy: testId` is supported so far. The sync reports any other kind it sees; supporting one is one line in `FIND_BY` of `framework/elements.ts`.
+- The sync refuses to copy a file that seems to contain a server address. To try the element files of another folder without copying them, set `OREO_ELEMENTS_DIR`.
+- The PO package is not affected: an exported case file already contains the resolved locators, so `elements/` is not packaged.
+
 ## QA: writing a new case
 
 The framework follows the Page Object Model, in three layers. Each layer only calls the one below it:
@@ -111,8 +141,8 @@ The framework follows the Page Object Model, in three layers. Each layer only ca
 // framework/pages/trades.page.ts
 export class TradesPage extends BasePage {
   static readonly path = '/trades';
-  protected readonly searchBox: Target = { testId: 'trades-search-input', inner: 'input' };
-  protected readonly firstRowId: Target = { testId: 'trades-row-trade-id', nth: 0 };
+  protected readonly searchBox = element('trade_portal.search_input', { inner: 'input' });
+  protected readonly firstRowId = element('trade_portal.row_trade_id', { nth: 0 });
 
   async fillSearch(tradeId: Val) { await this.ui.fill(this.searchBox, tradeId); }
   async submitSearch() { await this.ui.press(this.searchBox, 'Enter'); }
@@ -120,9 +150,9 @@ export class TradesPage extends BasePage {
 }
 ```
 
-A control used on several pages is a component (`framework/components/`), e.g. `new Combobox(this.ui, { testId: '...', inner: 'input' }).select(value)`.
+A control used on several pages is a component (`framework/components/`), e.g. `new Combobox(this.ui, element('...', { inner: 'input' })).select(value)`.
 
-A form with many fields is a table instead of one operation per field: `NewTradePage.fields` maps each field name to its testid and kind of control (`combobox`, `text`), and `newTrade.setField(name, value)` operates it according to the kind. **To support another New Trade field, add one line to that table and write its value in testdata** (in the case's row, or in `defaults` for every case): the create flows fill every optional field a case has a value for, in the order of the table, in one `And I fill the optional fields` step. A name in the data that is not in the table fails the case. Only a new kind of control needs new code. A new page is registered in `framework/app.ts` (`App`).
+A form with many fields is a table instead of one operation per field: `NewTradePage.fields` maps each field name to its element and kind of control (`combobox`, `text`), and `newTrade.setField(name, value)` operates it according to the kind. **To support another New Trade field, add one line to that table and write its value in testdata** (in the case's row, or in `defaults` for every case): the create flows fill every optional field a case has a value for, in the order of the table, in one `And I fill the optional fields` step. A name in the data that is not in the table fails the case. Only a new kind of control needs new code. A new page is registered in `framework/app.ts` (`App`).
 
 **2. Flow: business steps.** A flow method wraps atomic operations in the Given / When / Then line the PO reads in the report. Flows are grouped by business domain, one class per file (`auth.flow.ts`, `trades.flow.ts`, `trade-creation.flow.ts`); a new domain extends `BaseFlow` and is registered in `framework/flows/index.ts` (`Flows`), which makes it available as `flows.<domain>`:
 

@@ -8,9 +8,10 @@ import { BaseComponent } from './base.component';
 export class ConfirmDialog extends BaseComponent {
   protected readonly header: Target;
 
-  constructor(ui: UI, dialogTestId: string, protected readonly confirmBtn: Target) {
+  /** dialog is the host of the modal */
+  constructor(ui: UI, dialog: Target, protected readonly confirmBtn: Target) {
     super(ui);
-    this.header = { testId: dialogTestId, inner: '[slot="header"]' };
+    this.header = { ...dialog, inner: '[slot="header"]' };
   }
 
   async expectVisible() {

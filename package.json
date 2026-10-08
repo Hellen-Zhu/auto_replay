@@ -8,6 +8,7 @@
     "replay": "node runner/runner.js",
     "record": "node runner/runner.js --record",
     "build:portable": "node scripts/build-portable.js",
+    "sync:elements": "node scripts/sync-elements.js",
     "mock": "node mock-oreo/server.js"
   },
   "license": "ISC",
