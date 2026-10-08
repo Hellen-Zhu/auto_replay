@@ -119,6 +119,19 @@ function openFile(file) {
   } catch { /* fine if it cannot be opened; the path has already been printed */ }
 }
 
+// ---------------- Saving settings ----------------
+// Update only the given keys in the config file and leave everything else in it untouched.
+function saveConfig(file, values) {
+  const doc = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, '')) : {};
+  for (const [key, v] of Object.entries(values)) {
+    const parts = key.split('.');
+    let o = doc;
+    for (const p of parts.slice(0, -1)) o = o[p] = o[p] && typeof o[p] === 'object' ? o[p] : {};
+    o[parts.at(-1)] = v;
+  }
+  fs.writeFileSync(file, JSON.stringify(doc, null, 2) + '\n', 'utf-8');
+}
+
 // ---------------- Execution ----------------
 async function runCase({ file, doc }, config) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -136,6 +149,7 @@ async function runCase({ file, doc }, config) {
   };
   const isEmpty = (v) => v === undefined || v === '';
   const required = doc.requiredConfig || [];
+  const toSave = {}; // non-secret values typed in during this run, offered for saving afterwards
 
   // Ask the PO at run time for missing config (e.g. passwords); kept in memory only
   const askConfig = async (key) => {
@@ -143,6 +157,7 @@ async function runCase({ file, doc }, config) {
       ? await askHidden(`Enter ${key} (input is hidden): `)
       : await ask(`Enter ${key}: `);
     setCfg(key, v);
+    if (!isSecret(key) && v !== '') toSave[key] = v;
     return v;
   };
 
@@ -161,19 +176,39 @@ async function runCase({ file, doc }, config) {
         const v = await ask(`  ${k} [${isEmpty(cur) ? 'not set' : cur}]: `);
         if (v === '' || v === cur) continue;
         setCfg(k, v);
+        toSave[k] = v;
         // A saved password belongs to the old environment/account: drop it so it is asked for again
         // instead of being sent to the wrong place.
         const scope = k === 'baseUrl' ? '' : k.slice(0, k.lastIndexOf('.') + 1);
-        for (const s of secrets) if (s.startsWith(scope)) setCfg(s, '');
+        for (const s of secrets) if (s.startsWith(scope)) { setCfg(s, ''); toSave[s] = ''; }
       }
-      console.log('  (These changes apply to this run only. To make them permanent, edit config.local.json.)\n');
     }
   }
 
   // Collect all required config up front so the run does not stop halfway
-  if (!config.baseUrl) config.baseUrl = await ask('Enter the system address (e.g. https://xxx:8088): ');
+  if (!config.baseUrl) {
+    config.baseUrl = await ask('Enter the system address (e.g. https://xxx:8088): ');
+    if (config.baseUrl) toSave.baseUrl = config.baseUrl;
+  }
   for (const key of required) {
     if (isEmpty(getCfg(key))) await askConfig(key);
+  }
+
+  // Offer to remember what was typed in, so the next run starts from it. Passwords are never written:
+  // the only secret entries in toSave are blanked ones, which remove a password that no longer matches.
+  if (Object.keys(toSave).some((k) => !isSecret(k))) {
+    const name = path.basename(config.__file);
+    const answer = await ask(`\nSave the address and account to ${name} for next time? Passwords are not saved. (y/N): `);
+    if (/^y(es)?$/i.test(answer)) {
+      try {
+        saveConfig(config.__file, toSave);
+        console.log(`  Saved to ${config.__file}`);
+      } catch (e) {
+        console.log(`  Could not save (${String(e.message).split('\n')[0]}); the settings still apply to this run.`);
+      }
+    } else {
+      console.log('  Not saved; the settings apply to this run only.');
+    }
   }
 
   console.log(`\n▶ Running: ${doc.name}\n  Evidence folder: ${dir}\n`);
