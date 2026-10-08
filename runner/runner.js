@@ -166,7 +166,7 @@ ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
 <div class="meta">${summary} · Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
 <table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
-<p class="meta">Full replay: <a href="${esc(run.traceUrl)}">${esc(run.traceUrl)}</a><br>
+<p class="meta">Full replay: <a href="${esc(run.traceUrl)}">Open trace viewer</a><br>
 Opens the trace viewer (every action with page snapshots, console and network). The link works while the runner window is still open; later, double-click view-trace.bat first. The same data is in trace.zip in this folder.</p>
 </body></html>`;
   fs.writeFileSync(path.join(dir, 'report.html'), html, 'utf-8');
@@ -472,7 +472,7 @@ async function runCase({ file, doc }, config) {
 
   console.log(run.status === 'passed' ? '\n✅ Run passed' : '\n❌ Run failed');
   console.log(`   Report:      ${reportUrl(config, path.basename(dir))}`);
-  console.log(`   Full replay: ${run.traceUrl}`);
+  console.log('   Full replay: "Open trace viewer" link at the bottom of the report');
   console.log(`   Folder:      ${dir}`);
   return { run, dir };
 }

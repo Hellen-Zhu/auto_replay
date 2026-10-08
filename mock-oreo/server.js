@@ -67,6 +67,17 @@ class SlMenuItem extends HTMLElement {
     this.attachShadow({ mode: 'open' }).innerHTML = '<div id="anchor" part="base" class="menu-item"><slot name="prefix" part="prefix"></slot><slot part="label" class="menu-item__label"></slot></div>';
   }
 }
+// Like the real sc-modal: the host has no size of its own, the panel lives in the shadow root and the content is slotted
+class ScModal extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' }).innerHTML = '<style>:host{display:block;width:0;height:0}:host([hidden]) .overlay{display:none}'
+      + '.overlay{position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center}'
+      + '.box{background:#fff;padding:24px;border-radius:8px;width:360px}</style>'
+      + '<div class="overlay"><div class="box"><slot name="header"></slot><slot></slot></div></div>';
+  }
+}
+customElements.define('sc-modal', ScModal);
 customElements.define('sl-menu-item', SlMenuItem);
 customElements.define('sc-combobox', ScCombobox);
 customElements.define('sc-text-input', ScTextInput);
@@ -141,9 +152,9 @@ const newTradePage = `${pageHead}
   <div id="err"></div>
   <sc-button data-testid="create-trade-save-btn">Save</sc-button> <sc-button data-testid="create-trade-book-btn">Book</sc-button>
 </main>
-<div class="overlay" data-testid="trade-change-confirmation-dialog" hidden><div class="box"><h3>Confirm trade creation</h3>
-  <p>Book this trade and send it for approval?</p>
-  <sc-button data-testid="trade-change-confirm-btn">Confirm</sc-button></div></div>
+<sc-modal data-testid="trade-change-confirmation-dialog" hidden><div slot="header"><h2>Confirm Trade Changes</h2>
+  <p>Review the changes and risk impact before saving</p></div>
+  <div><sc-button data-testid="trade-change-confirm-btn">Confirm &amp; Save</sc-button></div></sc-modal>
 <script>
 const $ = (id) => document.querySelector('[data-testid=' + id + ']');
 const err = document.getElementById('err'), dialog = $('trade-change-confirmation-dialog');

@@ -36,7 +36,9 @@ export const T = {
     stepinFullRadio: { testId: 'create-trade-stepin-full-radio' },
     stepinPartialRadio: { testId: 'create-trade-stepin-partial-radio' },
     oldCounterparty: { testId: 'create-trade-old-counterparty-combobox', inner: 'input' },
-    confirmDialog: { testId: 'trade-change-confirmation-dialog' },
+    // The sc-modal host itself is 0 x 0 (its panel is rendered by the shadow root), so it never counts as visible;
+    // the slotted title is what the user actually sees
+    confirmDialog: { testId: 'trade-change-confirmation-dialog', inner: 'h2' },
     confirmBtn: { testId: 'trade-change-confirm-btn' },
   },
   tradeDetail: {
