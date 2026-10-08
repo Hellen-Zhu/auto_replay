@@ -503,11 +503,17 @@ function watchUserActions() {
       // a button inside a shadow root has no text of its own (it is slotted), so fall back to the host
       text: clean(control.innerText) || clean(holder && holder.innerText) || clean(el.getAttribute('aria-label') || el.getAttribute('placeholder')),
       tag: el.tagName.toLowerCase(),
+      // what the draft case needs to find the element again
+      inner: holder && el !== holder && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) ? el.tagName.toLowerCase() : '',
+      // an entry inside a list (dropdown item, tab ...) is found by its role and text, even inside a testid container
+      role: ((els.slice(0, holder ? els.indexOf(holder) + 1 : els.length).find((n) => /^(menuitem|option|tab)$/.test(n.getAttribute('role') || '')) || { getAttribute: () => '' }).getAttribute('role')) || '',
+      placeholder: el.getAttribute('placeholder') || '',
+      field: el.tagName === 'SELECT' ? 'select' : el.type === 'file' ? 'file' : el.type === 'password' ? 'password' : el.type === 'checkbox' || el.type === 'radio' ? 'check' : '',
     };
   };
   const send = (kind, d, extra) => {
     if (!d || typeof window.__oreoRecord !== 'function') return;
-    window.__oreoRecord({ kind, testId: d.testId, text: d.text, tag: d.tag, path: location.pathname, ...extra });
+    window.__oreoRecord({ kind, testId: d.testId, text: d.text, tag: d.tag, inner: d.inner, role: d.role, placeholder: d.placeholder, field: d.field, path: location.pathname, ...extra });
   };
   // Typed text: "change" does not leave a shadow root, so the field being edited is remembered from "input"
   // (which does) and reported once, before the next thing the user does.
@@ -552,6 +558,80 @@ function describeUserAction(a, secrets) {
   if (a.kind === 'click') return `Click${quoted} (${where})`;
   if (a.kind === 'press') return `Press ${value} in ${where}`;
   return `Enter "${String(value).slice(0, 80)}" in ${where}`;
+}
+
+// ---- Draft case from a recording ----
+// Turns the recorded actions into steps of the normal case format, so the runner can replay them. It is a draft:
+// it has no checks, and a value the system generated (a trade ID) is replayed as the literal text that was seen.
+
+/** Every string in the config that a typed value may be replaced with: [[value, '${cfg:path}'], ...] */
+function configRefs(config) {
+  const out = [];
+  const walk = (o, prefix) => {
+    for (const [k, v] of Object.entries(o || {})) {
+      if (v && typeof v === 'object') walk(v, `${prefix}${k}.`);
+      else if (typeof v === 'string' && v.length >= 3) out.push([v, `\${cfg:${prefix}${k}}`]);
+    }
+  };
+  walk(config.accounts, 'accounts.');
+  walk(config.tradeData, 'tradeData.');
+  return out;
+}
+
+/** One recorded action -> one step, or null when the element cannot be found again reliably */
+function draftStep(a, refs, state) {
+  // a text that is a config value (e.g. the counterparty picked from a dropdown) stays configurable
+  const text = (refs.find(([v]) => v === a.text) || [])[1] || a.text;
+  const byRole = a.role && a.text ? { role: a.role, name: text, exact: true } : null;
+  const byId = a.testId ? { testId: a.testId, ...(a.inner && a.kind !== 'click' && a.field !== 'file' ? { inner: a.inner } : {}) } : null;
+  const target = (a.kind === 'click' && byRole) || byId
+    || (a.kind === 'click' ? (a.text ? { text, exact: true } : null) : (a.placeholder ? { placeholder: a.placeholder } : null));
+  if (!target) return null;
+  if (a.kind === 'click') return { action: 'click', target };
+  if (a.kind === 'press') return { action: 'press', target, value: a.value };
+  if (a.field === 'check') return null; // the click that toggled it is already a step
+  if (a.field === 'file') return { action: 'upload', target, value: `data/${a.value}` };
+  let value = a.value;
+  if (a.field === 'password') {
+    // never recorded: point at the password of the account whose name was typed just before
+    value = `\${cfg:accounts.${state.account || 'recorded'}.password}`;
+  } else {
+    const ref = refs.find(([v]) => v === value);
+    if (ref) {
+      value = ref[1];
+      const m = /^\$\{cfg:accounts\.([^.]+)\./.exec(value);
+      if (m) state.account = m[1];
+    }
+  }
+  return { action: a.field === 'select' ? 'select' : 'fill', target, value };
+}
+
+function writeDraftCase(dir, run, drafted, baseUrl) {
+  const steps = [{ title: 'Given I open the system', action: 'goto', value: new URL(baseUrl).pathname }];
+  const skipped = [];
+  let page = null;
+  for (const { rec, step } of drafted) {
+    if (!step) { skipped.push(rec.desc); continue; }
+    const last = steps[steps.length - 1];
+    // clicking into a field before typing in it is not a step of its own
+    if (step.action !== 'click' && last.action === 'click' && last.target.testId && last.target.testId === step.target.testId) {
+      const title = last.title;
+      steps.pop();
+      if (title) step.title = title;
+    }
+    if (rec.page !== page) { page = rec.page; if (!step.title) step.title = `When I work on ${page || 'the page'}`; }
+    steps.push(step);
+  }
+  const requiredConfig = [...new Set(JSON.stringify(steps).match(/\$\{cfg:[^}]+\}/g) || [])].map((r) => r.slice(6, -1));
+  const doc = {
+    formatVersion: 1, draft: true,
+    name: run.description || `Recorded session ${run.startedAt}`,
+    description: 'Draft generated from a manual recording. It has no checks and replays generated values (e.g. trade IDs) literally: review it before using it as a case.',
+    source: `recording ${path.basename(dir)}`, requiredConfig, steps,
+    ...(skipped.length ? { skipped } : {}),
+  };
+  fs.writeFileSync(path.join(dir, 'case-draft.json'), JSON.stringify(doc, null, 2) + '\n', 'utf-8');
+  return { count: steps.length, skipped: skipped.length };
 }
 
 function writeRecordingReport(dir, run) {
@@ -601,6 +681,7 @@ async function recordSession(config) {
 
   // Reports are handled one at a time, so the trace entries and screenshots stay in the order things happened
   let queue = Promise.resolve(), open = true;
+  const refs = configRefs(config), draftState = {}, drafted = [];
   const add = (page, a) => {
     if (!open) return;
     const desc = describeUserAction(a, secrets);
@@ -608,6 +689,7 @@ async function recordSession(config) {
       const no = run.steps.length + 1;
       const rec = { desc, time: new Date().toLocaleTimeString(), page: a.path || '' };
       run.steps.push(rec);
+      drafted.push({ rec, step: draftStep(a, refs, draftState) });
       console.log(`    [${no}] ${desc}`);
       try {
         await context.tracing.group(desc);
@@ -643,12 +725,17 @@ async function recordSession(config) {
   await browser.close().catch(() => {});
   run.durationSec = Math.round((Date.now() - t0) / 1000);
   writeRecordingReport(dir, run);
+  const draft = run.steps.length ? writeDraftCase(dir, run, drafted, config.baseUrl) : null;
 
   console.log(`\n■ Recording saved (${run.steps.length} action${run.steps.length === 1 ? '' : 's'})`);
   if (!traced) console.log('   Note: the trace could not be saved because the browser was already gone; the report and screenshots are there.');
   console.log(`   Report:      ${reportUrl(config, path.basename(dir))}`);
   console.log('   Full replay: "Open trace viewer" link at the bottom of the report');
   console.log(`   Folder:      ${dir}  (send this folder to QA)`);
+  if (draft) {
+    console.log(`   Draft case:  case-draft.json in that folder (${draft.count} steps${draft.skipped ? `, ${draft.skipped} action(s) could not be converted` : ''}).`);
+    console.log('                Drag it onto run-case.bat to replay what was recorded. It is a draft without checks; QA reviews it.');
+  }
   // when the browser was closed, the prompt above is still waiting for its Enter
   return { dir, pendingEnter: endedBy === 'closed' && interactive ? enter : undefined };
 }
