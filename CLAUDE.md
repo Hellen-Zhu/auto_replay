@@ -92,7 +92,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 - Known testids:
   - Login: `login-dialog`, `login-email-input`, `login-password-input`, `login-sign-in-to-portal-btn`
   - Top bar: `layout-new-trade-btn`, `layout-ai-reader-btn`, `layout-theme-toggle-btn`, `layout-user-menu-btn` (contains `<span>maker</span>`), `layout-topnav-c…` (truncated in the screenshot)
-- New Trade (from the E2E project's element JSON): confirmed testids `create-trade-stepin-container`, `create-trade-counterparty-combobox`, `create-trade-portfolio-combobox`, `create-trade-stepin-full-radio`; every other new-trade / confirmation dialog / trade detail testid in `framework/targets.ts` is a guess marked `UNCONFIRMED`. Comboboxes: fill the inner input, then click `{ role: 'option', name }`. Test data lives in `tradeData.*` of `config.local.json`; the product type is typed as the Product ID.
+- New Trade: all testids in `framework/targets.ts` (`newTrade`, `tradeDetail`) were supplied by the user from the E2E project's element JSON. Still `UNCONFIRMED` in `framework/flows.ts`: the create-trade request path and the pending-approval status text. Comboboxes: fill the inner input, then click `{ role: 'option', name }`. Test data lives in `tradeData.*` of `config.local.json`; the product type is typed as the Product ID.
 - Trades page path is `/trades`; the page has blotters such as Validation Blotter / Pending Approval / Expires Today, and a search box "Search by Trade ID..." (testid unknown).
 - Example test account: `maker@test.com` (display name `maker`). **The login page path is unconfirmed**; `/` is currently assumed.
 
@@ -126,7 +126,7 @@ npx tsc -p .                      # type check
 ## 10. Suggested next steps
 
 1. **Connect to the real system**: confirm the login page path (change `LOGIN_PATH` in `flows.ts`) and get `login.spec.ts` passing against the real `baseUrl`.
-2. **Trade creation on the real system**: confirm the `UNCONFIRMED` testids, the create-trade request path, what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; extend `PRODUCTS` to all 18 products.
+2. **Trade creation on the real system**: confirm the create-trade request path, what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; extend `PRODUCTS` to all 18 products.
 3. **Approval case**: maker books a TARF through New Trade → `read` the trade ID → checker logs in → finds the trade in Pending Approval and approves it → verify the status. This validates automatic trade-ID variables. Needs the testids of the booking form, search box, approve button and status field.
 4. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).
 5. Optional enhancements: parameterized runs (PO changes currency pair / notional); business data in the report; a case index page; copying ffmpeg from the local cache into the package (if video is needed later).

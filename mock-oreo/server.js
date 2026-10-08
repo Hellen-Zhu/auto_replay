@@ -119,34 +119,34 @@ const newTradePage = `${pageHead}
   <div class="row"><label>Counterparty</label><sc-combobox data-testid="create-trade-counterparty-combobox" options="${COUNTERPARTIES}"></sc-combobox></div>
   <div class="row"><label>Portfolio</label><sc-combobox data-testid="create-trade-portfolio-combobox" options="ABS_CR_UK_ETFBB|MOCK_PORTFOLIO_2"></sc-combobox></div>
   <div class="row"><label>Product ID</label><sc-combobox data-testid="create-trade-product-id-input" options="FX_CO|FX_TRF|FX_FSB|FX_OPT"></sc-combobox></div>
-  <div class="row"><label>Direction</label><sc-combobox data-testid="create-trade-direction-combobox" options="Buy|Sell"></sc-combobox></div>
-  <div class="row"><label>Trade file (.dat)</label><input type="file" accept=".dat" data-testid="create-trade-file-input"></div>
+  <div class="row"><label>Direction</label><sc-combobox data-testid="create-trade-direction-select" options="Buy|Sell"></sc-combobox></div>
+  <div class="row"><label>Trade file (.dat)</label><input type="file" accept=".dat" data-testid="trade-file-upload"></div>
   <div class="row"><label>StepIn</label><input type="checkbox" data-testid="create-trade-stepin-toggle"></div>
   <div id="stepin" hidden>
     <div class="row"><label>StepIn type</label>
       <label><input type="radio" name="stepin" value="full" data-testid="create-trade-stepin-full-radio"> Full</label>
       <label><input type="radio" name="stepin" value="partial" data-testid="create-trade-stepin-partial-radio"> Partial</label></div>
-    <div class="row"><label>Old counterparty</label><sc-combobox data-testid="create-trade-stepin-old-counterparty-combobox" options="${COUNTERPARTIES}"></sc-combobox></div>
+    <div class="row"><label>Old counterparty</label><sc-combobox data-testid="create-trade-old-counterparty-combobox" options="${COUNTERPARTIES}"></sc-combobox></div>
   </div>
   <div id="err"></div>
   <sc-button data-testid="create-trade-save-btn">Save</sc-button> <sc-button data-testid="create-trade-book-btn">Book</sc-button>
 </main>
 <div class="overlay" data-testid="trade-change-confirmation-dialog" hidden><div class="box"><h3>Confirm trade creation</h3>
   <p>Book this trade and send it for approval?</p>
-  <sc-button data-testid="trade-change-confirmation-confirm-btn">Confirm</sc-button></div></div>
+  <sc-button data-testid="trade-change-confirm-btn">Confirm</sc-button></div></div>
 <script>
 const $ = (id) => document.querySelector('[data-testid=' + id + ']');
 const err = document.getElementById('err'), dialog = $('trade-change-confirmation-dialog');
 $('create-trade-stepin-toggle').addEventListener('change', (e) => { document.getElementById('stepin').hidden = !e.target.checked; });
 function collect() {
-  const file = $('create-trade-file-input').files[0];
+  const file = $('trade-file-upload').files[0];
   const stepIn = $('create-trade-stepin-toggle').checked;
   return {
     counterparty: $('create-trade-counterparty-combobox').value, portfolio: $('create-trade-portfolio-combobox').value,
-    productId: $('create-trade-product-id-input').value, direction: $('create-trade-direction-combobox').value,
+    productId: $('create-trade-product-id-input').value, direction: $('create-trade-direction-select').value,
     fileName: file ? file.name : '',
     stepIn: stepIn ? ((document.querySelector('input[name=stepin]:checked') || {}).value || '') : null,
-    oldCounterparty: stepIn ? $('create-trade-stepin-old-counterparty-combobox').value : '',
+    oldCounterparty: stepIn ? $('create-trade-old-counterparty-combobox').value : '',
   };
 }
 $('create-trade-book-btn').addEventListener('click', () => {
@@ -157,7 +157,7 @@ $('create-trade-book-btn').addEventListener('click', () => {
   // simulate the risk calculation that runs before the confirmation dialog
   if (!missing.length) setTimeout(() => { dialog.hidden = false; }, 400);
 });
-$('trade-change-confirmation-confirm-btn').addEventListener('click', async () => {
+$('trade-change-confirm-btn').addEventListener('click', async () => {
   const r = await fetch('/api/trades', { method: 'POST', body: JSON.stringify(collect()) });
   const body = await r.json();
   dialog.hidden = true;

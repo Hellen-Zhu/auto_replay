@@ -50,7 +50,7 @@ npm run replay                         # replay with the runner, exactly what th
 
 1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a product without its file is skipped.
 2. Fill in `tradeData` in `config.local.json` (counterparty, portfolio, direction, old counterparty for StepIn). These values are not stored in the case files, so the PO can use their own.
-3. Against the real system, first replace the entries marked `UNCONFIRMED` in `framework/targets.ts` and `framework/flows.ts` (testids, the create-trade request path, the status text) with the real values.
+3. Against the real system, first check the two entries marked `UNCONFIRMED` in `framework/flows.ts` (the create-trade request path and the status text).
 
 To add a product, add it to `PRODUCTS` in the spec and put its `.dat` file in `data/`.
 

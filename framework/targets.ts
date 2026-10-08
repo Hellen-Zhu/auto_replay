@@ -22,26 +22,25 @@ export const T = {
     password: { testId: 'login-password-input', inner: 'input' },
     signInBtn: { testId: 'login-sign-in-to-portal-btn' },
   },
-  // New Trade form. Entries marked UNCONFIRMED are testids guessed from the naming convention:
-  // replace them with the values from the E2E project's element JSON before running against the real system.
+  // New Trade form (testids taken from the E2E project's element JSON)
   newTrade: {
     container: { testId: 'create-trade-stepin-container' },
     counterparty: { testId: 'create-trade-counterparty-combobox', inner: 'input' },
     portfolio: { testId: 'create-trade-portfolio-combobox', inner: 'input' },
-    productId: { testId: 'create-trade-product-id-input', inner: 'input' }, // UNCONFIRMED
-    direction: { testId: 'create-trade-direction-combobox', inner: 'input' }, // UNCONFIRMED
-    fileInput: { testId: 'create-trade-file-input' }, // UNCONFIRMED
-    bookBtn: { testId: 'create-trade-book-btn' }, // UNCONFIRMED
-    saveBtn: { testId: 'create-trade-save-btn' }, // UNCONFIRMED
-    stepinToggle: { testId: 'create-trade-stepin-toggle' }, // UNCONFIRMED
+    productId: { testId: 'create-trade-product-id-input', inner: 'input' },
+    direction: { testId: 'create-trade-direction-select', inner: 'input' },
+    fileInput: { testId: 'trade-file-upload' },
+    bookBtn: { testId: 'create-trade-book-btn' },
+    saveBtn: { testId: 'create-trade-save-btn' },
+    stepinToggle: { testId: 'create-trade-stepin-toggle' },
     stepinFullRadio: { testId: 'create-trade-stepin-full-radio' },
-    stepinPartialRadio: { testId: 'create-trade-stepin-partial-radio' }, // UNCONFIRMED
-    oldCounterparty: { testId: 'create-trade-stepin-old-counterparty-combobox', inner: 'input' }, // UNCONFIRMED
-    confirmDialog: { testId: 'trade-change-confirmation-dialog' }, // UNCONFIRMED
-    confirmBtn: { testId: 'trade-change-confirmation-confirm-btn' }, // UNCONFIRMED
+    stepinPartialRadio: { testId: 'create-trade-stepin-partial-radio' },
+    oldCounterparty: { testId: 'create-trade-old-counterparty-combobox', inner: 'input' },
+    confirmDialog: { testId: 'trade-change-confirmation-dialog' },
+    confirmBtn: { testId: 'trade-change-confirm-btn' },
   },
   tradeDetail: {
-    headerCard: { testId: 'trade-detail-header-card' }, // UNCONFIRMED
+    headerCard: { testId: 'trade-detail-header-card' },
   },
   layout: {
     newTradeBtn: { testId: 'layout-new-trade-btn' },
