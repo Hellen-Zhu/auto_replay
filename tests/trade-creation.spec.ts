@@ -7,9 +7,9 @@ import { datFile, type TradeCreationData } from '../framework/flows';
 // since not every product supports StepIn full / partial. To cover another product, add it to the lists of the
 // scenarios it supports and put its data/<PRODUCT>.dat in place (a case needs a row in
 // testdata/trade-creation.json only for values that differ from the shared ones); the product type is also what is typed into the Product ID field.
-const PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
-const STEPIN_FULL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
-const STEPIN_PARTIAL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
+const PRODUCTS = ['FX_PSCRIPT', 'FX_TRF', 'FX_PSCRIPT_FSKO'];
+const STEPIN_FULL_PRODUCTS = ['FX_PSCRIPT', 'FX_TRF', 'FX_PSCRIPT_FSKO'];
+const STEPIN_PARTIAL_PRODUCTS = ['FX_PSCRIPT', 'FX_TRF', 'FX_PSCRIPT_FSKO'];
 const SELL_PRODUCTS = ['FX_TRF'];
 
 /** Skips the case when the product's dat file is not there, and sets the description shown to the PO */

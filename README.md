@@ -63,7 +63,7 @@ npm run replay                         # replay with the runner, exactly what th
 
 `tests/trade-creation.spec.ts` has four tests (normal trade, StepIn full, StepIn partial, normal trade with direction Sell), each run for its own list of products, since not every product supports StepIn, mirroring `trade_creation.feature` of the E2E project. Before running them:
 
-1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a case whose product has no file is skipped.
+1. Copy the product `.dat` files into `data/` (`FX_PSCRIPT.dat`, `FX_TRF.dat`, `FX_PSCRIPT_FSKO.dat`); a case whose product has no file is skipped.
 2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
 To add a product, add it to the lists of the scenarios it supports (`PRODUCTS`, `STEPIN_FULL_PRODUCTS`, `STEPIN_PARTIAL_PRODUCTS`, `SELL_PRODUCTS` in the spec) and put its `.dat` file in `data/`.
