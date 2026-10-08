@@ -62,7 +62,6 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `framework/data.ts` | `loadCases<T>(name)`: rows of `testdata/<name>.json` merged with its `defaults` and `testdata/common.json` (folder overridable with `OREO_TESTDATA_DIR`) |
 | `framework/fixtures.ts` | Injects `ui`, `app` and `flows`, exports after the test passes; the file name is the case ID, i.e. the `[xxx]` at the start of the title (or an `@case:xxx` tag when the title has none) |
 | `framework/flows/` | Flow layer, one file per domain: `base.flow.ts` (`BaseFlow` with `this.params(data)`, `Keyword`), `auth.flow.ts` (`flows.auth`: `login(role, keyword?)`, `expectCurrentUser(role)`), `trades.flow.ts` (`flows.trades`: `expectOnTradesPage()`), `trade-creation.flow.ts` (`flows.tradeCreation`: `createTrade(data)` up to the confirmed booking, returning the trade ID, and `expectPendingApproval(tradeId)`; `datFile`, `TradeKind`, `TradeCreationData`), `index.ts` (`Flows`, the registry) |
-| `tests/login.spec.ts` | Login example case |
 | `tests/trade-creation.spec.ts` | Trade creation: one case per row of `testdata/trade-creation.json` (products x {normal, StepIn full, StepIn partial}), mirroring `trade_creation.feature` of the Java + Cucumber E2E project; skips a case whose product has no `.dat` |
 | `testdata/` | Case data: `common.json` plus one `<name>.json` per spec. Committed, QA side only (not packaged: a case file carries the values it uses). The committed values are those of the real system (`10 AM NY`, `CM_OIL_CRU_OPT`, `Buy`, old counterparty `10 AM JAK`); the mock offers them too |
 | `data/` | Files the cases upload (`<PRODUCT>.dat`, copied by the user from the E2E project); packaged for the PO. Only `data/README.md` is in the repo so far |
@@ -72,14 +71,14 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `portable/view-trace.bat` | Runs `runner.js --view`: serves the evidence list with report / trace viewer links until Enter (CRLF, ASCII) |
 | `scripts/build-portable.js` | Builds `dist/UAT-Runner(.zip)` |
 | `mock-oreo/server.js` | Mock OREO (mirrors the shadow DOM structure and testids), for local verification only; `npm run mock` → `http://localhost:4173`, maker / `maker1` |
-| `cases/` | Exported case files (committed to Git, distributed to the PO) |
+| `cases/` | Exported case files (committed to Git, distributed to the PO). Empty in the repo until the trade creation cases are exported with the real `.dat` files |
 
 ## 5. Case file format (formatVersion 1 and 2)
 
 ```json
 {
   "formatVersion": 2, "name": "...", "description": "...",
-  "source": "tests/login.spec.ts › ...", "codeVersion": "git:abc123",
+  "source": "tests/trade-creation.spec.ts › ...", "codeVersion": "git:abc123",
   "requiredConfig": ["accounts.maker.email", "accounts.maker.password"],
   "params": { "counterpartyName": "10 AM NY" },
   "steps": [
@@ -145,7 +144,7 @@ npx tsc -p .                      # type check
 
 ## 10. Suggested next steps
 
-1. **Connect to the real system**: confirm the login page path (change `LoginPage.path`) and get `login.spec.ts` passing against the real `baseUrl`.
+1. **Connect to the real system**: confirm the login page path (change `LoginPage.path`) and get the login step of the trade creation cases passing against the real `baseUrl`. There is no separate login case (removed at the user's request): login is only a `Given` of business cases.
 2. **Trade creation on the real system**: confirm what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; add rows for all 18 products.
 3. **Approval case**: maker books a TARF through New Trade → `read` the trade ID → checker logs in → finds the trade in Pending Approval and approves it → verify the status. This validates automatic trade-ID variables. Needs the testids of the booking form, search box, approve button and status field.
 4. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).

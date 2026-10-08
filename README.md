@@ -3,7 +3,7 @@
 QA runs a case locally with Playwright → once it passes, a **case file** (JSON) is exported automatically → the PO double-clicks the **portable runner** to replay it, really driving Edge on their own computer and producing an execution report with screenshots.
 
 ```
-QA: npx playwright test  ──export──►  cases/login_maker_trades.json
+QA: npx playwright test  ──export──►  cases/TC-TRADE-CREATION-FX_TRF-UI-001.json
                                           │ put on the shared drive
 PO: double-click run-case.bat → pick a number → Edge opens and runs → evidence/xxx/report.html
 ```
@@ -32,7 +32,7 @@ Two kinds of data are kept apart:
 | `framework/data.ts` | `loadCases('<name>')`: the rows of `testdata/<name>.json`, one per case |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/` automatically after a test passes |
 | `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`) |
-| `tests/` | Test cases: `login.spec.ts`, `trade-creation.spec.ts` (one case per row of `testdata/trade-creation.json`) |
+| `tests/` | Test cases: `trade-creation.spec.ts` (one case per row of `testdata/trade-creation.json`) |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
