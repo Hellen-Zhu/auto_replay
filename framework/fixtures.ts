@@ -21,12 +21,13 @@ function exportIdOf(title: string): string {
   return id || title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 80);
 }
 
-/** Returns the data of the running case: its row in testdata/, with defaults and common values filled in */
+/** Returns the data of the running case: the common values and defaults, overridden by its own row if it has one */
 export type TestData = <T extends object>() => T & { id: string };
 
 export const test = base.extend<{ ui: UI; app: App; flows: Flows; testData: TestData }>({
   // Case data, matched at run time by the case ID: the [xxx] at the start of the title is looked up as "id" in
-  // testdata/<spec file name>.json (tests/trade-creation.spec.ts -> testdata/trade-creation.json)
+  // testdata/<spec file name>.json (tests/trade-creation.spec.ts -> testdata/trade-creation.json). A case
+  // without a row there gets the shared values only
   testData: async ({}, use, testInfo) => {
     await use(<T extends object>() => {
       const id = caseIdOf(testInfo.title);

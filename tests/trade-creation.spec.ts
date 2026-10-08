@@ -5,8 +5,8 @@ import { datFile, type TradeCreationData } from '../framework/flows';
 
 // Mirrors trade_creation.feature of the E2E project: one test per scenario, each with its own list of products,
 // since not every product supports StepIn full / partial. To cover another product, add it to the lists of the
-// scenarios it supports, add the rows of those case IDs to testdata/trade-creation.json and put its
-// data/<PRODUCT>.dat in place; the product type is also what is typed into the Product ID field.
+// scenarios it supports and put its data/<PRODUCT>.dat in place (a case needs a row in
+// testdata/trade-creation.json only for values that differ from the shared ones); the product type is also what is typed into the Product ID field.
 const PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
 const STEPIN_FULL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
 const STEPIN_PARTIAL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];

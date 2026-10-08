@@ -18,44 +18,38 @@ function readJson(file: string, label: string): unknown {
 }
 
 /**
- * The rows of testdata/<name>.json, one per case:
- *   { "defaults": { ...shared by every row of this file... }, "cases": [ { "id": "TC-XXX-001", ... }, ... ] }
- * Each row is completed with "defaults" and then with testdata/common.json (values shared by every file):
- * the row wins over defaults, defaults win over common. "id" is the full case ID, the one in [ ] at the start
- * of the test title.
+ * The data of one case: testdata/common.json (values shared by every file), then "defaults" of
+ * testdata/<name>.json, then the row of its "cases" whose "id" is the case ID; a later one wins.
+ *   { "defaults": { ...shared by every case of this spec... }, "cases": [ { "id": "TC-XXX-001", ... }, ... ] }
+ * Everything is optional: a case needs a row only for values that differ from the shared ones, and a spec whose
+ * cases all use the common values needs no file.
  */
-export function loadCases<T extends object>(name: string): (T & { id: string })[] {
-  const label = `testdata/${name}.json`;
-  const file = path.join(DIR, `${name}.json`);
-  if (!fs.existsSync(file)) throw new Error(`Test data file not found: ${label} (looked in ${DIR})`);
-  const doc = readJson(file, label);
-  if (!isObject(doc) || !Array.isArray(doc.cases) || !doc.cases.length) throw new Error(`${label} must contain "cases": a list with at least one row`);
-  if (doc.defaults !== undefined && !isObject(doc.defaults)) throw new Error(`${label}: "defaults" must be an object`);
-
+export function findCase<T extends object>(name: string, id: string): T & { id: string } {
   const commonFile = path.join(DIR, 'common.json');
   const common = fs.existsSync(commonFile) ? readJson(commonFile, 'testdata/common.json') : {};
   if (!isObject(common)) throw new Error('testdata/common.json must be an object');
 
+  const label = `testdata/${name}.json`;
+  const file = path.join(DIR, `${name}.json`);
+  const doc = fs.existsSync(file) ? readJson(file, label) : {};
+  if (!isObject(doc)) throw new Error(`${label} must be an object with "defaults" and / or "cases"`);
+  const { defaults = {}, cases = [] } = doc;
+  if (!isObject(defaults)) throw new Error(`${label}: "defaults" must be an object`);
+  if (!Array.isArray(cases)) throw new Error(`${label}: "cases" must be a list`);
+
   const seen = new Set<string>();
-  return doc.cases.map((row: unknown, i: number) => {
+  let own: Row = {};
+  cases.forEach((row: unknown, i: number) => {
     if (!isObject(row)) throw new Error(`${label}: row ${i + 1} of "cases" must be an object`);
-    const { id } = row;
-    if (typeof id !== 'string' || !/^[\w-]+$/.test(id)) throw new Error(`${label}: row ${i + 1} needs an "id" made of letters, digits, _ and -`);
-    if (seen.has(id)) throw new Error(`${label}: id "${id}" is used by more than one row`);
-    seen.add(id);
-    return { ...common, ...(doc.defaults as Row | undefined), ...row } as T & { id: string };
+    if (typeof row.id !== 'string' || !/^[\w-]+$/.test(row.id)) throw new Error(`${label}: row ${i + 1} needs an "id" made of letters, digits, _ and -`);
+    if (seen.has(row.id)) throw new Error(`${label}: id "${row.id}" is used by more than one row`);
+    seen.add(row.id);
+    if (row.id === id) own = row;
   });
+  return { ...common, ...defaults, ...own, id } as T & { id: string };
 }
 
 /** The case ID of a test: the [xxx] at the start of its title */
 export function caseIdOf(title: string): string | undefined {
   return title.match(/^\s*\[([\w-]+)\]/)?.[1];
-}
-
-/** The row of testdata/<name>.json whose id is the given case ID */
-export function findCase<T extends object>(name: string, id: string): T & { id: string } {
-  const rows = loadCases<T>(name);
-  const row = rows.find((r) => r.id === id);
-  if (!row) throw new Error(`testdata/${name}.json has no row with "id": "${id}" (it has: ${rows.map((r) => r.id).join(', ')})`);
-  return row;
 }

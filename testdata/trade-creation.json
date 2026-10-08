@@ -1,14 +1,5 @@
 {
-  "defaults": {"oldCounterpartyName": "10 AM JAK"},
-  "cases": [
-    {"id": "TC-TRADE-CREATION-FX_CO-UI-001"},
-    {"id": "TC-TRADE-CREATION-FX_CO-UI-002"},
-    {"id": "TC-TRADE-CREATION-FX_CO-UI-003"},
-    {"id": "TC-TRADE-CREATION-FX_TRF-UI-001"},
-    {"id": "TC-TRADE-CREATION-FX_TRF-UI-002"},
-    {"id": "TC-TRADE-CREATION-FX_TRF-UI-003"},
-    {"id": "TC-TRADE-CREATION-FX_FSB-UI-001"},
-    {"id": "TC-TRADE-CREATION-FX_FSB-UI-002"},
-    {"id": "TC-TRADE-CREATION-FX_FSB-UI-003"}
-  ]
+  "defaults": {
+    "oldCounterpartyName": "10 AM JAK"
+  }
 }
