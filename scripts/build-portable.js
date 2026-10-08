@@ -2,9 +2,11 @@
 // 打包 PO 用的绿色版运行器：dist/UAT-Runner(.zip)
 //
 // 用法（在 QA 的 Windows 电脑上）：
-//   npm run build:portable
-//   npm run build:portable -- --node-zip D:\soft\node-v22.22.0-win-x64.zip   # 内网不能访问 nodejs.org 时用本地 zip
-//   npm run build:portable -- --with-config                                  # 把你的 config.local.json 一起打进去（会去掉密码）
+//   npm run build:portable                      # 默认直接复制你电脑上正在用的 node.exe，不联网下载
+//   npm run build:portable -- --with-config     # 把你的 config.local.json 一起打进去（会去掉密码）
+//   npm run build:portable -- --node-zip D:\soft\node-v22.22.0-win-x64.zip   # 想指定别的 Node 版本时
+//   npm run build:portable -- --download-node   # 从 nodejs.org 下载（需要外网）
+//   npm run build:portable -- --with-ffmpeg     # 需要录像时才加
 //
 // 产物结构：
 //   UAT-Runner/
@@ -59,8 +61,14 @@ async function main() {
   // 1. 便携版 Node（只需要 node.exe）
   if (flag('--skip-node')) {
     console.log('1/5 跳过 Node（--skip-node）');
+  } else if (!opt('--node-zip') && !flag('--download-node')) {
+    // 默认：复制当前正在运行的 node.exe（就是你本机装的 Node），不需要外网
+    console.log('1/5 复制本机 Node：' + process.execPath + '（v' + process.versions.node + '）');
+    if (!isWin) console.log('  ⚠ 当前不是 Windows，复制的 node 不能在 PO 的 Windows 电脑上运行，请在 Windows 上打包');
+    fs.mkdirSync(path.join(OUT, 'node'));
+    fs.copyFileSync(process.execPath, path.join(OUT, 'node', isWin ? 'node.exe' : 'node'));
   } else {
-    console.log('1/5 准备便携版 Node');
+    console.log('1/5 准备便携版 Node（来自 zip）');
     const zip = await getNodeZip();
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'node-x-'));
     sh(isWin ? `tar -xf "${zip}" -C "${tmp}"` : `unzip -q "${zip}" -d "${tmp}"`);
@@ -109,7 +117,7 @@ async function main() {
   sh('npm install --omit=dev --no-audit --no-fund', OUT);
 
   // 录像用的 ffmpeg（很小，约 1-2MB），装到运行器自己的目录里；失败不影响执行，只是没有录像
-  if (!flag('--skip-ffmpeg')) {
+  if (flag('--with-ffmpeg')) {
     try {
       console.log('  安装录像组件 ffmpeg');
       const env = { ...process.env, PLAYWRIGHT_BROWSERS_PATH: path.join(OUT, 'ms-playwright') };

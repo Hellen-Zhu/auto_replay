@@ -15,7 +15,7 @@ const DEFAULTS = {
     slowMo: 300, // 每步放慢 300ms，PO 看得清
   },
   timeouts: { step: 15000 },
-  evidence: { video: true }, // 录像需要 Playwright 的 ffmpeg，打包脚本会一起打进去
+  evidence: { video: false }, // 录像需要 Playwright 的 ffmpeg（内网通常装不了），需要时在 config.local.json 里设为 true
 };
 
 function deepMerge(base, extra) {

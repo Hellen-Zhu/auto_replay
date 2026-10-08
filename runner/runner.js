@@ -61,12 +61,13 @@ async function chooseCase(argPath) {
     console.log(`\ncases 文件夹里没有用例。请把 QA 提供的 .json 用例文件放到：\n  ${CASES_DIR}\n`);
     return null;
   }
-  console.log('\n可执行的用例：\n');
+  console.log(`\n在 ${CASES_DIR} 中找到 ${cases.length} 个用例：\n`);
   cases.forEach((c, i) => {
-    console.log(`  ${String(i + 1).padStart(2)}. ${c.doc.name}`);
+    console.log(`  ${String(i + 1).padStart(2)}. ${c.doc.name}   [${path.basename(c.file)}]`);
     if (c.doc.description) console.log(`      ${c.doc.description}`);
   });
-  const n = Number(await ask(`\n请输入编号（1-${cases.length}）后回车：`));
+  const answer = await ask(`\n请输入要执行的用例编号（1-${cases.length}），直接回车执行第 1 个：`);
+  const n = answer === '' ? 1 : Number(answer);
   if (!Number.isInteger(n) || n < 1 || n > cases.length) {
     console.log('编号无效。');
     return null;
@@ -154,7 +155,7 @@ async function runCase({ file, doc }, config) {
   const viewport = { width: 1280, height: 720 };
   let browser = await chromium.launch(launchOptions(config));
   let context, page;
-  if (config.evidence?.video !== false) {
+  if (config.evidence?.video === true) {
     try {
       context = await browser.newContext({ viewport, recordVideo: { dir, size: viewport } });
       page = await context.newPage();

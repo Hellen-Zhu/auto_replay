@@ -4,3 +4,4 @@ test-results/
 playwright-report/
 evidence/
 dist/
+.DS_Store

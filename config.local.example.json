@@ -19,5 +19,8 @@
   },
   "timeouts": {
     "step": 15000
+  },
+  "evidence": {
+    "video": false
   }
 }

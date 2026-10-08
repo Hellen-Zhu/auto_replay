@@ -16,7 +16,7 @@ export default defineConfig({
     channel: launch.channel,
     launchOptions: { slowMo: launch.slowMo, executablePath: launch.executablePath, args: launch.args },
     trace: 'on',
-    video: cfg.evidence?.video === false ? 'off' : 'on',
+    video: cfg.evidence?.video === true ? 'on' : 'off',
     screenshot: 'on',
   },
 });
