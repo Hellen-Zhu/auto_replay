@@ -4,6 +4,7 @@
 //   double-click run-case.bat               -> list the cases, type a number to run one
 //   drag a case .json onto run-case.bat     -> run that case directly
 //   node runner/runner.js cases/xxx.json
+//   double-click view-trace.bat             -> serve reports and full replays (trace viewer) of earlier runs
 
 const fs = require('fs');
 const path = require('path');
@@ -165,7 +166,8 @@ ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
 <div class="meta">${summary} · Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
 <table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
-<p class="meta">Full replay: trace.zip (QA can open it with npx playwright show-trace to inspect step by step)</p>
+<p class="meta">Full replay: <a href="${esc(run.traceUrl)}">${esc(run.traceUrl)}</a><br>
+Opens the trace viewer (every action with page snapshots, console and network). The link works while the runner window is still open; later, double-click view-trace.bat first. The same data is in trace.zip in this folder.</p>
 </body></html>`;
   fs.writeFileSync(path.join(dir, 'report.html'), html, 'utf-8');
 }
@@ -176,6 +178,73 @@ function openFile(file) {
     if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', file], { detached: true, stdio: 'ignore' }).unref();
     else if (process.platform === 'darwin') spawn('open', [file], { detached: true, stdio: 'ignore' }).unref();
   } catch { /* fine if it cannot be opened; the path has already been printed */ }
+}
+
+// ---------------- Report and trace viewer links ----------------
+// Playwright's trace viewer is a static web app shipped inside playwright-core, but it needs http (a service
+// worker), so a file:// link cannot open it. A tiny local-only server serves the viewer and the evidence
+// folder, which gives every report and every trace.zip a URL.
+const VIEW_HOST = '127.0.0.1';
+const viewPort = (config) => Number(process.env.OREO_VIEW_PORT) || Number(config?.evidence?.viewPort) || 9400;
+const viewBase = (config) => `http://${VIEW_HOST}:${viewPort(config)}`;
+const reportUrl = (config, runDir) => `${viewBase(config)}/evidence/${encodeURIComponent(runDir)}/report.html`;
+const traceUrl = (config, runDir) =>
+  `${viewBase(config)}/trace/index.html?trace=${encodeURIComponent(`${viewBase(config)}/evidence/${encodeURIComponent(runDir)}/trace.zip`)}`;
+
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.zip': 'application/zip', '.ttf': 'font/ttf', '.webm': 'video/webm', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm',
+};
+
+function evidenceIndex(config) {
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const runs = fs.existsSync(EVIDENCE_DIR)
+    ? fs.readdirSync(EVIDENCE_DIR).filter((d) => fs.existsSync(path.join(EVIDENCE_DIR, d, 'report.html')))
+        .sort((a, b) => b.slice(-19).localeCompare(a.slice(-19))) // newest first: folder names end with the run timestamp
+    : [];
+  const rows = runs.map((d) => {
+    let status = '';
+    try { status = JSON.parse(fs.readFileSync(path.join(EVIDENCE_DIR, d, 'result.json'), 'utf-8')).status; } catch { /* older run */ }
+    const trace = fs.existsSync(path.join(EVIDENCE_DIR, d, 'trace.zip')) ? `<a href="${esc(traceUrl(config, d))}">Full replay</a>` : '';
+    return `<tr><td>${esc(d)}</td><td>${esc(status)}</td><td><a href="${esc(reportUrl(config, d))}">Report</a></td><td>${trace}</td></tr>`;
+  }).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>UAT runs</title>
+<style>body{font-family:system-ui;margin:24px;color:#111}table{border-collapse:collapse;font-size:13px}td,th{padding:6px 14px;border-bottom:1px solid #e5e7eb;text-align:left}</style></head>
+<body><h1>UAT runs</h1>${runs.length ? `<table><thead><tr><th>Run</th><th>Result</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No runs yet.</p>'}</body></html>`;
+}
+
+/** Resolves to the server, or to null when the port is taken (normally by another runner window that already serves the links) */
+function startViewServer(config) {
+  const viewerDir = path.join(path.dirname(require.resolve('playwright-core/package.json')), 'lib', 'vite', 'traceViewer');
+  const roots = { trace: viewerDir, evidence: EVIDENCE_DIR };
+  const server = require('http').createServer((req, res) => {
+    let pathname;
+    try { pathname = decodeURIComponent(new URL(req.url, viewBase(config)).pathname); } catch { res.writeHead(400); return res.end(); }
+    if (pathname === '/') { res.writeHead(200, { 'content-type': MIME['.html'] }); return res.end(evidenceIndex(config)); }
+    const [, top, ...rest] = pathname.split('/');
+    const root = roots[top];
+    const file = root && path.resolve(root, rest.join('/'));
+    // never serve anything outside the viewer and evidence folders
+    if (!file || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end('Not found'); }
+    res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store' });
+    fs.createReadStream(file).pipe(res);
+  });
+  return new Promise((resolve) => {
+    server.once('error', () => resolve(null));
+    server.listen(viewPort(config), VIEW_HOST, () => resolve(server));
+  });
+}
+
+/** Keep the links alive until the PO presses Enter (console only: with piped input there is nobody to wait for) */
+async function serveUntilEnter(config) {
+  const server = await startViewServer(config);
+  if (!server) {
+    console.log(`   (Port ${viewPort(config)} is already in use - normally by another runner or view-trace window, which keeps the links working.)`);
+    return;
+  }
+  if (interactive) await askOptional('\nThe links above work while this window stays open. Press Enter to close: ');
+  server.closeAllConnections?.();
+  server.close();
 }
 
 // ---------------- Saving settings ----------------
@@ -283,6 +352,7 @@ async function runCase({ file, doc }, config) {
   const run = {
     caseName: doc.name, description: doc.description, caseFile: path.basename(file), source: doc.source, codeVersion: doc.codeVersion,
     machine: require('os').hostname(), startedAt: new Date().toLocaleString(), status: 'passed', stepByStep, pausedSec: 0, steps: [],
+    traceUrl: traceUrl(config, path.basename(dir)),
   };
   const t0 = Date.now();
 
@@ -391,16 +461,25 @@ async function runCase({ file, doc }, config) {
   writeReport(dir, run);
 
   console.log(run.status === 'passed' ? '\n✅ Run passed' : '\n❌ Run failed');
-  console.log(`   Report: ${path.join(dir, 'report.html')}\n`);
+  console.log(`   Report:      ${reportUrl(config, path.basename(dir))}`);
+  console.log(`   Full replay: ${run.traceUrl}`);
+  console.log(`   Folder:      ${dir}`);
   return { run, dir };
 }
 
 async function main() {
   const config = loadConfig(ROOT);
+  if (process.argv[2] === '--view') {
+    console.log(`\nReports and full replays of earlier runs: ${viewBase(config)}/`);
+    if (!process.env.OREO_NO_OPEN) openFile(`${viewBase(config)}/`);
+    await serveUntilEnter(config);
+    return 0;
+  }
   const chosen = await chooseCase(process.argv[2]);
   if (!chosen) return 2;
   const { run, dir } = await runCase(chosen, config);
   if (!process.env.OREO_NO_OPEN) openFile(path.join(dir, 'report.html'));
+  await serveUntilEnter(config);
   return run.status === 'passed' ? 0 : 1;
 }
 

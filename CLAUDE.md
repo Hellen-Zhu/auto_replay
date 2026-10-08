@@ -41,6 +41,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 - When settings are already provided, the runner shows them and lets the PO type `C` to change `baseUrl` and the non-secret account fields for that run only; changing the address or an account clears the matching saved password so it is asked for again. Afterwards the runner offers to save the typed-in address and account to `config.local.json` (default No); it never writes a password, only blanks one that no longer matches.
 - Pausing is a runner-only feature (the case format has no pause action): before the run the PO can type `S` for step-by-step mode (stops before each titled group), and on a real console pressing `P` pauses after the current step; Enter resumes. Pauses only happen between steps, are recorded per step (`pausedSec`) and excluded from the reported duration. That prompt defaults to a normal run when input has ended, so older piped inputs keep working.
 - Every replay produces `evidence/<caseId>_<timestamp>/`: `report.html` (one row per BDD step, i.e. per titled group, with its result and screenshot; the actions behind it are in a collapsed list, opened automatically for a failed step), `result.json` (still one entry per action), `step-XX.png` (one per action), `trace.zip`.
+- Links: the runner starts a local-only http server (`127.0.0.1`, port `evidence.viewPort` or `OREO_VIEW_PORT`, default 9400) that serves `/evidence/*` and Playwright's own trace viewer from `playwright-core/lib/vite/traceViewer` at `/trace/*`. The console and the report footer show the report URL and the "Full replay" trace viewer URL (`/trace/index.html?trace=<url of trace.zip>`). On a console the server lives until the PO presses Enter; with piped input the runner exits right away. `--view` (view-trace.bat) serves an index of all runs. `trace.playwright.dev` is not used: the intranet cannot reach it.
 
 ## 4. Layout and responsibilities
 
@@ -57,6 +58,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `data/` | Files the cases upload (`<PRODUCT>.dat`, copied by the user from the E2E project); packaged for the PO. Only `data/README.md` is in the repo so far |
 | `runner/runner.js` | PO-side runner: case selection, prompts for missing config (hidden password input), execution, screenshots, trace, HTML report |
 | `portable/run-case.bat` | The PO's double-click entry point (**must use CRLF line endings**, keep the content ASCII) |
+| `portable/view-trace.bat` | Runs `runner.js --view`: serves the evidence list with report / trace viewer links until Enter (CRLF, ASCII) |
 | `scripts/build-portable.js` | Builds `dist/UAT-Runner(.zip)` |
 | `mock-oreo/server.js` | Mock OREO (mirrors the shadow DOM structure and testids), for local verification only; `npm run mock` → `http://localhost:4173`, maker / `maker1` |
 | `cases/` | Exported case files (committed to Git, distributed to the PO) |
@@ -120,6 +122,7 @@ npx tsc -p .                      # type check
 - While a case runs on a console, key echo is muted and lines typed during the run are discarded before the next prompt (`discardTyped`), so a stray Enter cannot skip a pause. This is skipped for piped input, where every buffered line is an intended answer.
 - When video initialization fails, **close the whole browser and launch again**; closing only the context makes the later `newPage` fail.
 - The "no browser found" hint is shown only when `browserType.launch` fails; otherwise it is a false alarm.
+- The trace viewer needs http (it registers a service worker), so a `file://` link to it never works; that is why the runner serves it. The Claude desktop preview pane cannot register that service worker either - verify the viewer in a real Chrome / Edge.
 - `${var:...}` inside a target must also be resolved in `executeStep` (needed to locate a trade that was just booked).
 - Response capture uses `page.route` + `route.fetch()`, not `waitForResponse`: when the page navigates right after the response, the body is already gone (`did not return JSON`).
 

@@ -24,6 +24,7 @@ A case file contains **no server address and no password**, only relative paths 
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
 | `portable/run-case.bat` | The launcher the PO double-clicks |
+| `portable/view-trace.bat` | Opens the list of earlier runs with their report and trace viewer links |
 | `scripts/build-portable.js` | Builds the portable runner |
 | `mock-oreo/` | Mock OREO pages, for local demos only |
 
@@ -102,11 +103,14 @@ This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, onl
 4. Press Enter to run, or type `S` to run **step by step**: the run then stops after each Given / When / Then block until you press Enter.
 5. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail.
 6. When it finishes, the report opens automatically. It reads as the scenario: one row per Given / When / Then step with its result and a screenshot (pauses and their length are shown too); click "N actions" under a step to see the individual actions behind it.
-7. If something goes wrong, send the matching folder under `evidence/` to QA; its `trace.zip` can be replayed step by step.
+7. The console and the bottom of the report give two links: **Report** (the report as a URL) and **Full replay** (Playwright's trace viewer for this run: every action with before / after snapshots, console and network). They are `http://127.0.0.1:9400/...` addresses served by the runner itself, so they work only on this computer and only while the runner window stays open (press Enter in it to close).
+8. To open an earlier run later, double-click **view-trace.bat**: it opens a page listing every run with its Report and Full replay links.
+9. If something goes wrong, send the matching folder under `evidence/` to QA; they can drop it into their own `evidence/` folder and open it the same way.
 
 ## Known limitations
 
 - No video by default (recording depends on Playwright's ffmpeg, which usually cannot be downloaded on the intranet); per-step screenshots and the trace are enough to reproduce. If needed, set `"evidence": { "video": true }` in `config.local.json` and install ffmpeg manually.
+- The report and trace viewer links are local (`127.0.0.1`), not shareable URLs; to show a run to someone else, send them the evidence folder. If port 9400 is taken, set `"evidence": { "viewPort": 9500 }` in `config.local.json`.
 - The PO's computer needs Edge (default) or Chrome (set `browser.channel` to `"chrome"`).
 - The company must allow running `node.exe` and `.bat` from a shared drive or an unzipped folder; test on one PO machine first.
 - `LOGIN_PATH` defaults to `/`; if the real login page is elsewhere, change `framework/flows.ts`.
