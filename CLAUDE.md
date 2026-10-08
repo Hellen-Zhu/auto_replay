@@ -76,6 +76,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `portable/view-trace.bat` | Runs `runner.js --view`: serves the evidence list with report / trace viewer links until Enter (CRLF, ASCII) |
 | `scripts/build-portable.js` | Builds `dist/UAT-Runner(.zip)` |
 | `scripts/sync-elements.js` | `npm run sync:elements`: mirrors the E2E project's element JSON into `elements/` and checks it against `framework/` (without a path: the check only). `SUPPORTED` must stay in step with `FIND_BY` |
+| `.claude/skills/porting-java-e2e-cases/` | Skill that implements a case of the Java + Cucumber E2E project here (`SKILL.md` plus `example-trade-creation.md`, the trace of the case that is already ported). The E2E project's layers are feature -> FLOW snippet -> PAGE / COMPONENT snippet -> built-in Genie step or custom Java step -> element key, mapped to case step -> flow method (substeps) -> page / component operation -> `element('<key>')`. It syncs `elements/` first, skips a whole scenario it cannot express (non-UI step, undefined element, unsupported control) and never commits. **Written from the user's photos of the E2E project and not run against it, at the user's request**: where the `*.snippet` files and the stored variables' data live, and the full list of built-in steps, are found at run time, so the first real port may need the skill adjusted |
 | `mock-oreo/server.js` | Mock OREO (mirrors the shadow DOM structure and testids), for local verification only; `npm run mock` → `http://localhost:4173`, maker / `maker1` |
 | `cases/` | Exported case files (committed to Git, distributed to the PO). Empty in the repo until the trade creation cases are exported with the real `.dat` files |
 
@@ -155,8 +156,9 @@ npx tsc -p .                      # type check
 2. **Connect to the real system**: confirm the login page path (change `LoginPage.path`) and get the login step of the trade creation cases passing against the real `baseUrl`. There is no separate login case (removed at the user's request): login is only a `Given` of business cases.
 3. **Trade creation on the real system**: confirm what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; extend the registry in `framework/products.ts` (per product, only the capabilities it supports) to all 18 products.
 4. **Approval case**: maker books a TARF through New Trade → `read` the trade ID → checker logs in → finds the trade in Pending Approval and approves it → verify the status. This validates automatic trade-ID variables. Needs the testids of the booking form, search box, approve button and status field.
-5. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).
-6. Optional enhancements: a case index page; copying ffmpeg from the local cache into the package (if video is needed later).
+5. **First port with the skill**: on the company machine run `/porting-java-e2e-cases <E2E project> <feature file>` on a small UI feature and correct the skill where the real project differs from the photos (snippet location, data files, built-in steps).
+6. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).
+7. Optional enhancements: a case index page; copying ffmpeg from the local cache into the package (if video is needed later).
 
 ## 11. Coding conventions
 

@@ -44,6 +44,7 @@ Two kinds of data are kept apart:
 | `scripts/build-portable.js` | Builds the portable runner |
 | `scripts/sync-elements.js` | Refreshes `elements/` from the E2E project and checks it against the page objects |
 | `mock-oreo/` | Mock OREO pages, for local demos only |
+| `.claude/skills/porting-java-e2e-cases/` | Claude Code skill: implements a case of the E2E project here, see "QA: porting a case from the E2E project" |
 
 ## QA: first-time setup
 
@@ -208,6 +209,30 @@ Key points:
 - In a page or component, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
 - Text fields of a target can be a parameter or a config reference too: `{ role: 'menuitem', name: p.direction }`.
 - Only **passing** cases are exported.
+
+## QA: porting a case from the E2E project
+
+A case that already exists in the Java + Cucumber E2E project does not have to be rewritten by hand: the Claude Code skill in `.claude/skills/porting-java-e2e-cases/` implements it here. Open this project in Claude Code and ask for it, or call the skill directly:
+
+```
+/porting-java-e2e-cases C:\path\to\the-e2e-project src\test\resources\features\ui\trading\trade_cancellation.feature
+```
+
+A third argument limits it to one case ID; the project path can also come from `OREO_E2E_DIR`.
+
+The two projects have the same layers, so the skill translates level by level:
+
+| E2E project | This project |
+|---|---|
+| Feature step | The case's step, with the same text |
+| FLOW snippet | Flow method; its lines become the substeps |
+| PAGE / COMPONENT snippet, built-in or Java step | Atomic operation of a page / component |
+| Element key | `element('<same key>')`, after `npm run sync:elements` |
+| Stored variable | `testdata/`, or the value a flow returns (a captured trade ID) |
+
+- It syncs `elements/` first, reuses the flows and operations that exist, and ends with a report per case ID: ported and passed, ported but not run, or not ported and why.
+- It stops instead of guessing: a step that is not a browser action (API, database), an element that is not defined or not found by testid, or a control this project cannot operate yet leaves the whole scenario unported, with what is needed. It never invents an element name, a testid or a data value.
+- It does not commit. Review the changes, run the cases against UAT (every run books real trades) and commit them yourself.
 
 ## Packaging for the PO
 
