@@ -201,6 +201,10 @@ async function executeStep(page, step, ctx) {
       // The target may be the file input itself or an upload zone (web component) that wraps it
       let loc = resolveTarget(page, step.target);
       await loc.waitFor({ state: 'attached', timeout });
+      // setInputFiles does not scroll, so bring the upload area into view first: the upload is then visible
+      // in the browser and in the step screenshot (a hidden file input cannot scroll, use its parent)
+      await loc.evaluate((el) => (el.offsetParent || !el.parentElement ? el : el.parentElement)
+        .scrollIntoView({ block: 'center', inline: 'nearest' }));
       if (!(await loc.evaluate((el) => el.tagName === 'INPUT'))) loc = loc.locator('input[type=file]');
       await loc.setInputFiles(file, { timeout });
       return;
