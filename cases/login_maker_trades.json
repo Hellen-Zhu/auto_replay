@@ -1,0 +1,68 @@
+{
+  "formatVersion": 1,
+  "name": "Maker 登录后进入 Trades 页面并显示当前用户",
+  "description": "使用 maker 账号登录 OREO，校验跳转到 Trades 页面，右上角用户菜单显示 maker",
+  "source": "tests/login.spec.ts › Maker 登录后进入 Trades 页面并显示当前用户 @case:login_maker_trades",
+  "codeVersion": "local",
+  "exportedAt": "2026-10-08T03:26:12.727Z",
+  "requiredConfig": [
+    "accounts.maker.email",
+    "accounts.maker.password",
+    "accounts.maker.displayName"
+  ],
+  "steps": [
+    {
+      "title": "以 maker 身份登录",
+      "action": "goto",
+      "value": "/"
+    },
+    {
+      "action": "expectVisible",
+      "target": {
+        "testId": "login-dialog"
+      }
+    },
+    {
+      "action": "fill",
+      "target": {
+        "testId": "login-email-input",
+        "inner": "input"
+      },
+      "value": "${cfg:accounts.maker.email}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "testId": "login-password-input",
+        "inner": "input"
+      },
+      "value": "${cfg:accounts.maker.password}",
+      "secret": true
+    },
+    {
+      "action": "click",
+      "target": {
+        "testId": "login-sign-in-to-portal-btn"
+      }
+    },
+    {
+      "title": "校验进入 Trades 页面",
+      "action": "expectUrl",
+      "value": "/trades"
+    },
+    {
+      "action": "expectVisible",
+      "target": {
+        "testId": "layout-new-trade-btn"
+      }
+    },
+    {
+      "title": "校验右上角显示当前用户",
+      "action": "expectText",
+      "target": {
+        "testId": "layout-user-menu-btn"
+      },
+      "value": "${cfg:accounts.maker.displayName}"
+    }
+  ]
+}

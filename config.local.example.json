@@ -1,0 +1,23 @@
+{
+  "baseUrl": "https://oreo-uat.example.internal:8088",
+  "accounts": {
+    "maker": {
+      "email": "maker@test.com",
+      "password": "",
+      "displayName": "maker"
+    },
+    "checker": {
+      "email": "checker@test.com",
+      "password": "",
+      "displayName": "checker"
+    }
+  },
+  "browser": {
+    "channel": "msedge",
+    "headless": false,
+    "slowMo": 300
+  },
+  "timeouts": {
+    "step": 15000
+  }
+}

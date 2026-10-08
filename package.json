@@ -1,0 +1,19 @@
+{
+  "name": "oreo-uat-replay",
+  "version": "1.0.0",
+  "description": "OREO UAT：本地跑 case 自动导出用例文件，PO 用绿色版运行器回放",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "replay": "node runner/runner.js",
+    "build:portable": "node scripts/build-portable.js",
+    "mock": "node mock-oreo/server.js"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
+  },
+  "private": true
+}
