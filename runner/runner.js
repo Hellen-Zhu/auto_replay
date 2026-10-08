@@ -105,7 +105,8 @@ const bdd = (title) => esc(title).replace(/^(Given|When|Then|And|But)\b/, '<b cl
 
 const STATUS_TEXT = { passed: 'Passed', failed: 'Failed', skipped: 'Not run' };
 
-// Group the recorded actions by BDD step: a titled action starts a new group and the untitled ones after it belong to it
+// Group the recorded actions by BDD step: a titled action starts a new group and the untitled ones after it belong to it.
+// A substep (a step of the flow behind the case's step) is a heading inside the group's action list
 function groupSteps(steps) {
   const groups = [];
   steps.forEach((s, i) => {
@@ -130,7 +131,7 @@ function writeReport(dir, run) {
   const groups = groupSteps(run.steps);
   const rows = groups.map((g, i) => {
     const actions = g.actions.map((a) => `
-          <li class="${a.status}"><span class="no">${a.no}.</span> ${esc(a.desc)} <span class="st">${STATUS_TEXT[a.status]}</span>${a.screenshot ? ` <a href="${esc(a.screenshot)}" target="_blank">screenshot</a>` : ''}${a.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(a.pausedSec)} after this action</div>` : ''}</li>`).join('');
+          ${a.substep ? `<li class="sub">${bdd(a.substep)}</li>` : ''}<li class="${a.status}"><span class="no">${a.no}.</span> ${esc(a.desc)} <span class="st">${STATUS_TEXT[a.status]}</span>${a.screenshot ? ` <a href="${esc(a.screenshot)}" target="_blank">screenshot</a>` : ''}${a.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(a.pausedSec)} after this action</div>` : ''}</li>`).join('');
     return `
     <tr class="${g.status}">
       <td>${i + 1}</td>
@@ -157,7 +158,7 @@ function writeReport(dir, run) {
   table{border-collapse:collapse;width:100%;font-size:13px}
   th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}
   tr.failed td{background:#fef2f2} tr.skipped td{color:#9ca3af}
-  .step{font-size:14px}
+  .step{font-size:14px} li.sub{list-style:none;margin:6px 0 2px -14px;font-weight:600;color:#374151}
   details{margin-top:6px;color:#4b5563;font-size:12px} summary{cursor:pointer;color:#6b7280}
   ul{list-style:none;margin:6px 0 0;padding:0} li{padding:2px 0} li.skipped{color:#9ca3af}
   .no{color:#9ca3af} .st{color:#16a34a} li.failed .st{color:#dc2626} li.skipped .st{color:#9ca3af}
@@ -390,7 +391,7 @@ async function runCase({ file, doc }, config) {
     }
   }
 
-  // Step-by-step mode stops after each titled group (Given / When / Then ...), so the PO can look at the page
+  // Step-by-step mode stops after each titled group (Given / When / Then ...) and each substep, so the PO can look at the page
   const stepByStep = /^s/i.test(await askOptional('\nPress Enter to run, or type S to run step by step (pause after each Given / When / Then): '));
 
   console.log(`\n▶ Scenario: ${doc.name}\n  Evidence folder: ${dir}`);
@@ -462,10 +463,12 @@ async function runCase({ file, doc }, config) {
     const step = doc.steps[i];
     const desc = describeStep(step, ctx.vars, ctx.params);
     const rec = { title: step.title, desc, status: 'skipped' };
+    if (step.substep) rec.substep = step.substep;
     run.steps.push(rec);
     if (failed) continue;
 
     if (step.title) console.log(`  ■ ${step.title}`);
+    if (step.substep) console.log(`    - ${step.substep}`);
     process.stdout.write(`    [${i + 1}/${doc.steps.length}] ${desc} ... `);
     try {
       const r = await executeStep(page, step, ctx);
@@ -488,7 +491,7 @@ async function runCase({ file, doc }, config) {
     } catch { /* ignore cases such as the page already being closed */ }
 
     const next = doc.steps[i + 1];
-    if (!failed && next && (pauseRequested || (stepByStep && next.title))) await pause(rec, i + 1);
+    if (!failed && next && (pauseRequested || (stepByStep && (next.title || next.substep)))) await pause(rec, i + 1);
   }
   if (interactive) process.stdin.off('keypress', onKey);
   setQuietKeys(false);

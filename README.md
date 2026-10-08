@@ -155,7 +155,7 @@ private async selectBasicInfo(product: string, data: TradeCreationData) {
 ```ts
 test('[TC-TRADE-SEARCH-FX_TRF-UI-001] Checker finds a new FX_TRF trade', async ({ flows, testData }) => {
   const data = testData<TradeCreationData>();                                      // shared values + row "TC-TRADE-SEARCH-FX_TRF-UI-001" of testdata/trade-search.json, if any
-  await flows.auth.login('maker');                                                 // Given I log in as maker
+  await When('maker is logged in to the trade portal', () => flows.auth.login('maker'));   // the step as in the feature file
   const tradeId = await flows.tradeCreation.createTrade('FX_TRF', data);           // When I open the New Trade form ... And I book the trade and confirm
   await flows.tradeCreation.expectPendingApproval(tradeId);                        // Then the trade is created with pending approval status
   await flows.auth.login('checker', 'And');                                        // And I log in as checker
@@ -168,7 +168,7 @@ Key points:
 
 - Cases hold no locators, no `ui.xxx` and no page calls: only flows and data. Flows hold no locators and no `ui.click / ui.fill`: only page / component operations. Pages and components hold no Given / When / Then and no multi-step sequences.
 - An action flow does not assert its own outcome: `createTrade` ends at the confirmed booking and returns the trade ID, and the case states the expected result with a separate `expect...` flow (the `Then`). This keeps the scenario readable in the case and lets another case expect something else after the same action.
-- Each flow has a default keyword (`login` is `Given`); pass another one when the step sits elsewhere in the scenario (`flows.auth.login('checker', 'And')`).
+- **A case is written like the scenario of a feature file**: each line is `await Given / When / Then / And / But('step text', () => flows.<domain>.<step>(...))`, using the fixtures of the same names; the step returns what the flow returns (`const tradeId = await And("creates a new 'FX_TRF' trade", () => flows.tradeCreation.createTrade(product, data))`). That step is a row of the PO's report; the steps the flow opens inside it (`I open the New Trade form`, `I book the trade and confirm`, ...) are recorded as `substep` and shown as headings in the row's action list, like a feature step and the snippet behind it. A flow called outside any case step still reports its own steps as rows.
 - Inside a page or component every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
 - The case ID in `[ ]` at the start of the title sets the exported file name (a title without one can use an `@case:xxx` tag instead). The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.

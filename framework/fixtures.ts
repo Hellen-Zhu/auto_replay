@@ -24,7 +24,19 @@ function exportIdOf(title: string): string {
 /** Returns the data of the running case: the common values and defaults, overridden by its own row if it has one */
 export type TestData = <T extends object>() => T & { id: string };
 
-export const test = base.extend<{ ui: UI; app: App; flows: Flows; testData: TestData }>({
+/** A step of the scenario as it is written in the case: await When('maker is logged in ...', () => flows.auth.login('maker')) */
+export type BddStep = <R>(text: string, fn: () => Promise<R>) => Promise<R>;
+type BddSteps = { Given: BddStep; When: BddStep; Then: BddStep; And: BddStep; But: BddStep };
+
+export const test = base.extend<{ ui: UI; app: App; flows: Flows; testData: TestData } & BddSteps>({
+  // The scenario's steps, written in the case like the lines of a feature file. The step returns what fn returns.
+  // Capitalized on purpose, like the methods of UI
+  Given: async ({ ui }, use) => use((text, fn) => ui.Given(text, fn)),
+  When: async ({ ui }, use) => use((text, fn) => ui.When(text, fn)),
+  Then: async ({ ui }, use) => use((text, fn) => ui.Then(text, fn)),
+  And: async ({ ui }, use) => use((text, fn) => ui.And(text, fn)),
+  But: async ({ ui }, use) => use((text, fn) => ui.But(text, fn)),
+
   // Case data, matched at run time by the case ID: the [xxx] at the start of the title is looked up as "id" in
   // testdata/<spec file name>.json (tests/trade-creation.spec.ts -> testdata/trade-creation.json). A case
   // without a row there gets the shared values only

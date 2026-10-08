@@ -48,6 +48,7 @@ export type Capture = { url: string; method?: string; field: string; saveAs: str
 
 type Step = {
   title?: string;
+  substep?: string;
   action: string;
   target?: Target;
   value?: string;
@@ -63,17 +64,27 @@ export class UI {
   /** Case data handed out by params() so far: name -> value */
   private readonly paramValues: Record<string, string> = {};
   private pendingTitle?: string;
+  private pendingSubstep?: string;
+  private depth = 0;
 
   constructor(readonly page: Page, readonly config: any, readonly rootDir?: string) {}
 
   // ---------- Business step grouping ----------
+  // Two levels, like a feature step and the snippet behind it: the outermost step (written in the case) is the
+  // title, i.e. a row of the report; a step opened inside it (by a flow) is recorded as a substep, shown under
+  // that row. A flow step that no case step wraps is itself the title.
   async step<R>(title: string, fn: () => Promise<R>): Promise<R> {
     return test.step(title, async () => {
-      this.pendingTitle = title;
+      const outer = this.depth === 0;
+      if (outer) this.pendingTitle = title;
+      else this.pendingSubstep = title.replace(/^(Given|When|Then|And|But) /, ''); // the keyword belongs to the case's step
+      this.depth++;
       try {
         return await fn();
       } finally {
-        this.pendingTitle = undefined;
+        this.depth--;
+        if (outer) this.pendingTitle = undefined;
+        this.pendingSubstep = undefined;
       }
     });
   }
@@ -172,10 +183,12 @@ export class UI {
   private async run(step: Step): Promise<any> {
     // Turn dynamic values into variables: if trade ID TRD-123 was read earlier, a later TRD-123 is rewritten to ${var:tradeId}
     const recorded: Step = this.variabilize(this.stripSecrets(step));
-    const title = this.pendingTitle;
-    this.pendingTitle = undefined; // the title is attached only to the first action of the group
+    // The title and the substep are attached only to the first action of their group
+    const group = { ...(this.pendingTitle ? { title: this.pendingTitle } : {}), ...(this.pendingSubstep ? { substep: this.pendingSubstep } : {}) };
+    this.pendingTitle = undefined;
+    this.pendingSubstep = undefined;
     const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, params: this.paramValues, rootDir: this.rootDir });
-    this.steps.push(title ? { title, ...recorded } : recorded);
+    this.steps.push({ ...group, ...recorded });
     return result;
   }
 
