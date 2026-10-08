@@ -21,7 +21,7 @@ function readJson(file: string, label: string): unknown {
  * The rows of testdata/<name>.json, one per case:
  *   { "defaults": { ...shared by every row of this file... }, "cases": [ { "id": "my_case", ... }, ... ] }
  * Each row is completed with "defaults" and then with testdata/common.json (values shared by every file):
- * the row wins over defaults, defaults win over common. "id" names the case and its exported file (@case:<id>).
+ * the row wins over defaults, defaults win over common. "id" is the case ID: the spec puts it in [ ] at the start of the title, and it names the exported file.
  */
 export function loadCases<T extends object>(name: string): (T & { id: string })[] {
   const label = `testdata/${name}.json`;

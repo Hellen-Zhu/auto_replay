@@ -80,8 +80,8 @@ Case data lives in `testdata/`, not in `config.local.json`:
 {
   "defaults": { "oldCounterpartyName": "MOCK BANK B" },
   "cases": [
-    { "id": "trade_creation_FX_TRF_normal", "product": "FX_TRF", "kind": "normal" },
-    { "id": "trade_creation_FX_TRF_normal_sell", "product": "FX_TRF", "kind": "normal", "direction": "Sell" }
+    { "id": "TC-TRADE-CREATION-FX_TRF-UI-001", "product": "FX_TRF", "kind": "normal" },
+    { "id": "TC-TRADE-CREATION-FX_TRF-UI-004", "product": "FX_TRF", "kind": "normal", "direction": "Sell" }
   ]
 }
 ```
@@ -89,7 +89,7 @@ Case data lives in `testdata/`, not in `config.local.json`:
 (The real files are plain JSON, without comments.)
 
 - A row is completed with `defaults` of its file, then with `common.json`: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once, and a case that needs something different just states it in its row.
-- `id` names the case: it becomes the exported file name (`cases/<id>.json`) and must be unique in the file. The same scenario with other data is one more row.
+- `id` is the case ID. The spec puts it in `[ ]` at the start of the test title (`[${data.id}] ...`) and never builds it from other fields; it is also the exported file name (`cases/<id>.json`) and must be unique in the file. The same scenario with other data is one more row.
 - `loadCases<TradeCreationData>('trade-creation')` returns the completed rows; the spec loops over them and hands each row to the flow.
 - In the flow, `const p = this.params(data)` turns the data into parameters. `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value is written into the `params` block of the case file, so the PO sees it before the run and can change it for one run. Only the parameters a case really uses are written.
 - Read a field directly (`data.product`, `data.kind`) when it decides **what the scenario does** (which steps, which file, which title). It is recorded as it is and the PO cannot change it.
@@ -154,7 +154,7 @@ async createTrade(data: TradeCreationData): Promise<string> {
 
 ```ts
 for (const data of loadCases<TradeCreationData>('trade-search')) {
-  test(`Checker finds a new ${data.product} trade @case:${data.id}`, async ({ flows }) => {
+  test(`[${data.id}] Checker finds a new ${data.product} trade`, async ({ flows }) => {
     await flows.auth.login('maker');                              // Given I log in as maker
     const tradeId = await flows.tradeCreation.createTrade(data); // When I open the New Trade form ... And I book the trade and confirm
     await flows.tradeCreation.expectPendingApproval(tradeId);    // Then the trade is created with pending approval status
@@ -171,7 +171,7 @@ Key points:
 - An action flow does not assert its own outcome: `createTrade` ends at the confirmed booking and returns the trade ID, and the case states the expected result with a separate `expect...` flow (the `Then`). This keeps the scenario readable in the case and lets another case expect something else after the same action.
 - Each flow has a default keyword (`login` is `Given`); pass another one when the step sits elsewhere in the scenario (`flows.auth.login('checker', 'And')`).
 - Inside a page or component every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
-- `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
+- The case ID in `[ ]` at the start of the title sets the exported file name (a title without one can use an `@case:xxx` tag instead). The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
 - Case data does not go into `config.local.json`: put it in `testdata/` and use it through `this.params(data)` in the flow.

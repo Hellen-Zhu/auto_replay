@@ -12,9 +12,13 @@ const { loadConfig } = require('../core/config');
 const ROOT = path.resolve(__dirname, '..');
 const CASES_DIR = process.env.OREO_CASES_DIR || path.join(ROOT, 'cases');
 
-/** Case ID: the @case:xxx tag in the title, used as the export file name; falls back to the title */
+/** Case ID: the [xxx] at the start of the title (also the id of the case's row in testdata/), or an @case:xxx tag */
+const CASE_ID = /^\s*\[([\w-]+)\]/;
+const CASE_TAG = /@case:([\w-]+)/;
+
+/** Used as the export file name; falls back to the title */
 function caseIdOf(title: string): string {
-  const m = title.match(/@case:([\w-]+)/);
+  const m = title.match(CASE_ID) || title.match(CASE_TAG);
   if (m) return m[1];
   return title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 80);
 }
@@ -27,7 +31,7 @@ export const test = base.extend<{ ui: UI; app: App; flows: Flows }>({
     // Export only passing cases, so a half-finished flow never reaches the PO
     if (testInfo.status === 'passed') {
       const id = caseIdOf(testInfo.title);
-      const name = testInfo.title.replace(/@case:[\w-]+/, '').trim();
+      const name = testInfo.title.replace(CASE_TAG, '').trim();
       const file = path.join(CASES_DIR, `${id}.json`);
       ui.exportCase(file, {
         name,
