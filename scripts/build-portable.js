@@ -10,7 +10,7 @@
 //
 // Output layout:
 //   UAT-Runner/
-//     run-case.bat   node/node.exe   runner/   core/   cases/   node_modules/
+//     run-case.bat   node/node.exe   runner/   core/   cases/   data/   node_modules/
 //     config.local.json (or config.local.example.json)
 
 const fs = require('fs');
@@ -90,6 +90,8 @@ async function main() {
   copyDir(path.join(ROOT, 'runner'), path.join(OUT, 'runner'));
   copyDir(path.join(ROOT, 'core'), path.join(OUT, 'core'));
   copyDir(path.join(ROOT, 'cases'), path.join(OUT, 'cases'), (p) => fs.statSync(p).isDirectory() || p.endsWith('.json'));
+  // Files the cases upload (e.g. the product .dat files)
+  if (fs.existsSync(path.join(ROOT, 'data'))) copyDir(path.join(ROOT, 'data'), path.join(OUT, 'data'));
   copyDir(path.join(ROOT, 'portable'), OUT);
   fs.mkdirSync(path.join(OUT, 'evidence'), { recursive: true });
 

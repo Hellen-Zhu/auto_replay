@@ -51,8 +51,10 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `framework/targets.ts` | Page element locator table `T` |
 | `framework/ui.ts` | `UI` class: `goto / fill / click / press / read / expectVisible / expectText / expectUrl / step / Given / When / Then / And / But`; automatic variables, password safety net, `exportCase` |
 | `framework/fixtures.ts` | Injects `ui`, exports after the test passes; `@case:xxx` in the title sets the file name |
-| `framework/flows.ts` | Reusable flows: `login(ui, role)`; `LOGIN_PATH = '/'` |
-| `tests/login.spec.ts` | The only example case |
+| `framework/flows.ts` | Reusable flows: `login(ui, role)`, `createTrade(ui, product, kind)`; `LOGIN_PATH = '/'`; unconfirmed `CREATE_TRADE_API`, `PENDING_APPROVAL_TEXT` |
+| `tests/login.spec.ts` | Login example case |
+| `tests/trade-creation.spec.ts` | Trade creation: loops `PRODUCTS` x {normal, StepIn full, StepIn partial}, mirroring `trade_creation.feature` of the Java + Cucumber E2E project; skips a product whose `.dat` is missing |
+| `data/` | Files the cases upload (`<PRODUCT>.dat`, copied by the user from the E2E project); packaged for the PO. Only `data/README.md` is in the repo so far |
 | `runner/runner.js` | PO-side runner: case selection, prompts for missing config (hidden password input), execution, screenshots, trace, HTML report |
 | `portable/run-case.bat` | The PO's double-click entry point (**must use CRLF line endings**, keep the content ASCII) |
 | `scripts/build-portable.js` | Builds `dist/UAT-Runner(.zip)` |
@@ -75,9 +77,10 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 }
 ```
 
-- Actions: `goto fill click press select read expectVisible expectText expectUrl wait`
+- Actions: `goto fill click press select upload read expectVisible expectText expectUrl wait`
+- `upload`: `value` is a path relative to the root that must be inside `data/` (`resolveDataFile`; the runner checks the files exist before prompting). `click` may carry `capture: { url, method, field, saveAs }`: the matching request (path ends with `url`) is passed through `page.route` and `field` of its JSON response is stored as a variable.
 - Target fields: `testId | role(+name) | label | placeholder | text | css`, plus `inner`, `nth`, `exact`
-- Placeholders: `${cfg:path}` = local config; `${var:name}` = a value read by an earlier `read`. **Resolved in both value and target.**
+- Placeholders: `${cfg:path}` = local config; `${var:name}` = a value read by an earlier `read` or `capture`. **Resolved in both value and target**; `requiredConfig` covers both as well.
 - `title` is attached only to the first action of each `ui.step()` group. Titles are written BDD-style (`Given ...`, `When ...`, `Then ...`); this is plain text in the same field, not a format change.
 - When changing the format, change both `ui.ts` (writer) and `actions.js` (reader), and consider `formatVersion` compatibility.
 
@@ -89,6 +92,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 - Known testids:
   - Login: `login-dialog`, `login-email-input`, `login-password-input`, `login-sign-in-to-portal-btn`
   - Top bar: `layout-new-trade-btn`, `layout-ai-reader-btn`, `layout-theme-toggle-btn`, `layout-user-menu-btn` (contains `<span>maker</span>`), `layout-topnav-c…` (truncated in the screenshot)
+- New Trade (from the E2E project's element JSON): confirmed testids `create-trade-stepin-container`, `create-trade-counterparty-combobox`, `create-trade-portfolio-combobox`, `create-trade-stepin-full-radio`; every other new-trade / confirmation dialog / trade detail testid in `framework/targets.ts` is a guess marked `UNCONFIRMED`. Comboboxes: fill the inner input, then click `{ role: 'option', name }`. Test data lives in `tradeData.*` of `config.local.json`; the product type is typed as the Product ID.
 - Trades page path is `/trades`; the page has blotters such as Validation Blotter / Pending Approval / Expires Today, and a search box "Search by Trade ID..." (testid unknown).
 - Example test account: `maker@test.com` (display name `maker`). **The login page path is unconfirmed**; `/` is currently assumed.
 
@@ -117,13 +121,15 @@ npx tsc -p .                      # type check
 - When video initialization fails, **close the whole browser and launch again**; closing only the context makes the later `newPage` fail.
 - The "no browser found" hint is shown only when `browserType.launch` fails; otherwise it is a false alarm.
 - `${var:...}` inside a target must also be resolved in `executeStep` (needed to locate a trade that was just booked).
+- Response capture uses `page.route` + `route.fetch()`, not `waitForResponse`: when the page navigates right after the response, the body is already gone (`did not return JSON`).
 
 ## 10. Suggested next steps
 
 1. **Connect to the real system**: confirm the login page path (change `LOGIN_PATH` in `flows.ts`) and get `login.spec.ts` passing against the real `baseUrl`.
-2. **First business case**: maker books a TARF through New Trade → `read` the trade ID → checker logs in → finds the trade in Pending Approval and approves it → verify the status. This validates automatic trade-ID variables. Needs the testids of the booking form, search box, approve button and status field.
-3. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).
-4. Optional enhancements: parameterized runs (PO changes currency pair / notional); business data in the report; a case index page; copying ffmpeg from the local cache into the package (if video is needed later).
+2. **Trade creation on the real system**: confirm the `UNCONFIRMED` testids, the create-trade request path, what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; extend `PRODUCTS` to all 18 products.
+3. **Approval case**: maker books a TARF through New Trade → `read` the trade ID → checker logs in → finds the trade in Pending Approval and approves it → verify the status. This validates automatic trade-ID variables. Needs the testids of the booking form, search box, approve button and status field.
+4. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).
+5. Optional enhancements: parameterized runs (PO changes currency pair / notional); business data in the report; a case index page; copying ffmpeg from the local cache into the package (if video is needed later).
 
 ## 11. Coding conventions
 

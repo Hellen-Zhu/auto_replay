@@ -18,7 +18,7 @@ function caseIdOf(title: string): string {
 
 export const test = base.extend<{ ui: UI }>({
   ui: async ({ page }, use, testInfo) => {
-    const ui = new UI(page, loadConfig(ROOT));
+    const ui = new UI(page, loadConfig(ROOT), ROOT);
     await use(ui);
 
     // Export only passing cases, so a half-finished flow never reaches the PO

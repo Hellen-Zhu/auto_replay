@@ -16,12 +16,19 @@ const { secretEntries } = require('../core/config');
 export type Val = string | { cfg: string };
 export const cfg = (p: string): Val => ({ cfg: p });
 
+/** Like Target, but text fields may also reference local config, e.g. { role: 'option', name: cfg('tradeData.direction') } */
+export type TargetIn = { [K in keyof Target]: Target[K] | (Target[K] extends string | undefined ? { cfg: string } : never) };
+
+/** Read a value from the response a click triggers; url is matched against the end of the request path */
+export type Capture = { url: string; method?: string; field: string; saveAs: string };
+
 type Step = {
   title?: string;
   action: string;
   target?: Target;
   value?: string;
   saveAs?: string;
+  capture?: Capture;
   exact?: boolean;
   secret?: boolean;
 };
@@ -31,7 +38,7 @@ export class UI {
   readonly vars: Record<string, string> = {};
   private pendingTitle?: string;
 
-  constructor(readonly page: Page, readonly config: any) {}
+  constructor(readonly page: Page, readonly config: any, readonly rootDir?: string) {}
 
   // ---------- Business step grouping ----------
   async step<R>(title: string, fn: () => Promise<R>): Promise<R> {
@@ -57,24 +64,35 @@ export class UI {
   goto(urlPath: string) {
     return this.run({ action: 'goto', value: urlPath });
   }
-  fill(target: Target, value: Val, opts: { secret?: boolean } = {}) {
-    return this.run({ action: 'fill', target, value: this.toPlaceholder(value), secret: opts.secret });
+  fill(target: TargetIn, value: Val, opts: { secret?: boolean } = {}) {
+    return this.run({ action: 'fill', target: this.toTarget(target), value: this.toPlaceholder(value), secret: opts.secret });
   }
-  click(target: Target) {
-    return this.run({ action: 'click', target });
+  click(target: TargetIn) {
+    return this.run({ action: 'click', target: this.toTarget(target) });
   }
-  press(target: Target, key: string) {
-    return this.run({ action: 'press', target, value: key });
+  /**
+   * Click and capture a value from the response the click triggers (e.g. the ID of a trade that was just created).
+   * Like read(), the value becomes a variable: later steps that use it are recorded as ${var:saveAs}.
+   */
+  async clickAndCapture(target: TargetIn, capture: Capture): Promise<string> {
+    return this.run({ action: 'click', target: this.toTarget(target), capture });
+  }
+  /** Upload a file shipped with the cases; file is relative to the project root and must be inside data/, e.g. 'data/FX_TRF.dat' */
+  upload(target: TargetIn, file: string) {
+    return this.run({ action: 'upload', target: this.toTarget(target), value: file.replace(/\\/g, '/') });
+  }
+  press(target: TargetIn, key: string) {
+    return this.run({ action: 'press', target: this.toTarget(target), value: key });
   }
   /** Read a dynamic value from the page (e.g. a trade ID); later steps that use the value get it replaced with a variable automatically */
-  async read(target: Target, saveAs: string): Promise<string> {
-    return this.run({ action: 'read', target, saveAs });
+  async read(target: TargetIn, saveAs: string): Promise<string> {
+    return this.run({ action: 'read', target: this.toTarget(target), saveAs });
   }
-  expectVisible(target: Target) {
-    return this.run({ action: 'expectVisible', target });
+  expectVisible(target: TargetIn) {
+    return this.run({ action: 'expectVisible', target: this.toTarget(target) });
   }
-  expectText(target: Target, value: Val, opts: { exact?: boolean } = {}) {
-    return this.run({ action: 'expectText', target, value: this.toPlaceholder(value), exact: opts.exact });
+  expectText(target: TargetIn, value: Val, opts: { exact?: boolean } = {}) {
+    return this.run({ action: 'expectText', target: this.toTarget(target), value: this.toPlaceholder(value), exact: opts.exact });
   }
   expectUrl(urlPath: string) {
     return this.run({ action: 'expectUrl', value: urlPath });
@@ -85,12 +103,18 @@ export class UI {
     return typeof v === 'string' ? v : '${cfg:' + v.cfg + '}';
   }
 
+  private toTarget(t: TargetIn): Target {
+    return Object.fromEntries(
+      Object.entries(t).map(([k, v]) => [k, v && typeof v === 'object' ? this.toPlaceholder(v as Val) : v]),
+    ) as Target;
+  }
+
   private async run(step: Step): Promise<any> {
     // Turn dynamic values into variables: if trade ID TRD-123 was read earlier, a later TRD-123 is rewritten to ${var:tradeId}
     const recorded: Step = this.variabilize(this.stripSecrets(step));
     const title = this.pendingTitle;
     this.pendingTitle = undefined; // the title is attached only to the first action of the group
-    const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars });
+    const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, rootDir: this.rootDir });
     this.steps.push(title ? { title, ...recorded } : recorded);
     return result;
   }
@@ -149,7 +173,8 @@ function gitVersion(): string {
 function requiredConfig(steps: Step[]): string[] {
   const set = new Set<string>();
   for (const s of steps) {
-    for (const m of String(s.value ?? '').matchAll(/\$\{cfg:([^}]+)\}/g)) set.add(m[1]);
+    const texts = [s.value, ...Object.values(s.target ?? {})].filter((v) => typeof v === 'string') as string[];
+    for (const t of texts) for (const m of t.matchAll(/\$\{cfg:([^}]+)\}/g)) set.add(m[1]);
   }
   return [...set];
 }

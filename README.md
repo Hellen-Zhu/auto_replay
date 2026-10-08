@@ -19,8 +19,9 @@ A case file contains **no server address and no password**, only relative paths 
 | `framework/targets.ts` | Page element locators, `data-testid` throughout |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values and passwords automatically |
 | `framework/fixtures.ts` | Exports to `cases/` automatically after a test passes |
-| `framework/flows.ts` | Reusable flows (login) |
-| `tests/` | Test cases |
+| `framework/flows.ts` | Reusable flows (`login`, `createTrade`) |
+| `tests/` | Test cases: `login.spec.ts`, `trade-creation.spec.ts` (products x normal / StepIn full / StepIn partial) |
+| `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
 | `portable/run-case.bat` | The launcher the PO double-clicks |
 | `scripts/build-portable.js` | Builds the portable runner |
@@ -41,7 +42,17 @@ npx playwright test --headed           # watch the browser while it runs
 npm run replay                         # replay with the runner, exactly what the PO sees
 ```
 
-> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173` and the maker password to `maker1`.
+> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173` and the maker password to `maker1`. For the trade creation cases also set `tradeData` to `counterpartyName: "MOCK BANK A"`, `portfolioId: "ABS_CR_UK_ETFBB"`, `direction: "Buy"`, `oldCounterpartyName: "MOCK BANK B"`.
+
+### Trade creation cases
+
+`tests/trade-creation.spec.ts` generates three cases per product (normal trade, StepIn full, StepIn partial), mirroring `trade_creation.feature` of the E2E project. Before running them:
+
+1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a product without its file is skipped.
+2. Fill in `tradeData` in `config.local.json` (counterparty, portfolio, direction, old counterparty for StepIn). These values are not stored in the case files, so the PO can use their own.
+3. Against the real system, first replace the entries marked `UNCONFIRMED` in `framework/targets.ts` and `framework/flows.ts` (testids, the create-trade request path, the status text) with the real values.
+
+To add a product, add it to `PRODUCTS` in the spec and put its `.dat` file in `data/`.
 
 ## QA: writing a new case
 
@@ -69,6 +80,8 @@ Key points:
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
 - OREO inputs are web components and the real `<input>` sits in the shadow DOM, so input targets need `inner: 'input'`; buttons can be clicked on the host element directly.
+- `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
+- Text fields of a target can reference config too: `{ role: 'option', name: cfg('tradeData.direction') }`.
 - Only **passing** cases are exported.
 
 ## Packaging for the PO
@@ -79,7 +92,7 @@ npm run build:portable -- --with-config   # include your baseUrl and accounts (p
 npm run build:portable -- --no-zip        # produce the folder only, no zip
 ```
 
-This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported `cases/*.json` files need to be sent to the PO, who drops them into their `cases` folder.
+This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported `cases/*.json` files need to be sent to the PO, who drops them into their `cases` folder (plus any new file under `data/` that a case uploads).
 
 ## PO: how to use it
 

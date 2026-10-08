@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { chromium } = require('@playwright/test');
-const { executeStep, describeStep } = require('../core/actions');
+const { executeStep, describeStep, resolveDataFile } = require('../core/actions');
 const { loadConfig, launchOptions } = require('../core/config');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -193,6 +193,9 @@ function saveConfig(file, values) {
 
 // ---------------- Execution ----------------
 async function runCase({ file, doc }, config) {
+  // Fail before asking for anything if a file the case uploads did not come with the package
+  for (const s of doc.steps) if (s.action === 'upload') resolveDataFile(ROOT, s.value);
+
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const caseId = path.basename(file, '.json');
   const dir = path.join(EVIDENCE_DIR, `${caseId}_${stamp}`);
@@ -304,7 +307,7 @@ async function runCase({ file, doc }, config) {
     page = await context.newPage();
   }
   await context.tracing.start({ screenshots: true, snapshots: true });
-  const ctx = { config, vars: {}, askConfig };
+  const ctx = { config, vars: {}, askConfig, rootDir: ROOT };
 
   // Pausing only ever happens between steps, never in the middle of an action.
   // P is picked up as a single key press (console only); the run stops once the current step has finished.
@@ -348,6 +351,7 @@ async function runCase({ file, doc }, config) {
       const r = await executeStep(page, step, ctx);
       rec.status = 'passed';
       if (step.action === 'read') rec.desc += ` (read: ${r})`;
+      else if (step.capture) rec.desc += ` (captured: ${r})`;
       console.log('✔');
     } catch (e) {
       rec.status = 'failed';

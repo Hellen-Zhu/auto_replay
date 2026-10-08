@@ -2,6 +2,8 @@
 // this same logic, so that "what ran when it was recorded is exactly what runs on replay".
 // Note: keep this file CommonJS and dependent only on @playwright/test, so it can be bundled into the portable runner.
 
+const fs = require('fs');
+const path = require('path');
 const { expect } = require('@playwright/test');
 
 /**
@@ -36,7 +38,8 @@ function describeTarget(target) {
     (target.text && `text=${target.text}`) ||
     (target.css && `css=${target.css}`) ||
     '?';
-  return base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : '');
+  return (base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : ''))
+    .replace(/\$\{cfg:([^}]+)\}/g, '[config $1]').replace(/\$\{var:([^}]+)\}/g, '[variable $1]');
 }
 
 /** Read a dotted path from an object: get({a:{b:1}}, 'a.b') => 1 */
@@ -83,13 +86,73 @@ function resolveUrl(baseUrl, path) {
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
+/**
+ * Files to upload are shipped with the cases in the data folder next to them (e.g. data/FX_TRF.dat).
+ * A case file can only point inside that folder, never at an arbitrary path on the machine.
+ */
+function resolveDataFile(rootDir, rel) {
+  if (!rootDir) throw new Error('The folder that holds the upload files is not known (ctx.rootDir is missing)');
+  const base = path.join(rootDir, 'data');
+  const file = path.resolve(rootDir, String(rel));
+  if (!file.startsWith(base + path.sep)) throw new Error(`Upload files must be inside the data folder: ${rel}`);
+  if (!fs.existsSync(file)) throw new Error(`File to upload was not found: ${rel} (expected at ${file})`);
+  return file;
+}
+
+/**
+ * Click and read a value out of the response the click triggers, e.g. the ID of the trade that was just created:
+ *   capture: { url: '/trades', method: 'POST', field: 'data.trade.id', saveAs: 'createdTradeId' }
+ * url is matched against the end of the request path, so no server address is needed.
+ */
+async function clickAndCapture(page, loc, capture, ctx, timeout) {
+  const method = capture.method ? String(capture.method).toUpperCase() : '';
+  const what = `${method || 'request'} ...${capture.url}`;
+  const isMatch = (url) => url.pathname.replace(/\/+$/, '').endsWith(capture.url);
+  // The request is passed through a route rather than observed with waitForResponse: when the page navigates
+  // right after the response (to the new trade's detail page), the browser has already dropped the body.
+  let done;
+  const seen = new Promise((resolve) => { done = resolve; });
+  const handler = async (route) => {
+    if (method && route.request().method() !== method) return route.fallback();
+    try {
+      const res = await route.fetch();
+      const text = await res.text();
+      done({ status: res.status(), ok: res.ok(), text });
+      await route.fulfill({ response: res, body: text });
+    } catch (e) {
+      done({ error: e });
+      await route.abort().catch(() => {});
+    }
+  };
+  await page.route(isMatch, handler);
+  let res;
+  try {
+    await loc.click({ timeout });
+    let timer;
+    const late = new Promise((resolve) => { timer = setTimeout(() => resolve(null), timeout); });
+    res = await Promise.race([seen, late]);
+    clearTimeout(timer);
+  } finally {
+    await page.unroute(isMatch, handler).catch(() => {});
+  }
+  if (!res) throw new Error(`No ${what} was sent within ${timeout} ms after the click`);
+  if (res.error) throw new Error(`${what} failed: ${res.error.message || res.error}`);
+  if (!res.ok) throw new Error(`${what} returned HTTP ${res.status}${res.text ? ': ' + res.text.slice(0, 300) : ''}`);
+  let body;
+  try { body = JSON.parse(res.text); } catch { throw new Error(`${what} did not return JSON`); }
+  const v = getPath(body, capture.field);
+  if (v === undefined || v === null || v === '') throw new Error(`${what} response has no ${capture.field}`);
+  ctx.vars[capture.saveAs] = String(v);
+  return String(v);
+}
+
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
  * Execute one step. The step's value may contain placeholders, which are resolved here.
- * Returns the text that was read for a read step, undefined otherwise.
+ * Returns the text that was read for a read step or captured by a click, undefined otherwise.
  */
 async function executeStep(page, step, ctx) {
   const timeout = step.timeout ?? ctx.config?.timeouts?.step ?? 15000;
@@ -109,7 +172,11 @@ async function executeStep(page, step, ctx) {
       await resolveTarget(page, step.target).fill(value, { timeout });
       return;
     case 'click':
+      if (step.capture) return clickAndCapture(page, resolveTarget(page, step.target), step.capture, ctx, timeout);
       await resolveTarget(page, step.target).click({ timeout });
+      return;
+    case 'upload':
+      await resolveTarget(page, step.target).setInputFiles(resolveDataFile(ctx.rootDir, value), { timeout });
       return;
     case 'press':
       await resolveTarget(page, step.target).press(value, { timeout });
@@ -154,7 +221,8 @@ function describeStep(step) {
   switch (step.action) {
     case 'goto': return `Open page ${v}`;
     case 'fill': return `Type ${v} into ${t}`;
-    case 'click': return `Click ${t}`;
+    case 'click': return step.capture ? `Click ${t} and save ${step.capture.field} from the response as ${step.capture.saveAs}` : `Click ${t}`;
+    case 'upload': return `Upload file ${v} to ${t}`;
     case 'press': return `Press ${v} on ${t}`;
     case 'select': return `Select ${v} in ${t}`;
     case 'read': return `Read ${t} and save as ${step.saveAs}`;
@@ -166,4 +234,4 @@ function describeStep(step) {
   }
 }
 
-module.exports = { resolveTarget, describeTarget, resolveValue, resolveUrl, executeStep, describeStep, getPath };
+module.exports = { resolveDataFile, resolveTarget, describeTarget, resolveValue, resolveUrl, executeStep, describeStep, getPath };
