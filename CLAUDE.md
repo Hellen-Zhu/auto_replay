@@ -64,7 +64,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `framework/flows/` | Flow layer, one file per domain: `base.flow.ts` (`BaseFlow` with `this.params(data)`, `Keyword`), `auth.flow.ts` (`flows.auth`: `login(role, keyword?)`, `expectCurrentUser(role)`), `trades.flow.ts` (`flows.trades`: `expectOnTradesPage()`), `trade-creation.flow.ts` (`flows.tradeCreation`: `createTrade(data)` up to the confirmed booking, returning the trade ID, and `expectPendingApproval(tradeId)`; `datFile`, `TradeKind`, `TradeCreationData`), `index.ts` (`Flows`, the registry) |
 | `tests/login.spec.ts` | Login example case |
 | `tests/trade-creation.spec.ts` | Trade creation: one case per row of `testdata/trade-creation.json` (products x {normal, StepIn full, StepIn partial}), mirroring `trade_creation.feature` of the Java + Cucumber E2E project; skips a case whose product has no `.dat` |
-| `testdata/` | Case data: `common.json` plus one `<name>.json` per spec. Committed, QA side only (not packaged: a case file carries the values it uses). The committed values match the mock |
+| `testdata/` | Case data: `common.json` plus one `<name>.json` per spec. Committed, QA side only (not packaged: a case file carries the values it uses). The committed values are those of the real system (`10 AM NY`, `CM_OIL_CRU_OPT`, `Buy`, old counterparty `10 AM JAK`); the mock offers them too |
 | `data/` | Files the cases upload (`<PRODUCT>.dat`, copied by the user from the E2E project); packaged for the PO. Only `data/README.md` is in the repo so far |
 | `runner/runner.js` | PO-side runner: case selection, prompts for missing config (hidden password input), execution, screenshots, trace, HTML report |
 | `portable/run-case.bat` | The PO's double-click entry point (**must use CRLF line endings**, keep the content ASCII) |
@@ -81,7 +81,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
   "formatVersion": 2, "name": "...", "description": "...",
   "source": "tests/login.spec.ts › ...", "codeVersion": "git:abc123",
   "requiredConfig": ["accounts.maker.email", "accounts.maker.password"],
-  "params": { "counterpartyName": "MOCK BANK A" },
+  "params": { "counterpartyName": "10 AM NY" },
   "steps": [
     { "title": "Log in as maker", "action": "goto", "value": "/" },
     { "action": "fill", "target": { "testId": "login-email-input", "inner": "input" }, "value": "${cfg:accounts.maker.email}" },
@@ -146,7 +146,7 @@ npx tsc -p .                      # type check
 ## 10. Suggested next steps
 
 1. **Connect to the real system**: confirm the login page path (change `LoginPage.path`) and get `login.spec.ts` passing against the real `baseUrl`.
-2. **Trade creation on the real system**: confirm what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; put the real values into `testdata/` and add rows for all 18 products.
+2. **Trade creation on the real system**: confirm what "configured risk engine mode" needs and the full pending-approval assertions; add the `.dat` files; add rows for all 18 products.
 3. **Approval case**: maker books a TARF through New Trade → `read` the trade ID → checker logs in → finds the trade in Pending Approval and approves it → verify the status. This validates automatic trade-ID variables. Needs the testids of the booking form, search box, approve button and status field.
 4. Test the portable build on the PO's machine (Edge launch, IT policy, UAT network reachability).
 5. Optional enhancements: a case index page; copying ffmpeg from the local cache into the package (if video is needed later).

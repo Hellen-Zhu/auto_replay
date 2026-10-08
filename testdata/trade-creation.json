@@ -1,5 +1,5 @@
 {
-  "defaults": {"oldCounterpartyName": "MOCK BANK B"},
+  "defaults": {"oldCounterpartyName": "10 AM JAK"},
   "cases": [
     {"id": "TC-TRADE-CREATION-FX_CO-UI-001", "product": "FX_CO", "kind": "normal"},
     {"id": "TC-TRADE-CREATION-FX_CO-UI-002", "product": "FX_CO", "kind": "stepinFull"},

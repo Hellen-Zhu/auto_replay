@@ -57,14 +57,14 @@ npx playwright test --headed           # watch the browser while it runs
 npm run replay                         # replay with the runner, exactly what the PO sees
 ```
 
-> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173` and the maker password to `maker1`. The values in `testdata/` as committed match the mock.
+> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173` and the maker password to `maker1`. The values in `testdata/` are those of the real system; the mock offers them too.
 
 ### Trade creation cases
 
 `tests/trade-creation.spec.ts` generates one case per row of `testdata/trade-creation.json`: three per product (normal trade, StepIn full, StepIn partial), mirroring `trade_creation.feature` of the E2E project. Before running them:
 
 1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a case whose product has no file is skipped.
-2. Put the values of the real system into `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
+2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
 To add a product, add its rows to `testdata/trade-creation.json` and put its `.dat` file in `data/`.
 
@@ -74,11 +74,11 @@ Case data lives in `testdata/`, not in `config.local.json`:
 
 ```jsonc
 // testdata/common.json: values shared by every case
-{ "counterpartyName": "MOCK BANK A", "portfolioId": "ABS_CR_UK_ETFBB", "direction": "Buy" }
+{ "counterpartyName": "10 AM NY", "portfolioId": "CM_OIL_CRU_OPT", "direction": "Buy" }
 
 // testdata/trade-creation.json: one row per case
 {
-  "defaults": { "oldCounterpartyName": "MOCK BANK B" },
+  "defaults": { "oldCounterpartyName": "10 AM JAK" },
   "cases": [
     { "id": "TC-TRADE-CREATION-FX_TRF-UI-001", "product": "FX_TRF", "kind": "normal" },
     { "id": "TC-TRADE-CREATION-FX_TRF-UI-004", "product": "FX_TRF", "kind": "normal", "direction": "Sell" }

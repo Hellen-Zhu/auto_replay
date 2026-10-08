@@ -134,11 +134,11 @@ const pageHead = `<!doctype html><html lang="en"><head><meta charset="utf-8"><ti
 <body><header data-testid="layout-topnav-container"><b>OREO 0.2.17</b></header>
 <script>if (!sessionStorage.getItem('user')) location.href = '/';</script>`;
 
-const COUNTERPARTIES = 'MOCK BANK A|MOCK BANK B|MOCK CORP C';
+const COUNTERPARTIES = '10 AM NY|10 AM JAK|MOCK BANK A|MOCK BANK B|MOCK CORP C';
 const newTradePage = `${pageHead}
 <main data-testid="create-trade-stepin-container"><h3>New Trade</h3>
   <div class="row"><label>Counterparty</label><sc-combobox data-testid="create-trade-counterparty-combobox" options="${COUNTERPARTIES}"></sc-combobox></div>
-  <div class="row"><label>Portfolio</label><sc-combobox data-testid="create-trade-portfolio-combobox" options="ABS_CR_UK_ETFBB|MOCK_PORTFOLIO_2"></sc-combobox></div>
+  <div class="row"><label>Portfolio</label><sc-combobox data-testid="create-trade-portfolio-combobox" options="CM_OIL_CRU_OPT|ABS_CR_UK_ETFBB|MOCK_PORTFOLIO_2"></sc-combobox></div>
   <div class="row"><label>Product ID</label><sc-combobox data-testid="create-trade-product-id-input" options="FX_CO|FX_TRF|FX_FSB|FX_OPT"></sc-combobox></div>
   <div class="row"><label>Direction</label><sc-combobox data-testid="create-trade-direction-select" options="Buy|Sell"></sc-combobox></div>
   <div class="row"><label>Trade file (.dat)</label><div data-testid="trade-file-upload" style="border:1px dashed #aaa;padding:12px;font-size:13px">Drag and drop or click to upload file <input type="file" accept=".dat"></div></div>
