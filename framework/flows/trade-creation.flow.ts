@@ -1,6 +1,6 @@
 import { cfg } from '../ui';
 import { NewTradePage, TradeDetailPage } from '../pages';
-import { BaseFlow } from './base.flow';
+import { BaseFlow, type Keyword } from './base.flow';
 
 export type TradeKind = 'normal' | 'stepinFull' | 'stepinPartial';
 
@@ -12,11 +12,12 @@ export class TradeCreationFlow extends BaseFlow {
   /**
    * Maker creates a trade for a product, mirroring the E2E project's trade_creation snippets:
    * a normal trade, or a StepIn full / StepIn partial trade. Test data comes from tradeData.* in config.local.json.
-   * Returns the new trade ID (recorded as ${var:createdTradeId}).
+   * Ends when the booking is confirmed and returns the new trade ID (recorded as ${var:createdTradeId});
+   * the outcome is asserted by the case, e.g. with expectPendingApproval(tradeId).
    */
   async createTrade(product: string, kind: TradeKind = 'normal'): Promise<string> {
     const { ui } = this;
-    const { topBar, newTrade, tradeDetail } = this.app;
+    const { topBar, newTrade } = this.app;
     const selectBasicInfo = () =>
       ui.And('I select the basic mandatory info', async () => {
         await newTrade.counterparty.select(cfg('tradeData.counterpartyName'));
@@ -51,11 +52,15 @@ export class TradeCreationFlow extends BaseFlow {
       await newTrade.confirmDialog.expectVisible();
       tradeId = await newTrade.confirmDialog.confirmAndCapture({ ...NewTradePage.createApi, saveAs: 'createdTradeId' });
     });
+    return tradeId;
+  }
 
-    await ui.Then('the trade is created with pending approval status', async () => {
+  /** The trade detail page shows the trade that was just booked, with pending approval status */
+  async expectPendingApproval(tradeId: string, keyword: Keyword = 'Then') {
+    const { tradeDetail } = this.app;
+    await this.ui[keyword]('the trade is created with pending approval status', async () => {
       await tradeDetail.expectTradeId(tradeId); // recorded as ${var:createdTradeId}
       await tradeDetail.expectStatus(TradeDetailPage.status.pendingApproval);
     });
-    return tradeId;
   }
 }

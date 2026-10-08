@@ -57,7 +57,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `framework/app.ts` | `App`: every page plus `topBar`, sharing one `ui` |
 | `framework/ui.ts` | `Target` type; `UI` class: `goto / fill / click / press / read / expectVisible / expectText / expectUrl / step / Given / When / Then / And / But`; automatic variables, password safety net, `exportCase` |
 | `framework/fixtures.ts` | Injects `ui`, `app` and `flows`, exports after the test passes; `@case:xxx` in the title sets the file name |
-| `framework/flows/` | Flow layer, one file per domain: `base.flow.ts` (`BaseFlow`, `Keyword`), `auth.flow.ts` (`flows.auth`: `login(role, keyword?)`, `expectCurrentUser(role)`), `trades.flow.ts` (`flows.trades`: `expectOnTradesPage()`), `trade-creation.flow.ts` (`flows.tradeCreation`: `createTrade(product, kind)`; `datFile`, `TradeKind`), `index.ts` (`Flows`, the registry) |
+| `framework/flows/` | Flow layer, one file per domain: `base.flow.ts` (`BaseFlow`, `Keyword`), `auth.flow.ts` (`flows.auth`: `login(role, keyword?)`, `expectCurrentUser(role)`), `trades.flow.ts` (`flows.trades`: `expectOnTradesPage()`), `trade-creation.flow.ts` (`flows.tradeCreation`: `createTrade(product, kind)` up to the confirmed booking, returning the trade ID, and `expectPendingApproval(tradeId)`; `datFile`, `TradeKind`), `index.ts` (`Flows`, the registry) |
 | `tests/login.spec.ts` | Login example case |
 | `tests/trade-creation.spec.ts` | Trade creation: loops `PRODUCTS` x {normal, StepIn full, StepIn partial}, mirroring `trade_creation.feature` of the Java + Cucumber E2E project; skips a product whose `.dat` is missing |
 | `data/` | Files the cases upload (`<PRODUCT>.dat`, copied by the user from the E2E project); packaged for the PO. Only `data/README.md` is in the repo so far |
@@ -144,6 +144,7 @@ npx tsc -p .                      # type check
 ## 11. Coding conventions
 
 - Reports read as BDD without any BDD framework (playwright-bdd / Cucumber were rejected by the user): the test title is the Scenario, and steps are grouped with `ui.Given / When / Then / And / But(text, fn)` (capitalized, since a lowercase `then` would make `UI` a thenable). `flows.auth.login(role, keyword)` defaults to `Given`. The runner emphasizes the keyword in the report.
+- Action flows do not assert their own outcome: the `Then` is a separate `expect...` flow called by the case (`createTrade` then `expectPendingApproval`), so the scenario's expectation is visible in the case.
 - Layering: cases call only flows; flows call only page / component operations (never `ui.click / ui.fill`, no locators) and own the Given / When / Then grouping; pages and components hold the locators and only atomic operations (no sequences, no BDD keywords). A new page extends `BasePage` and is registered in `App`; a control shared by pages becomes a component; a new business domain extends `BaseFlow` and is registered in `Flows`.
 - Every page action must go through `ui.xxx` (inside a page or component: `this.ui.xxx`); do not use `page` directly, or it will not be recorded.
 - Add new elements to the page or component that owns them, preferring `data-testid`; when a testid is missing, ask the developers to add one rather than writing brittle CSS/XPath.

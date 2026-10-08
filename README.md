@@ -104,7 +104,8 @@ export class TradesFlow extends BaseFlow {
 ```ts
 test('Checker finds a new trade @case:trade_search', async ({ flows }) => {
   await flows.auth.login('maker');                                  // Given I log in as maker
-  const tradeId = await flows.tradeCreation.createTrade('FX_TRF'); // When ... Then ... (returns the new trade ID)
+  const tradeId = await flows.tradeCreation.createTrade('FX_TRF'); // When I open the New Trade form ... And I book the trade and confirm
+  await flows.tradeCreation.expectPendingApproval(tradeId);        // Then the trade is created with pending approval status
   await flows.auth.login('checker', 'And');                         // And I log in as checker
   await flows.trades.searchTrade(tradeId);                          // When I search for the trade
   await flows.trades.expectListedFirst(tradeId);                    // Then the trade is listed first
@@ -114,6 +115,7 @@ test('Checker finds a new trade @case:trade_search', async ({ flows }) => {
 Key points:
 
 - Cases hold no locators, no `ui.xxx` and no page calls: only flows and data. Flows hold no locators and no `ui.click / ui.fill`: only page / component operations. Pages and components hold no Given / When / Then and no multi-step sequences.
+- An action flow does not assert its own outcome: `createTrade` ends at the confirmed booking and returns the trade ID, and the case states the expected result with a separate `expect...` flow (the `Then`). This keeps the scenario readable in the case and lets another case expect something else after the same action.
 - Each flow has a default keyword (`login` is `Given`); pass another one when the step sits elsewhere in the scenario (`flows.auth.login('checker', 'And')`).
 - Inside a page or component every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
 - `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.

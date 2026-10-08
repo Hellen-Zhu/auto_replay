@@ -24,7 +24,8 @@ test.describe('Trade creation', () => {
         });
 
         await flows.auth.login('maker');
-        await flows.tradeCreation.createTrade(product, kind);
+        const tradeId = await flows.tradeCreation.createTrade(product, kind);
+        await flows.tradeCreation.expectPendingApproval(tradeId);
       });
     }
   }
