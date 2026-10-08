@@ -179,7 +179,7 @@ $('create-trade-book-btn').addEventListener('click', () => {
   if (!missing.length) setTimeout(() => { dialog.hidden = false; }, 400);
 });
 $('trade-change-confirm-btn').addEventListener('click', async () => {
-  const r = await fetch('/api/trades', { method: 'POST', body: JSON.stringify(collect()) });
+  const r = await fetch('/api/v1/trades/create?tradeAction=SUBMIT', { method: 'POST', body: JSON.stringify(collect()) });
   const body = await r.json();
   dialog.hidden = true;
   if (!r.ok) { err.textContent = body.message; return; }
@@ -219,7 +219,7 @@ http.createServer((req, res) => {
     });
     return;
   }
-  if (req.method === 'POST' && req.url === '/api/trades') {
+  if (req.method === 'POST' && req.url === '/api/v1/trades/create?tradeAction=SUBMIT') {
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {

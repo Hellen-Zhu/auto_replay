@@ -102,12 +102,16 @@ function resolveDataFile(rootDir, rel) {
 /**
  * Click and read a value out of the response the click triggers, e.g. the ID of the trade that was just created:
  *   capture: { url: '/trades', method: 'POST', field: 'data.trade.id', saveAs: 'createdTradeId' }
- * url is matched against the end of the request path, so no server address is needed.
+ * url is matched against the end of the request path, so no server address is needed. It may carry a query
+ * ('/trades/create?tradeAction=SUBMIT'): those parameters must then be present on the request with the same values.
  */
 async function clickAndCapture(page, loc, capture, ctx, timeout) {
   const method = capture.method ? String(capture.method).toUpperCase() : '';
   const what = `${method || 'request'} ...${capture.url}`;
-  const isMatch = (url) => url.pathname.replace(/\/+$/, '').endsWith(capture.url);
+  const [wantPath, wantQuery = ''] = String(capture.url).split('?');
+  const wantParams = [...new URLSearchParams(wantQuery)];
+  const isMatch = (url) => url.pathname.replace(/\/+$/, '').endsWith(wantPath.replace(/\/+$/, ''))
+    && wantParams.every(([k, v]) => url.searchParams.get(k) === v);
   // The request is passed through a route rather than observed with waitForResponse: when the page navigates
   // right after the response (to the new trade's detail page), the browser has already dropped the body.
   let done;

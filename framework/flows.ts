@@ -26,10 +26,10 @@ export type TradeKind = 'normal' | 'stepinFull' | 'stepinPartial';
 
 /**
  * The request that creates the trade; the new trade ID is read from its response.
- * UNCONFIRMED: url is matched against the end of the request path. Check it in the browser's Network tab
- * (the E2E project stores this response as 'tradeCreateResponse' and reads 'data.trade.id' from it).
+ * Confirmed in the browser's Network tab: POST .../api/v1/trades/create?tradeAction=SUBMIT, answered with
+ * { data: { trade: { id } } }. url is matched against the end of the request path plus the listed query parameters.
  */
-export const CREATE_TRADE_API = { url: '/trades', method: 'POST', field: 'data.trade.id' };
+export const CREATE_TRADE_API = { url: '/trades/create?tradeAction=SUBMIT', method: 'POST', field: 'data.trade.id' };
 
 /** UNCONFIRMED: status text shown on the trade detail header right after booking */
 export const PENDING_APPROVAL_TEXT = 'Pending Approval';
