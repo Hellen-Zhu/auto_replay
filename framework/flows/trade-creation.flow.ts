@@ -1,14 +1,25 @@
-import { NewTradePage, TradeDetailPage } from '../pages';
+import { NewTradePage, TradeDetailPage, type NewTradeField, type NewTradeFieldDef } from '../pages';
+import type { Val } from '../ui';
 import { BaseFlow, type Keyword } from './base.flow';
 
-/** The data of one trade creation case: its row of testdata/trade-creation.json */
-export interface TradeCreationData {
-  counterpartyName: string;
-  portfolioId: string;
-  direction: string;
-  /** StepIn trades only */
-  oldCounterpartyName?: string;
-}
+type Fields = typeof NewTradePage.fields;
+/** The fields that take their value from case data */
+type DataField = { [K in NewTradeField]: Fields[K] extends { scenario: true } ? never : K }[NewTradeField];
+type RequiredField = { [K in DataField]: Fields[K] extends { required: true } ? K : never }[DataField];
+
+/**
+ * The data of one trade creation case (common values, defaults and its row of testdata/trade-creation.json):
+ * one optional value per data field of NewTradePage.fields; the required ones must be there.
+ */
+export type TradeCreationData = { [K in RequiredField]: string } & { [K in Exclude<DataField, RequiredField>]?: string };
+
+const FIELD_NAMES = Object.keys(NewTradePage.fields) as NewTradeField[];
+const fieldDef = (name: NewTradeField): NewTradeFieldDef => NewTradePage.fields[name];
+const DATA_FIELDS = FIELD_NAMES.filter((name) => !fieldDef(name).scenario);
+/** Filled in the first step, in the order of the form */
+const BASIC_FIELDS = FIELD_NAMES.filter((name) => fieldDef(name).required || fieldDef(name).scenario);
+/** Filled in one step after the basic ones, each only when the case has a value for it */
+const OPTIONAL_FIELDS = DATA_FIELDS.filter((name) => !fieldDef(name).required && !fieldDef(name).when);
 
 /** The product's .dat file, shipped with the cases in data/ (same names as the E2E project's ProductDatFiles) */
 export const datFile = (product: string) => `data/${product}.dat`;
@@ -25,6 +36,7 @@ export class TradeCreationFlow extends BaseFlow {
   async createTrade(product: string, data: TradeCreationData): Promise<string> {
     await this.openNewTradeForm();
     await this.selectBasicInfo(product, data);
+    await this.fillOptionalFields(data);
     await this.uploadDat(product);
     return this.bookAndConfirm();
   }
@@ -45,10 +57,11 @@ export class TradeCreationFlow extends BaseFlow {
     await this.openNewTradeForm();
     await this.uploadDat(product);
     await this.selectBasicInfo(product, data);
+    await this.fillOptionalFields(data);
     await this.ui.And(`I enable StepIn ${full ? 'full' : 'partial'} and select the old counterparty`, async () => {
       await newTrade.toggleStepIn();
       await (full ? newTrade.chooseStepInFull() : newTrade.chooseStepInPartial());
-      await newTrade.oldCounterparty.select(p.oldCounterpartyName);
+      await newTrade.setField('oldCounterpartyName', p.oldCounterpartyName);
     });
     return this.bookAndConfirm();
   }
@@ -63,12 +76,23 @@ export class TradeCreationFlow extends BaseFlow {
 
   private async selectBasicInfo(product: string, data: TradeCreationData) {
     const { newTrade } = this.app;
-    const p = this.params(data);
+    const p = this.params(data) as Record<NewTradeField, Val>;
+    checkFieldNames(data);
     await this.ui.And('I select the basic mandatory info', async () => {
-      await newTrade.counterparty.select(p.counterpartyName);
-      await newTrade.portfolio.select(p.portfolioId);
-      await newTrade.productId.select(product); // the product type is what is typed as the Product ID
-      await newTrade.direction.select(p.direction);
+      // The product type is what is typed as the Product ID
+      for (const name of BASIC_FIELDS) await newTrade.setField(name, name === 'productId' ? product : p[name]);
+    });
+  }
+
+  /** Every other field of NewTradePage.fields the case has a value for, in the order of the form; no step when there is none */
+  private async fillOptionalFields(data: TradeCreationData) {
+    const { newTrade } = this.app;
+    const p = this.params(data) as Record<NewTradeField, Val>;
+    const values = data as Partial<Record<NewTradeField, string>>;
+    const names = OPTIONAL_FIELDS.filter((name) => values[name] !== undefined && values[name] !== '');
+    if (!names.length) return;
+    await this.ui.And('I fill the optional fields', async () => {
+      for (const name of names) await newTrade.setField(name, p[name]);
     });
   }
 
@@ -94,5 +118,13 @@ export class TradeCreationFlow extends BaseFlow {
       await tradeDetail.expectTradeId(tradeId); // recorded as ${var:createdTradeId}
       await tradeDetail.expectStatus(TradeDetailPage.status.pendingApproval);
     });
+  }
+}
+
+/** A name in the data that is not a field of the form would otherwise be ignored without a word */
+function checkFieldNames(data: object) {
+  const unknown = Object.keys(data).filter((name) => name !== 'id' && !DATA_FIELDS.includes(name as NewTradeField));
+  if (unknown.length) {
+    throw new Error(`Unknown trade creation data: ${unknown.join(', ')}. The fields are listed in NewTradePage.fields (framework/pages/new-trade.page.ts): ${DATA_FIELDS.join(', ')}`);
   }
 }

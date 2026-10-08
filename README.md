@@ -120,7 +120,9 @@ export class TradesPage extends BasePage {
 }
 ```
 
-A control used on several pages is a component (`framework/components/`) that a page exposes as a field, e.g. `readonly counterparty = new Combobox(this.ui, { testId: '...', inner: 'input' })`, used as `newTrade.counterparty.select(value)`. A new page is registered in `framework/app.ts` (`App`).
+A control used on several pages is a component (`framework/components/`), e.g. `new Combobox(this.ui, { testId: '...', inner: 'input' }).select(value)`.
+
+A form with many fields is a table instead of one operation per field: `NewTradePage.fields` maps each field name to its testid and kind of control (`combobox`, `text`), and `newTrade.setField(name, value)` operates it according to the kind. **To support another New Trade field, add one line to that table and write its value in testdata** (in the case's row, or in `defaults` for every case): the create flows fill every optional field a case has a value for, in the order of the table, in one `And I fill the optional fields` step. A name in the data that is not in the table fails the case. Only a new kind of control needs new code. A new page is registered in `framework/app.ts` (`App`).
 
 **2. Flow: business steps.** A flow method wraps atomic operations in the Given / When / Then line the PO reads in the report. Flows are grouped by business domain, one class per file (`auth.flow.ts`, `trades.flow.ts`, `trade-creation.flow.ts`); a new domain extends `BaseFlow` and is registered in `framework/flows/index.ts` (`Flows`), which makes it available as `flows.<domain>`:
 
@@ -144,8 +146,8 @@ A flow that needs case data takes it as one typed object and turns it into param
 private async selectBasicInfo(product: string, data: TradeCreationData) {
   const p = this.params(data);      // case data: recorded as ${param:name}; the product is recorded as it is
   ...
-  await newTrade.counterparty.select(p.counterpartyName);
-  await newTrade.productId.select(product);
+  await newTrade.setField('counterpartyName', p.counterpartyName);
+  await newTrade.setField('productId', product);
 ```
 
 **3. Case: the scenario.** A case uses the `flows` fixture and nothing else; its data comes from `testdata/`, matched by the case ID in the title:
