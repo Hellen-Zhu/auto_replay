@@ -21,7 +21,7 @@ A case file contains **no server address and no password**, only relative paths 
 | `framework/app.ts` | `App`: one instance of every page and shared component |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values and passwords automatically |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/` automatically after a test passes |
-| `framework/flows.ts` | Flow layer (`Flows`): business steps (`login`, `createTrade`, ...) reported as Given / When / Then, composed from atomic operations |
+| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`) |
 | `tests/` | Test cases: `login.spec.ts`, `trade-creation.spec.ts` (products x normal / StepIn full / StepIn partial) |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
@@ -63,8 +63,8 @@ The framework follows the Page Object Model, in three layers. Each layer only ca
 
 | Layer | Where | Contains | Example |
 |---|---|---|---|
-| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.createTrade('FX_TRF')` |
-| Flow | `framework/flows.ts` | Business steps: a Given / When / Then line of the report and the atomic operations behind it | `I book the trade and confirm` |
+| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.tradeCreation.createTrade('FX_TRF')` |
+| Flow | `framework/flows/*.flow.ts` | Business steps: a Given / When / Then line of the report and the atomic operations behind it | `I book the trade and confirm` |
 | Page / component | `framework/pages/`, `framework/components/` | Locators and **atomic operations**: one thing a user does (fill one field, click one button, pick one dropdown value) or one check | `newTrade.clickBook()` |
 
 **1. Page / component: atomic operations.** Locators stay inside the class (`protected`); the outside only sees methods:
@@ -84,16 +84,18 @@ export class TradesPage extends BasePage {
 
 A control used on several pages is a component (`framework/components/`) that a page exposes as a field, e.g. `readonly counterparty = new Combobox(this.ui, { testId: '...', inner: 'input' })`, used as `newTrade.counterparty.select(value)`. A new page is registered in `framework/app.ts` (`App`).
 
-**2. Flow: business steps.** A method of `Flows` wraps atomic operations in the Given / When / Then line the PO reads in the report:
+**2. Flow: business steps.** A flow method wraps atomic operations in the Given / When / Then line the PO reads in the report. Flows are grouped by business domain, one class per file (`auth.flow.ts`, `trades.flow.ts`, `trade-creation.flow.ts`); a new domain extends `BaseFlow` and is registered in `framework/flows/index.ts` (`Flows`), which makes it available as `flows.<domain>`:
 
 ```ts
-// framework/flows.ts, inside class Flows
-async searchTrade(tradeId: string, keyword: Keyword = 'When') {
-  const { trades } = this.app;
-  await this.ui[keyword]('I search for the trade', async () => {
-    await trades.fillSearch(tradeId);          // becomes ${var:createdTradeId} automatically
-    await trades.submitSearch();
-  });
+// framework/flows/trades.flow.ts
+export class TradesFlow extends BaseFlow {
+  async searchTrade(tradeId: string, keyword: Keyword = 'When') {
+    const { trades } = this.app;
+    await this.ui[keyword]('I search for the trade', async () => {
+      await trades.fillSearch(tradeId);        // becomes ${var:createdTradeId} automatically
+      await trades.submitSearch();
+    });
+  }
 }
 ```
 
@@ -101,18 +103,18 @@ async searchTrade(tradeId: string, keyword: Keyword = 'When') {
 
 ```ts
 test('Checker finds a new trade @case:trade_search', async ({ flows }) => {
-  await flows.login('maker');                                 // Given I log in as maker
-  const tradeId = await flows.createTrade('FX_TRF');          // When ... Then ... (returns the new trade ID)
-  await flows.login('checker', 'And');                        // And I log in as checker
-  await flows.searchTrade(tradeId);                           // When I search for the trade
-  await flows.expectTradeListedFirst(tradeId);                // Then the trade is listed first
+  await flows.auth.login('maker');                                  // Given I log in as maker
+  const tradeId = await flows.tradeCreation.createTrade('FX_TRF'); // When ... Then ... (returns the new trade ID)
+  await flows.auth.login('checker', 'And');                         // And I log in as checker
+  await flows.trades.searchTrade(tradeId);                          // When I search for the trade
+  await flows.trades.expectListedFirst(tradeId);                    // Then the trade is listed first
 });
 ```
 
 Key points:
 
 - Cases hold no locators, no `ui.xxx` and no page calls: only flows and data. Flows hold no locators and no `ui.click / ui.fill`: only page / component operations. Pages and components hold no Given / When / Then and no multi-step sequences.
-- Each flow has a default keyword (`login` is `Given`); pass another one when the step sits elsewhere in the scenario (`flows.login('checker', 'And')`).
+- Each flow has a default keyword (`login` is `Given`); pass another one when the step sits elsewhere in the scenario (`flows.auth.login('checker', 'And')`).
 - Inside a page or component every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
 - `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.

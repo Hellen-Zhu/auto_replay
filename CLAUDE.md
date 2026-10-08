@@ -28,7 +28,7 @@
 ## 3. Architecture
 
 ```
-QA:  tests/*.spec.ts ─► framework/flows.ts ─► framework/pages + components ──ui.xxx──► framework/ui.ts (execute + record)
+QA:  tests/*.spec.ts ─► framework/flows/   ─► framework/pages + components ──ui.xxx──► framework/ui.ts (execute + record)
      (case: scenario)   (flow: BDD steps)      (locators + atomic operations)       │ calls
                                                                                     ▼
                                                                               core/actions.js  ◄── shared execution core
@@ -36,7 +36,7 @@ QA:  tests/*.spec.ts ─► framework/flows.ts ─► framework/pages + componen
 PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by step──────┘
 ```
 
-- Page Object Model in three layers, each calling only the one below (QA side only; the case format and the runner know nothing about it). **Page / component** (`framework/pages`, `framework/components`): owns locators as `protected readonly` fields and exposes atomic operations built on `this.ui.xxx` (one field, one button, one dropdown value, one check); a page exposes the components it contains as public fields (`newTrade.counterparty.select(v)`). **Flow** (`Flows` in `framework/flows.ts`, the `flows` fixture): business steps, i.e. the Given / When / Then groups and the atomic operations inside them; each takes an optional keyword. **Case** (`tests/`): only `flows.xxx(...)` calls and data. `App` (`framework/app.ts`, the `app` fixture) holds one instance of every page and of `TopBar`. The refactoring was verified by exporting all ten cases on the mock before and after: the steps are identical.
+- Page Object Model in three layers, each calling only the one below (QA side only; the case format and the runner know nothing about it). **Page / component** (`framework/pages`, `framework/components`): owns locators as `protected readonly` fields and exposes atomic operations built on `this.ui.xxx` (one field, one button, one dropdown value, one check); a page exposes the components it contains as public fields (`newTrade.counterparty.select(v)`). **Flow** (`framework/flows`, one class per business domain extending `BaseFlow`, reached through the `flows` fixture as `flows.<domain>.<step>()`): business steps, i.e. the Given / When / Then groups and the atomic operations inside them; each takes an optional keyword. **Case** (`tests/`): only `flows.<domain>.xxx(...)` calls and data. `App` (`framework/app.ts`, the `app` fixture) holds one instance of every page and of `TopBar`. The refactoring was verified by exporting all ten cases on the mock before and after: the steps are identical.
 
 - After a test **passes**, `framework/fixtures.ts` exports `cases/<caseId>.json` automatically.
 - The runner lists the cases under `cases/`; the PO types a number (plain Enter = the first one) or drags a json onto the bat.
@@ -57,7 +57,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `framework/app.ts` | `App`: every page plus `topBar`, sharing one `ui` |
 | `framework/ui.ts` | `Target` type; `UI` class: `goto / fill / click / press / read / expectVisible / expectText / expectUrl / step / Given / When / Then / And / But`; automatic variables, password safety net, `exportCase` |
 | `framework/fixtures.ts` | Injects `ui`, `app` and `flows`, exports after the test passes; `@case:xxx` in the title sets the file name |
-| `framework/flows.ts` | Flow layer, class `Flows`: `login(role, keyword?)`, `expectOnTradesPage()`, `expectCurrentUser(role)`, `createTrade(product, kind)`; also `datFile(product)`, `TradeKind`, `Keyword` |
+| `framework/flows/` | Flow layer, one file per domain: `base.flow.ts` (`BaseFlow`, `Keyword`), `auth.flow.ts` (`flows.auth`: `login(role, keyword?)`, `expectCurrentUser(role)`), `trades.flow.ts` (`flows.trades`: `expectOnTradesPage()`), `trade-creation.flow.ts` (`flows.tradeCreation`: `createTrade(product, kind)`; `datFile`, `TradeKind`), `index.ts` (`Flows`, the registry) |
 | `tests/login.spec.ts` | Login example case |
 | `tests/trade-creation.spec.ts` | Trade creation: loops `PRODUCTS` x {normal, StepIn full, StepIn partial}, mirroring `trade_creation.feature` of the Java + Cucumber E2E project; skips a product whose `.dat` is missing |
 | `data/` | Files the cases upload (`<PRODUCT>.dat`, copied by the user from the E2E project); packaged for the PO. Only `data/README.md` is in the repo so far |
@@ -143,8 +143,8 @@ npx tsc -p .                      # type check
 
 ## 11. Coding conventions
 
-- Reports read as BDD without any BDD framework (playwright-bdd / Cucumber were rejected by the user): the test title is the Scenario, and steps are grouped with `ui.Given / When / Then / And / But(text, fn)` (capitalized, since a lowercase `then` would make `UI` a thenable). `flows.login(role, keyword)` defaults to `Given`. The runner emphasizes the keyword in the report.
-- Layering: cases call only flows; flows call only page / component operations (never `ui.click / ui.fill`, no locators) and own the Given / When / Then grouping; pages and components hold the locators and only atomic operations (no sequences, no BDD keywords). A new page extends `BasePage` and is registered in `App`; a control shared by pages becomes a component.
+- Reports read as BDD without any BDD framework (playwright-bdd / Cucumber were rejected by the user): the test title is the Scenario, and steps are grouped with `ui.Given / When / Then / And / But(text, fn)` (capitalized, since a lowercase `then` would make `UI` a thenable). `flows.auth.login(role, keyword)` defaults to `Given`. The runner emphasizes the keyword in the report.
+- Layering: cases call only flows; flows call only page / component operations (never `ui.click / ui.fill`, no locators) and own the Given / When / Then grouping; pages and components hold the locators and only atomic operations (no sequences, no BDD keywords). A new page extends `BasePage` and is registered in `App`; a control shared by pages becomes a component; a new business domain extends `BaseFlow` and is registered in `Flows`.
 - Every page action must go through `ui.xxx` (inside a page or component: `this.ui.xxx`); do not use `page` directly, or it will not be recorded.
 - Add new elements to the page or component that owns them, preferring `data-testid`; when a testid is missing, ask the developers to add one rather than writing brittle CSS/XPath.
 - Accounts and passwords always use `cfg('accounts.<role>.password')`; never put a real server address, IP or password into any committed file.

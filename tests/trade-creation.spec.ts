@@ -23,8 +23,8 @@ test.describe('Trade creation', () => {
           description: `Maker books a new ${product} ${label} from its dat file and verifies it is created with pending approval status`,
         });
 
-        await flows.login('maker');
-        await flows.createTrade(product, kind);
+        await flows.auth.login('maker');
+        await flows.tradeCreation.createTrade(product, kind);
       });
     }
   }
