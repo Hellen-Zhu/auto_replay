@@ -61,12 +61,12 @@ npm run replay                         # replay with the runner, exactly what th
 
 ### Trade creation cases
 
-`tests/trade-creation.spec.ts` has three tests (normal trade, StepIn full, StepIn partial), each run for its own list of products, since not every product supports StepIn, mirroring `trade_creation.feature` of the E2E project. Before running them:
+`tests/trade-creation.spec.ts` has four tests (normal trade, StepIn full, StepIn partial, normal trade with direction Sell), each run for its own list of products, since not every product supports StepIn, mirroring `trade_creation.feature` of the E2E project. Before running them:
 
 1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a case whose product has no file is skipped.
 2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
-To add a product, add it to the lists of the scenarios it supports (`PRODUCTS`, `STEPIN_FULL_PRODUCTS`, `STEPIN_PARTIAL_PRODUCTS` in the spec) and put its `.dat` file in `data/`.
+To add a product, add it to the lists of the scenarios it supports (`PRODUCTS`, `STEPIN_FULL_PRODUCTS`, `STEPIN_PARTIAL_PRODUCTS`, `SELL_PRODUCTS` in the spec) and put its `.dat` file in `data/`.
 
 ## QA: test data
 
@@ -80,14 +80,14 @@ Case data lives in `testdata/`, not in `config.local.json`:
 {
   "defaults": { "oldCounterpartyName": "10 AM JAK" },
   "cases": [
-    { "id": "TC-TRADE-CREATION-FX_FSB-UI-001", "direction": "Sell" }
+    { "id": "TC-TRADE-CREATION-FX_TRF-UI-004", "direction": "Sell" }
   ]
 }
 ```
 
 (The real files are plain JSON, without comments.)
 
-- A case gets `common.json`, then `defaults` of its spec's file, then its own row: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once. **A case that needs nothing different has no row at all** (the committed `trade-creation.json` has only `defaults`); `cases`, `defaults` and even the file are optional.
+- A case gets `common.json`, then `defaults` of its spec's file, then its own row: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once. **A case that needs nothing different has no row at all** (only the Sell case has one); `cases`, `defaults` and even the file are optional.
 - `id` is the full case ID. **The data is matched at run time**: a test title starts with its case ID in `[ ]` (the spec may build it, e.g. `[TC-TRADE-CREATION-${product}-UI-001]`), and the `testData` fixture looks that ID up in `testdata/<spec file name>.json` (`tests/trade-creation.spec.ts` → `testdata/trade-creation.json`). Take care with the spelling of an `id`: a row that matches no case is simply not used. The ID is also the exported file name (`cases/<id>.json`).
 - In the test: `const data = testData<TradeCreationData>()`, then hand it to the flow.
 - In the flow, `const p = this.params(data)` turns the data into parameters. `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value is written into the `params` block of the case file, so the PO sees it before the run and can change it for one run. Only the parameters a case really uses are written.

@@ -10,6 +10,7 @@ import { datFile, type TradeCreationData } from '../framework/flows';
 const PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
 const STEPIN_FULL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
 const STEPIN_PARTIAL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
+const SELL_PRODUCTS = ['FX_TRF'];
 
 /** Skips the case when the product's dat file is not there, and sets the description shown to the PO */
 function prepare(product: string, what: string) {
@@ -50,6 +51,18 @@ test.describe('Trade creation', () => {
 
       await flows.auth.login('maker');
       const tradeId = await flows.tradeCreation.createStepInPartialTrade(product, data);
+      await flows.tradeCreation.expectPendingApproval(tradeId);
+    });
+  }
+
+  // The direction comes from this case's row in testdata/trade-creation.json
+  for (const product of SELL_PRODUCTS) {
+    test(`[TC-TRADE-CREATION-${product}-UI-004] Maker creates a new ${product} trade with direction Sell`, async ({ flows, testData }) => {
+      prepare(product, 'trade with direction Sell');
+      const data = testData<TradeCreationData>();
+
+      await flows.auth.login('maker');
+      const tradeId = await flows.tradeCreation.createTrade(product, data);
       await flows.tradeCreation.expectPendingApproval(tradeId);
     });
   }
