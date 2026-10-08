@@ -77,13 +77,15 @@ async function chooseCase(argPath) {
 
 // ---------------- Report ----------------
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// Step titles written as Given / When / Then get the keyword emphasized, so the report reads like a BDD scenario
+const bdd = (title) => esc(title).replace(/^(Given|When|Then|And|But)\b/, '<b class="kw">$1</b>');
 
 function writeReport(dir, run) {
   fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify(run, null, 2), 'utf-8');
   const rows = run.steps.map((s, i) => `
     <tr class="${s.status}">
       <td>${i + 1}</td>
-      <td>${esc(s.title || '')}</td>
+      <td>${bdd(s.title || '')}</td>
       <td>${esc(s.desc)}${s.error ? `<pre>${esc(s.error)}</pre>` : ''}</td>
       <td>${s.status === 'passed' ? 'Passed' : s.status === 'failed' ? 'Failed' : 'Not run'}</td>
       <td>${s.screenshot ? `<a href="${esc(s.screenshot)}" target="_blank"><img src="${esc(s.screenshot)}"></a>` : ''}</td>
@@ -92,7 +94,7 @@ function writeReport(dir, run) {
 <title>${esc(run.caseName)} - Execution Report</title>
 <style>
   body{font-family:system-ui,"Segoe UI",sans-serif;margin:24px;color:#1f2937}
-  h1{font-size:20px;margin:0 0 4px} .meta{color:#6b7280;font-size:13px;margin-bottom:16px}
+  h1{font-size:20px;margin:0 0 4px} .kw{color:#1d4ed8} .desc{font-size:13px;margin:0 0 6px} .meta{color:#6b7280;font-size:13px;margin-bottom:16px}
   .badge{display:inline-block;padding:2px 10px;border-radius:12px;color:#fff;font-size:13px}
   .badge.passed{background:#16a34a} .badge.failed{background:#dc2626}
   table{border-collapse:collapse;width:100%;font-size:13px}
@@ -102,9 +104,10 @@ function writeReport(dir, run) {
   pre{white-space:pre-wrap;color:#b91c1c;font-size:12px;margin:6px 0 0}
   video{max-width:100%;margin-top:16px;border:1px solid #e5e7eb}
 </style></head><body>
-<h1>${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
+<h1><span class="kw">Scenario:</span> ${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
+${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
 <div class="meta">Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${run.durationSec}s · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
-<table><thead><tr><th>#</th><th>Business step</th><th>Action</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>#</th><th>Step</th><th>Action</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
 <p class="meta">Full replay: trace.zip (QA can open it with npx playwright show-trace to inspect step by step)</p>
 </body></html>`;
@@ -211,9 +214,9 @@ async function runCase({ file, doc }, config) {
     }
   }
 
-  console.log(`\n▶ Running: ${doc.name}\n  Evidence folder: ${dir}\n`);
+  console.log(`\n▶ Scenario: ${doc.name}\n  Evidence folder: ${dir}\n`);
   const run = {
-    caseName: doc.name, caseFile: path.basename(file), source: doc.source, codeVersion: doc.codeVersion,
+    caseName: doc.name, description: doc.description, caseFile: path.basename(file), source: doc.source, codeVersion: doc.codeVersion,
     machine: require('os').hostname(), startedAt: new Date().toLocaleString(), status: 'passed', steps: [],
   };
   const t0 = Date.now();

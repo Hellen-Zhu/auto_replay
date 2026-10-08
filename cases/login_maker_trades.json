@@ -4,7 +4,7 @@
   "description": "Log in to OREO with the maker account, verify the redirect to the Trades page and that the top-right user menu shows maker",
   "source": "tests/login.spec.ts › Maker logs in, lands on the Trades page and sees the current user @case:login_maker_trades",
   "codeVersion": "local",
-  "exportedAt": "2026-10-08T06:14:31.670Z",
+  "exportedAt": "2026-10-08T06:25:37.726Z",
   "requiredConfig": [
     "accounts.maker.email",
     "accounts.maker.password",
@@ -12,7 +12,7 @@
   ],
   "steps": [
     {
-      "title": "Log in as maker",
+      "title": "Given I log in as maker",
       "action": "goto",
       "value": "/"
     },
@@ -46,7 +46,7 @@
       }
     },
     {
-      "title": "Verify the Trades page is shown",
+      "title": "Then I am on the Trades page",
       "action": "expectUrl",
       "value": "/trades"
     },
@@ -57,7 +57,7 @@
       }
     },
     {
-      "title": "Verify the top-right corner shows the current user",
+      "title": "And the top-right corner shows the current user",
       "action": "expectText",
       "target": {
         "testId": "layout-user-menu-btn"

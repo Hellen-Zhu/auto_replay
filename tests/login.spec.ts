@@ -12,12 +12,12 @@ test.describe('Login', () => {
 
     await login(ui, 'maker');
 
-    await ui.step('Verify the Trades page is shown', async () => {
+    await ui.Then('I am on the Trades page', async () => {
       await ui.expectUrl('/trades');
       await ui.expectVisible(T.layout.newTradeBtn);
     });
 
-    await ui.step('Verify the top-right corner shows the current user', async () => {
+    await ui.And('the top-right corner shows the current user', async () => {
       await ui.expectText(T.layout.userMenuBtn, cfg('accounts.maker.displayName'));
     });
   });

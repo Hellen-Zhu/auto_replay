@@ -48,15 +48,15 @@ npm run replay                         # replay with the runner, exactly what th
 ```ts
 test('Book a TARF @case:tarf_book', async ({ ui }) => {
   let tradeId = '';
-  await login(ui, 'maker');
-  await ui.step('Book the TARF', async () => {
+  await login(ui, 'maker');                                   // Given I log in as maker
+  await ui.When('I book a TARF', async () => {
     await ui.click(T.layout.newTradeBtn);
     await ui.fill({ testId: 'trade-ccy-pair-input', inner: 'input' }, 'USDCNH');
     await ui.click({ testId: 'trade-submit-btn' });
     tradeId = await ui.read({ testId: 'trade-id' }, 'tradeId');   // read the trade ID
   });
-  await ui.step('Checker approves', async () => {
-    await login(ui, 'checker');
+  await login(ui, 'checker', 'And');                          // And I log in as checker
+  await ui.Then('the trade can be found by its ID', async () => {
     await ui.fill({ testId: 'trades-search-input', inner: 'input' }, tradeId); // becomes ${var:tradeId} automatically
   });
 });
@@ -65,7 +65,7 @@ test('Book a TARF @case:tarf_book', async ({ ui }) => {
 Key points:
 
 - Every page action goes through `ui.xxx`. Do not call `page` directly, or the action will not be recorded.
-- `@case:xxx` sets the exported file name; the title in `ui.step('title', ...)` appears in the PO's run log and report.
+- `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
 - OREO inputs are web components and the real `<input>` sits in the shadow DOM, so input targets need `inner: 'input'`; buttons can be clicked on the host element directly.

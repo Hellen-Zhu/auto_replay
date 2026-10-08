@@ -45,6 +45,14 @@ export class UI {
     });
   }
 
+  // BDD-style groups: the keyword becomes part of the title, so logs and the PO's report read as
+  // Given / When / Then. Capitalized on purpose: a lowercase `then` method would make UI a thenable.
+  Given<R>(text: string, fn: () => Promise<R>) { return this.step(`Given ${text}`, fn); }
+  When<R>(text: string, fn: () => Promise<R>) { return this.step(`When ${text}`, fn); }
+  Then<R>(text: string, fn: () => Promise<R>) { return this.step(`Then ${text}`, fn); }
+  And<R>(text: string, fn: () => Promise<R>) { return this.step(`And ${text}`, fn); }
+  But<R>(text: string, fn: () => Promise<R>) { return this.step(`But ${text}`, fn); }
+
   // ---------- Actions ----------
   goto(urlPath: string) {
     return this.run({ action: 'goto', value: urlPath });

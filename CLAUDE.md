@@ -48,7 +48,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 | `core/actions.js` | Execution core: `resolveTarget`, `resolveValue` (placeholders), `executeStep`, `describeStep`. **Keep it CommonJS and dependent only on `@playwright/test`** (it is bundled into the runner) |
 | `core/config.js` | Reads `config.local.json` (overridable with `OREO_UAT_CONFIG` / `OREO_BASE_URL`), `launchOptions`, `secretEntries` |
 | `framework/targets.ts` | Page element locator table `T` |
-| `framework/ui.ts` | `UI` class: `goto / fill / click / press / read / expectVisible / expectText / expectUrl / step`; automatic variables, password safety net, `exportCase` |
+| `framework/ui.ts` | `UI` class: `goto / fill / click / press / read / expectVisible / expectText / expectUrl / step / Given / When / Then / And / But`; automatic variables, password safety net, `exportCase` |
 | `framework/fixtures.ts` | Injects `ui`, exports after the test passes; `@case:xxx` in the title sets the file name |
 | `framework/flows.ts` | Reusable flows: `login(ui, role)`; `LOGIN_PATH = '/'` |
 | `tests/login.spec.ts` | The only example case |
@@ -77,7 +77,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 - Actions: `goto fill click press select read expectVisible expectText expectUrl wait`
 - Target fields: `testId | role(+name) | label | placeholder | text | css`, plus `inner`, `nth`, `exact`
 - Placeholders: `${cfg:path}` = local config; `${var:name}` = a value read by an earlier `read`. **Resolved in both value and target.**
-- `title` is attached only to the first action of each `ui.step()` group.
+- `title` is attached only to the first action of each `ui.step()` group. Titles are written BDD-style (`Given ...`, `When ...`, `Then ...`); this is plain text in the same field, not a format change.
 - When changing the format, change both `ui.ts` (writer) and `actions.js` (reader), and consider `formatVersion` compatibility.
 
 ## 6. Known OREO page structure (from user screenshots)
@@ -125,6 +125,7 @@ npx tsc -p .                      # type check
 
 ## 11. Coding conventions
 
+- Reports read as BDD without any BDD framework (playwright-bdd / Cucumber were rejected by the user): the test title is the Scenario, and steps are grouped with `ui.Given / When / Then / And / But(text, fn)` (capitalized, since a lowercase `then` would make `UI` a thenable). `login(ui, role, keyword)` defaults to `Given`. The runner emphasizes the keyword in the report.
 - Every page action must go through `ui.xxx`; do not use `page` directly, or it will not be recorded.
 - Add new elements to `framework/targets.ts` first, preferring `data-testid`; when a testid is missing, ask the developers to add one rather than writing brittle CSS/XPath.
 - Accounts and passwords always use `cfg('accounts.<role>.password')`; never put a real server address, IP or password into any committed file.
