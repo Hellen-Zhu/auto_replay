@@ -80,7 +80,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 ```
 
 - Actions: `goto fill click press select upload read expectVisible expectText expectUrl wait`
-- `upload`: `value` is a path relative to the root that must be inside `data/` (`resolveDataFile`; the runner checks the files exist before prompting). `click` may carry `capture: { url, method, field, saveAs }`: the matching request (path ends with `url`; a query in `url` must match too, since the path alone never contains it) is passed through `page.route` and `field` of its JSON response is stored as a variable.
+- `upload`: `value` is a path relative to the root that must be inside `data/` (`resolveDataFile`; the runner checks the files exist before prompting). `click` may carry `capture: { url, method, field, saveAs }`: the response of the matching request (path ends with `url`; a query in `url` must match too, since the path alone never contains it) is read in the browser without re-sending it, and `field` of its JSON response is stored as a variable.
 - Target fields: `testId | role(+name) | label | placeholder | text | css`, plus `inner`, `nth`, `exact`
 - Placeholders: `${cfg:path}` = local config; `${var:name}` = a value read by an earlier `read` or `capture`. **Resolved in both value and target**; `requiredConfig` covers both as well.
 - `title` is attached only to the first action of each `ui.step()` group. Titles are written BDD-style (`Given ...`, `When ...`, `Then ...`); this is plain text in the same field, not a format change.
@@ -124,7 +124,7 @@ npx tsc -p .                      # type check
 - The "no browser found" hint is shown only when `browserType.launch` fails; otherwise it is a false alarm.
 - The trace viewer needs http (it registers a service worker), so a `file://` link to it never works; that is why the runner serves it. The Claude desktop preview pane cannot register that service worker either - verify the viewer in a real Chrome / Edge.
 - `${var:...}` inside a target must also be resolved in `executeStep` (needed to locate a trade that was just booked).
-- Response capture uses `page.route` + `route.fetch()`, not `waitForResponse`: when the page navigates right after the response, the body is already gone (`did not return JSON`).
+- Response capture pauses the response in the browser through a CDP session (`Fetch.enable` at the `Response` stage, `Fetch.getResponseBody`, then `Fetch.continueRequest`); Chromium only. Do not go back to either alternative: `waitForResponse` / `page.on('response')` lose the body when the page navigates right after the response, and `page.route` + `route.fetch()` re-sends a multipart upload without its file (the real system answers `Invalid dat file: empty or null bytes`). The mock posts real multipart and navigates immediately, so it catches both.
 
 ## 10. Suggested next steps
 

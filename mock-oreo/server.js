@@ -179,7 +179,11 @@ $('create-trade-book-btn').addEventListener('click', () => {
   if (!missing.length) setTimeout(() => { dialog.hidden = false; }, 400);
 });
 $('trade-change-confirm-btn').addEventListener('click', async () => {
-  const r = await fetch('/api/v1/trades/create?tradeAction=SUBMIT', { method: 'POST', body: JSON.stringify(collect()) });
+  // like the real system: multipart/form-data that carries the uploaded file itself
+  const form = new FormData();
+  form.append('trade', JSON.stringify(collect()));
+  form.append('file', $('trade-file-upload').querySelector('input').files[0]);
+  const r = await fetch('/api/v1/trades/create?tradeAction=SUBMIT', { method: 'POST', body: form });
   const body = await r.json();
   dialog.hidden = true;
   if (!r.ok) { err.textContent = body.message; return; }
@@ -223,7 +227,9 @@ http.createServer((req, res) => {
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
-      const t = JSON.parse(body || '{}');
+      const field = (name) => (body.match(new RegExp('name="' + name + '"[^\\r\\n]*\\r\\n(?:[^\\r\\n]+\\r\\n)*\\r\\n([\\s\\S]*?)\\r\\n--')) || [])[1];
+      const t = JSON.parse(field('trade') || '{}');
+      if (!field('file')) return json(res, 400, { message: 'The trade data file is missing or empty' });
       if (!t.counterparty || !t.portfolio || !t.productId || !t.direction) return json(res, 400, { message: 'Basic mandatory info is incomplete' });
       if (t.fileName !== t.productId + '.dat') return json(res, 400, { message: `The uploaded file does not match product ${t.productId}` });
       if (t.stepIn !== null && (!t.stepIn || !t.oldCounterparty)) return json(res, 400, { message: 'StepIn info is incomplete' });

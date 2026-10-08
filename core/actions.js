@@ -112,32 +112,40 @@ async function clickAndCapture(page, loc, capture, ctx, timeout) {
   const wantParams = [...new URLSearchParams(wantQuery)];
   const isMatch = (url) => url.pathname.replace(/\/+$/, '').endsWith(wantPath.replace(/\/+$/, ''))
     && wantParams.every(([k, v]) => url.searchParams.get(k) === v);
-  // The request is passed through a route rather than observed with waitForResponse: when the page navigates
-  // right after the response (to the new trade's detail page), the browser has already dropped the body.
+  // The response is paused in the browser (CDP Fetch domain, response stage), read, then released to the page:
+  // - page.route + route.fetch() would re-send the request without the file of a multipart upload (the browser
+  //   does not expose it), so the server receives a trade with an empty file;
+  // - merely observing the response loses its body when the page navigates right after receiving it.
+  // The request itself is sent by the browser untouched. Works on Chromium browsers (Edge, Chrome) only.
+  let cdp;
+  try { cdp = await page.context().newCDPSession(page); }
+  catch (e) { throw new Error(`Reading a response needs Edge or Chrome: ${e.message || e}`); }
   let done;
   const seen = new Promise((resolve) => { done = resolve; });
-  const handler = async (route) => {
-    if (method && route.request().method() !== method) return route.fallback();
+  cdp.on('Fetch.requestPaused', async (ev) => {
     try {
-      const res = await route.fetch();
-      const text = await res.text();
-      done({ status: res.status(), ok: res.ok(), text });
-      await route.fulfill({ response: res, body: text });
+      if ((method && ev.request.method !== method) || !isMatch(new URL(ev.request.url))) return;
+      if (ev.responseErrorReason) return done({ error: new Error(ev.responseErrorReason) });
+      const status = ev.responseStatusCode;
+      if (status === undefined || (status >= 300 && status < 400)) return; // not a final response
+      const b = await cdp.send('Fetch.getResponseBody', { requestId: ev.requestId });
+      done({ status, ok: status >= 200 && status < 300, text: b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf-8') : b.body });
     } catch (e) {
       done({ error: e });
-      await route.abort().catch(() => {});
+    } finally {
+      await cdp.send('Fetch.continueRequest', { requestId: ev.requestId }).catch(() => {});
     }
-  };
-  await page.route(isMatch, handler);
+  });
   let res;
   try {
+    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: `*${wantPath.replace(/\/+$/, '')}*`, requestStage: 'Response' }] });
     await loc.click({ timeout });
     let timer;
     const late = new Promise((resolve) => { timer = setTimeout(() => resolve(null), timeout); });
     res = await Promise.race([seen, late]);
     clearTimeout(timer);
   } finally {
-    await page.unroute(isMatch, handler).catch(() => {});
+    await cdp.detach().catch(() => {});
   }
   if (!res) throw new Error(`No ${what} was sent within ${timeout} ms after the click`);
   if (res.error) throw new Error(`${what} failed: ${res.error.message || res.error}`);
