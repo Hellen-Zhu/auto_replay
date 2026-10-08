@@ -88,7 +88,7 @@ This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, onl
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account for this run (the password is then asked for again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
 4. Press Enter to run, or type `S` to run **step by step**: the run then stops after each Given / When / Then block until you press Enter.
 5. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail.
-6. When it finishes, the report opens automatically with a screenshot and result for every step (pauses and their length are shown too).
+6. When it finishes, the report opens automatically. It reads as the scenario: one row per Given / When / Then step with its result and a screenshot (pauses and their length are shown too); click "N actions" under a step to see the individual actions behind it.
 7. If something goes wrong, send the matching folder under `evidence/` to QA; its `trace.zip` can be replayed step by step.
 
 ## Known limitations

@@ -40,7 +40,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 - The runner lists the cases under `cases/`; the PO types a number (plain Enter = the first one) or drags a json onto the bat.
 - When settings are already provided, the runner shows them and lets the PO type `C` to change `baseUrl` and the non-secret account fields for that run only; changing the address or an account clears the matching saved password so it is asked for again. Afterwards the runner offers to save the typed-in address and account to `config.local.json` (default No); it never writes a password, only blanks one that no longer matches.
 - Pausing is a runner-only feature (the case format has no pause action): before the run the PO can type `S` for step-by-step mode (stops before each titled group), and on a real console pressing `P` pauses after the current step; Enter resumes. Pauses only happen between steps, are recorded per step (`pausedSec`) and excluded from the reported duration. That prompt defaults to a normal run when input has ended, so older piped inputs keep working.
-- Every replay produces `evidence/<caseId>_<timestamp>/`: `report.html` (per-step result + screenshot), `result.json`, `step-XX.png`, `trace.zip`.
+- Every replay produces `evidence/<caseId>_<timestamp>/`: `report.html` (one row per BDD step, i.e. per titled group, with its result and screenshot; the actions behind it are in a collapsed list, opened automatically for a failed step), `result.json` (still one entry per action), `step-XX.png` (one per action), `trace.zip`.
 
 ## 4. Layout and responsibilities
 

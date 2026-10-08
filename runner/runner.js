@@ -102,16 +102,45 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 // Step titles written as Given / When / Then get the keyword emphasized, so the report reads like a BDD scenario
 const bdd = (title) => esc(title).replace(/^(Given|When|Then|And|But)\b/, '<b class="kw">$1</b>');
 
+const STATUS_TEXT = { passed: 'Passed', failed: 'Failed', skipped: 'Not run' };
+
+// Group the recorded actions by BDD step: a titled action starts a new group and the untitled ones after it belong to it
+function groupSteps(steps) {
+  const groups = [];
+  steps.forEach((s, i) => {
+    if (s.title || !groups.length) groups.push({ title: s.title || '', actions: [] });
+    groups[groups.length - 1].actions.push({ ...s, no: i + 1 });
+  });
+  for (const g of groups) {
+    const failed = g.actions.find((a) => a.status === 'failed');
+    g.status = failed ? 'failed' : g.actions.every((a) => a.status === 'passed') ? 'passed' : g.actions.some((a) => a.status === 'passed') ? 'failed' : 'skipped';
+    g.error = failed && failed.error;
+    // The screenshot that represents the step: where it failed, otherwise how the page looked when it finished
+    g.screenshot = (failed || [...g.actions].reverse().find((a) => a.screenshot) || {}).screenshot;
+    g.pausedSec = g.actions.reduce((sum, a) => sum + (a.pausedSec || 0), 0);
+    g.paused = g.actions.some((a) => a.pausedSec !== undefined);
+  }
+  return groups;
+}
+
 function writeReport(dir, run) {
   fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify(run, null, 2), 'utf-8');
-  const rows = run.steps.map((s, i) => `
-    <tr class="${s.status}">
+  const shot = (file) => (file ? `<a href="${esc(file)}" target="_blank"><img src="${esc(file)}"></a>` : '');
+  const groups = groupSteps(run.steps);
+  const rows = groups.map((g, i) => {
+    const actions = g.actions.map((a) => `
+          <li class="${a.status}"><span class="no">${a.no}.</span> ${esc(a.desc)} <span class="st">${STATUS_TEXT[a.status]}</span>${a.screenshot ? ` <a href="${esc(a.screenshot)}" target="_blank">screenshot</a>` : ''}${a.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(a.pausedSec)} after this action</div>` : ''}</li>`).join('');
+    return `
+    <tr class="${g.status}">
       <td>${i + 1}</td>
-      <td>${bdd(s.title || '')}</td>
-      <td>${esc(s.desc)}${s.error ? `<pre>${esc(s.error)}</pre>` : ''}${s.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(s.pausedSec)} after this step</div>` : ''}</td>
-      <td>${s.status === 'passed' ? 'Passed' : s.status === 'failed' ? 'Failed' : 'Not run'}</td>
-      <td>${s.screenshot ? `<a href="${esc(s.screenshot)}" target="_blank"><img src="${esc(s.screenshot)}"></a>` : ''}</td>
-    </tr>`).join('');
+      <td><div class="step">${bdd(g.title) || esc(g.actions[0].desc)}</div>${g.error ? `<pre>${esc(g.error)}</pre>` : ''}${g.paused ? `<div class="paused">Paused for ${fmtSec(g.pausedSec)} during this step</div>` : ''}
+        <details${g.status === 'failed' ? ' open' : ''}><summary>${g.actions.length} action${g.actions.length === 1 ? '' : 's'}</summary><ul>${actions}</ul></details></td>
+      <td>${STATUS_TEXT[g.status]}</td>
+      <td>${shot(g.screenshot)}</td>
+    </tr>`;
+  }).join('');
+  const count = (st) => groups.filter((g) => g.status === st).length;
+  const summary = `${groups.length} step${groups.length === 1 ? '' : 's'}: ${count('passed')} passed${count('failed') ? `, ${count('failed')} failed` : ''}${count('skipped') ? `, ${count('skipped')} not run` : ''}`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${esc(run.caseName)} - Execution Report</title>
 <style>
@@ -122,6 +151,10 @@ function writeReport(dir, run) {
   table{border-collapse:collapse;width:100%;font-size:13px}
   th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}
   tr.failed td{background:#fef2f2} tr.skipped td{color:#9ca3af}
+  .step{font-size:14px}
+  details{margin-top:6px;color:#4b5563;font-size:12px} summary{cursor:pointer;color:#6b7280}
+  ul{list-style:none;margin:6px 0 0;padding:0} li{padding:2px 0} li.skipped{color:#9ca3af}
+  .no{color:#9ca3af} .st{color:#16a34a} li.failed .st{color:#dc2626} li.skipped .st{color:#9ca3af}
   img{max-width:240px;border:1px solid #e5e7eb;border-radius:4px}
   pre{white-space:pre-wrap;color:#b91c1c;font-size:12px;margin:6px 0 0}
   .paused{color:#b45309;font-size:12px;margin-top:6px}
@@ -129,8 +162,8 @@ function writeReport(dir, run) {
 </style></head><body>
 <h1><span class="kw">Scenario:</span> ${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
 ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
-<div class="meta">Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
-<table><thead><tr><th>#</th><th>Step</th><th>Action</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="meta">${summary} · Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
+<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
 <p class="meta">Full replay: trace.zip (QA can open it with npx playwright show-trace to inspect step by step)</p>
 </body></html>`;
