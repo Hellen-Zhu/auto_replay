@@ -121,7 +121,8 @@ Notes:
 
 - Password fields are shown as `******` in the report, but `trace.zip` records the page and network traffic as they are, **including the password that was typed**. Share the folder only inside the team, never on a public site.
 - Clicks, values entered and the Enter key are listed; scrolling, hovering and drag and drop are not, although they are still visible in the trace's screen recording.
-- A recording is evidence, not a case: it cannot be replayed by the runner. QA turns it into a case when it is worth repeating.
+- The folder also gets a **draft case**, `case-draft.json`, generated from the recorded actions; drag it onto `run-case.bat` to replay what was done by hand. Passwords are never written into it: accounts, passwords and other values that match `config.local.json` become config references.
+- The draft is a starting point, not a finished case. It has no checks, so "passed" only means every action could be repeated. A value the system generated (a trade ID that was clicked or typed) is replayed literally and will not exist next time. An element without a `data-testid` is found by its text, or left out and listed under `skipped`. An uploaded file must be put into `data/` by hand. For a case that is kept, QA still writes it in `tests/` (the draft shows the targets and the order).
 - QA can do the same locally with `npm run record`.
 
 ## Known limitations
