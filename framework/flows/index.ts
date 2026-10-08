@@ -19,5 +19,5 @@ export class Flows {
 }
 
 export { BaseFlow, type Keyword } from './base.flow';
-export { datFile, type TradeKind } from './trade-creation.flow';
+export { datFile, type TradeCreationData, type TradeKind } from './trade-creation.flow';
 export { AuthFlow, TradesFlow, TradeCreationFlow };

@@ -12,12 +12,6 @@
       "displayName": "checker"
     }
   },
-  "tradeData": {
-    "counterpartyName": "",
-    "portfolioId": "",
-    "direction": "",
-    "oldCounterpartyName": ""
-  },
   "browser": {
     "channel": "msedge",
     "headless": false,

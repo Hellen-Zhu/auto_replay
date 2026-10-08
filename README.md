@@ -10,6 +10,15 @@ PO: double-click run-case.bat → pick a number → Edge opens and runs → evid
 
 A case file contains **no server address and no password**, only relative paths and config references (`${cfg:accounts.maker.password}`). Those values live in each computer's own `config.local.json`.
 
+Two kinds of data are kept apart:
+
+| | Environment | Case data |
+|---|---|---|
+| What | Server address, accounts, passwords | What a case types or selects: counterparty, portfolio, direction, notional... |
+| Where | `config.local.json` on each computer, never committed | `testdata/*.json`, committed |
+| In the case file | `${cfg:accounts.maker.email}` (the value is not in the file) | `${param:counterpartyName}` plus the value in the `params` block of the file |
+| For the PO | Asked for when missing; `C` changes it for a run | Comes with the case; `D` changes it for a run |
+
 ## Layout
 
 | Path | Purpose |
@@ -19,10 +28,12 @@ A case file contains **no server address and no password**, only relative paths 
 | `framework/components/` | Component objects: controls and regions shared by several pages (`TopBar`, `Combobox`, `ConfirmDialog`), atomic operations only |
 | `framework/pages/` | Page objects: one class per page, holding its locators (`data-testid` throughout) and its atomic operations |
 | `framework/app.ts` | `App`: one instance of every page and shared component |
-| `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values and passwords automatically |
+| `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
+| `framework/data.ts` | `loadCases('<name>')`: the rows of `testdata/<name>.json`, one per case |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/` automatically after a test passes |
 | `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`) |
-| `tests/` | Test cases: `login.spec.ts`, `trade-creation.spec.ts` (products x normal / StepIn full / StepIn partial) |
+| `tests/` | Test cases: `login.spec.ts`, `trade-creation.spec.ts` (one case per row of `testdata/trade-creation.json`) |
+| `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
 | `portable/run-case.bat` | The launcher the PO double-clicks |
@@ -46,16 +57,44 @@ npx playwright test --headed           # watch the browser while it runs
 npm run replay                         # replay with the runner, exactly what the PO sees
 ```
 
-> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173` and the maker password to `maker1`. For the trade creation cases also set `tradeData` to `counterpartyName: "MOCK BANK A"`, `portfolioId: "ABS_CR_UK_ETFBB"`, `direction: "Buy"`, `oldCounterpartyName: "MOCK BANK B"`.
+> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173` and the maker password to `maker1`. The values in `testdata/` as committed match the mock.
 
 ### Trade creation cases
 
-`tests/trade-creation.spec.ts` generates three cases per product (normal trade, StepIn full, StepIn partial), mirroring `trade_creation.feature` of the E2E project. Before running them:
+`tests/trade-creation.spec.ts` generates one case per row of `testdata/trade-creation.json`: three per product (normal trade, StepIn full, StepIn partial), mirroring `trade_creation.feature` of the E2E project. Before running them:
 
-1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a product without its file is skipped.
-2. Fill in `tradeData` in `config.local.json` (counterparty, portfolio, direction, old counterparty for StepIn). These values are not stored in the case files, so the PO can use their own.
+1. Copy the product `.dat` files into `data/` (`FX_CO.dat`, `FX_TRF.dat`, `FX_FSB.dat`); a case whose product has no file is skipped.
+2. Put the values of the real system into `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
-To add a product, add it to `PRODUCTS` in the spec and put its `.dat` file in `data/`.
+To add a product, add its rows to `testdata/trade-creation.json` and put its `.dat` file in `data/`.
+
+## QA: test data
+
+Case data lives in `testdata/`, not in `config.local.json`:
+
+```jsonc
+// testdata/common.json: values shared by every case
+{ "counterpartyName": "MOCK BANK A", "portfolioId": "ABS_CR_UK_ETFBB", "direction": "Buy" }
+
+// testdata/trade-creation.json: one row per case
+{
+  "defaults": { "oldCounterpartyName": "MOCK BANK B" },
+  "cases": [
+    { "id": "trade_creation_FX_TRF_normal", "product": "FX_TRF", "kind": "normal" },
+    { "id": "trade_creation_FX_TRF_normal_sell", "product": "FX_TRF", "kind": "normal", "direction": "Sell" }
+  ]
+}
+```
+
+(The real files are plain JSON, without comments.)
+
+- A row is completed with `defaults` of its file, then with `common.json`: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once, and a case that needs something different just states it in its row.
+- `id` names the case: it becomes the exported file name (`cases/<id>.json`) and must be unique in the file. The same scenario with other data is one more row.
+- `loadCases<TradeCreationData>('trade-creation')` returns the completed rows; the spec loops over them and hands each row to the flow.
+- In the flow, `const p = this.params(data)` turns the data into parameters. `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value is written into the `params` block of the case file, so the PO sees it before the run and can change it for one run. Only the parameters a case really uses are written.
+- Read a field directly (`data.product`, `data.kind`) when it decides **what the scenario does** (which steps, which file, which title). It is recorded as it is and the PO cannot change it.
+- `testdata/` and the exported case files are committed, so they hold business values only. A value that must not be committed is written as a reference to local config, e.g. `"counterpartyName": "${cfg:tradeData.counterpartyName}"`; the PO is then asked for it like any other setting. Passwords never go here (the run fails if a test data value contains one).
+- A missing value fails the case with the name of the field, e.g. `Test data "oldCounterpartyName" is not set`.
 
 ## QA: writing a new case
 
@@ -63,7 +102,7 @@ The framework follows the Page Object Model, in three layers. Each layer only ca
 
 | Layer | Where | Contains | Example |
 |---|---|---|---|
-| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.tradeCreation.createTrade('FX_TRF')` |
+| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.tradeCreation.createTrade(data)` |
 | Flow | `framework/flows/*.flow.ts` | Business steps: a Given / When / Then line of the report and the atomic operations behind it | `I book the trade and confirm` |
 | Page / component | `framework/pages/`, `framework/components/` | Locators and **atomic operations**: one thing a user does (fill one field, click one button, pick one dropdown value) or one check | `newTrade.clickBook()` |
 
@@ -99,17 +138,31 @@ export class TradesFlow extends BaseFlow {
 }
 ```
 
-**3. Case: the scenario.** A case uses the `flows` fixture and nothing else:
+A flow that needs case data takes it as one typed object and turns it into parameters (see "QA: test data"):
 
 ```ts
-test('Checker finds a new trade @case:trade_search', async ({ flows }) => {
-  await flows.auth.login('maker');                                  // Given I log in as maker
-  const tradeId = await flows.tradeCreation.createTrade('FX_TRF'); // When I open the New Trade form ... And I book the trade and confirm
-  await flows.tradeCreation.expectPendingApproval(tradeId);        // Then the trade is created with pending approval status
-  await flows.auth.login('checker', 'And');                         // And I log in as checker
-  await flows.trades.searchTrade(tradeId);                          // When I search for the trade
-  await flows.trades.expectListedFirst(tradeId);                    // Then the trade is listed first
-});
+// framework/flows/trade-creation.flow.ts
+async createTrade(data: TradeCreationData): Promise<string> {
+  const { product, kind } = data;   // decide the scenario: recorded as they are
+  const p = this.params(data);      // everything else: recorded as ${param:name}
+  ...
+  await newTrade.counterparty.select(p.counterpartyName);
+  await newTrade.productId.select(product);
+```
+
+**3. Case: the scenario.** A case uses the `flows` fixture and nothing else; its data comes from `testdata/`, one case per row:
+
+```ts
+for (const data of loadCases<TradeCreationData>('trade-search')) {
+  test(`Checker finds a new ${data.product} trade @case:${data.id}`, async ({ flows }) => {
+    await flows.auth.login('maker');                              // Given I log in as maker
+    const tradeId = await flows.tradeCreation.createTrade(data); // When I open the New Trade form ... And I book the trade and confirm
+    await flows.tradeCreation.expectPendingApproval(tradeId);    // Then the trade is created with pending approval status
+    await flows.auth.login('checker', 'And');                     // And I log in as checker
+    await flows.trades.searchTrade(tradeId);                      // When I search for the trade
+    await flows.trades.expectListedFirst(tradeId);                // Then the trade is listed first
+  });
+}
 ```
 
 Key points:
@@ -121,9 +174,10 @@ Key points:
 - `@case:xxx` sets the exported file name. The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
+- Case data does not go into `config.local.json`: put it in `testdata/` and use it through `this.params(data)` in the flow.
 - OREO inputs are web components and the real `<input>` sits in the shadow DOM, so input targets need `inner: 'input'`; buttons can be clicked on the host element directly.
 - In a page or component, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
-- Text fields of a target can reference config too: `{ role: 'option', name: cfg('tradeData.direction') }`.
+- Text fields of a target can be a parameter or a config reference too: `{ role: 'menuitem', name: p.direction }`.
 - Only **passing** cases are exported.
 
 ## Packaging for the PO
@@ -134,13 +188,16 @@ npm run build:portable -- --with-config   # include your baseUrl and accounts (p
 npm run build:portable -- --no-zip        # produce the folder only, no zip
 ```
 
-This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported `cases/*.json` files need to be sent to the PO, who drops them into their `cases` folder (plus any new file under `data/` that a case uploads).
+This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported `cases/*.json` files need to be sent to the PO, who drops them into their `cases` folder (plus any new file under `data/` that a case uploads). `testdata/` is not part of the package: a case file carries the data it uses.
+
+Case files with case data are format version 2 and need a runner built from this version or later; an older runner must be replaced with a new package. Version 1 files (cases without case data) run on both.
 
 ## PO: how to use it
 
 1. Unzip `UAT-Runner.zip` (nothing needs to be installed).
 2. Double-click **run-case.bat**, type a number and press Enter; or drag a case `.json` onto the bat file.
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account for this run (the password is then asked for again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
+   If the case comes with **case data** (counterparty, portfolio...), it is listed there too. Type `D` to change a value for this run, e.g. to book against another counterparty; `CD` changes both settings and data. The case file itself is not modified, and the report shows the data the run used and marks what was changed.
 4. Press Enter to run, or type `S` to run **step by step**: the run then stops after each Given / When / Then block until you press Enter.
 5. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail.
 6. When it finishes, the report opens automatically. It reads as the scenario: one row per Given / When / Then step with its result and a screenshot (pauses and their length are shown too); click "N actions" under a step to see the individual actions behind it.

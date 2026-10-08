@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { chromium } = require('@playwright/test');
-const { executeStep, describeStep, resolveDataFile } = require('../core/actions');
+const { FORMAT_VERSION, executeStep, describeStep, showPlaceholders, resolveDataFile } = require('../core/actions');
 const { loadConfig, launchOptions, secretEntries } = require('../core/config');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -142,6 +142,11 @@ function writeReport(dir, run) {
   }).join('');
   const count = (st) => groups.filter((g) => g.status === st).length;
   const summary = `${groups.length} step${groups.length === 1 ? '' : 's'}: ${count('passed')} passed${count('failed') ? `, ${count('failed')} failed` : ''}${count('skipped') ? `, ${count('skipped')} not run` : ''}`;
+  // The data the case ran with; a value the PO changed for this run is flagged, with the value of the case file
+  const caseData = run.caseData && run.caseData.length ? `<table class="data"><caption>Case data</caption><tbody>${run.caseData.map((d) => `
+    <tr><td>${esc(d.name)}</td><td>${esc(d.value)}${d.changedFrom !== undefined ? ` <span class="changed">changed for this run (case file: ${esc(d.changedFrom)})</span>` : ''}</td></tr>`).join('')}
+</tbody></table>
+` : '';
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${esc(run.caseName)} - Execution Report</title>
 <style>
@@ -159,12 +164,14 @@ function writeReport(dir, run) {
   img{max-width:240px;border:1px solid #e5e7eb;border-radius:4px}
   pre{white-space:pre-wrap;color:#b91c1c;font-size:12px;margin:6px 0 0}
   .paused{color:#b45309;font-size:12px;margin-top:6px}
+  table.data{width:auto;margin-bottom:16px} table.data caption{text-align:left;font-weight:600;padding:0 8px 2px}
+  table.data td{padding:4px 8px} table.data td:first-child{color:#6b7280} .changed{color:#b45309}
   video{max-width:100%;margin-top:16px;border:1px solid #e5e7eb}
 </style></head><body>
 <h1><span class="kw">Scenario:</span> ${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
 ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
 <div class="meta">${summary} · Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
-<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
+${caseData}<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
 <p class="meta">Full replay: <a href="${esc(run.traceUrl)}">Open trace viewer</a><br>
 Opens the trace viewer (every action with page snapshots, console and network). The link works while the runner window is still open; later, double-click view-trace.bat first. The same data is in trace.zip in this folder.</p>
@@ -274,6 +281,9 @@ function saveConfig(file, values) {
 
 // ---------------- Execution ----------------
 async function runCase({ file, doc }, config) {
+  if (Number(doc.formatVersion) > FORMAT_VERSION) {
+    throw new Error(`${path.basename(file)} is case format version ${doc.formatVersion}; this runner supports up to version ${FORMAT_VERSION}. Ask QA for the current UAT-Runner package.`);
+  }
   // Fail before asking for anything if a file the case uploads did not come with the package
   for (const s of doc.steps) if (s.action === 'upload') resolveDataFile(ROOT, s.value);
 
@@ -304,14 +314,29 @@ async function runCase({ file, doc }, config) {
     return v;
   };
 
+  // Case data (version 2 case files): the values the case types or selects. The PO can change them for this run;
+  // the case file itself is never modified.
+  const params = Object.fromEntries(Object.entries(doc.params || {}).map(([k, v]) => [k, String(v)]));
+  const paramNames = Object.keys(params);
+  const showData = (v) => showPlaceholders(v); // a value that points at local config is shown by its name
+
   // When settings are already provided, show them and let the PO switch environment or account
   // for this run without editing any file.
   const editable = ['baseUrl', ...required.filter((k) => !isSecret(k))];
-  if (editable.some((k) => !isEmpty(getCfg(k)))) {
-    console.log('\nSettings for this run:');
-    for (const k of editable) console.log(`  ${k}: ${isEmpty(getCfg(k)) ? '(not set)' : getCfg(k)}`);
-    const answer = await ask('\nPress Enter to continue with these settings, or type C to change the environment or account: ');
-    if (answer.toLowerCase() === 'c') {
+  const hasSettings = editable.some((k) => !isEmpty(getCfg(k)));
+  if (hasSettings || paramNames.length) {
+    if (hasSettings) {
+      console.log('\nSettings for this run:');
+      for (const k of editable) console.log(`  ${k}: ${isEmpty(getCfg(k)) ? '(not set)' : getCfg(k)}`);
+    }
+    if (paramNames.length) {
+      console.log('\nCase data:');
+      for (const k of paramNames) console.log(`  ${k}: ${showData(params[k])}`);
+    }
+    const choices = [hasSettings && 'C to change the environment or account', paramNames.length && 'D to change the case data'].filter(Boolean).join(', ');
+    const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or type ${choices}: `)).toLowerCase();
+    const chose = (letter) => /^[cd\s,+]+$/.test(answer) && answer.includes(letter);
+    if (hasSettings && chose('c')) {
       console.log('\nType a new value, or just press Enter to keep the current one.');
       const secrets = required.filter(isSecret);
       for (const k of editable) {
@@ -326,7 +351,18 @@ async function runCase({ file, doc }, config) {
         for (const s of secrets) if (s.startsWith(scope)) { setCfg(s, ''); toSave[s] = ''; }
       }
     }
+    if (paramNames.length && chose('d')) {
+      console.log('\nType a new value, or just press Enter to keep the current one. Changes apply to this run only.');
+      for (const k of paramNames) {
+        const v = await ask(`  ${k} [${showData(params[k])}]: `);
+        if (v !== '') params[k] = v;
+      }
+    }
   }
+  const caseData = paramNames.map((name) => {
+    const original = String(doc.params[name]);
+    return { name, value: showData(params[name]), ...(params[name] !== original ? { changedFrom: showData(original) } : {}) };
+  });
 
   // Collect all required config up front so the run does not stop halfway
   if (!config.baseUrl) {
@@ -359,12 +395,14 @@ async function runCase({ file, doc }, config) {
 
   console.log(`\n▶ Scenario: ${doc.name}\n  Evidence folder: ${dir}`);
   if (stepByStep) console.log('  Mode: step by step');
+  for (const d of caseData) if (d.changedFrom !== undefined) console.log(`  Case data changed for this run: ${d.name} = ${d.value} (case file: ${d.changedFrom})`);
   if (interactive) console.log('  Tip: press P in this window at any time to pause after the current step.');
   console.log('');
   const run = {
     caseName: doc.name, description: doc.description, caseFile: path.basename(file), source: doc.source, codeVersion: doc.codeVersion,
     machine: require('os').hostname(), startedAt: new Date().toLocaleString(), status: 'passed', stepByStep, pausedSec: 0, steps: [],
     traceUrl: traceUrl(config, path.basename(dir)),
+    ...(caseData.length ? { caseData } : {}),
   };
   const t0 = Date.now();
 
@@ -389,7 +427,7 @@ async function runCase({ file, doc }, config) {
     page = await context.newPage();
   }
   await context.tracing.start({ screenshots: true, snapshots: true });
-  const ctx = { config, vars: {}, askConfig, rootDir: ROOT };
+  const ctx = { config, vars: {}, params, askConfig, rootDir: ROOT };
 
   // Pausing only ever happens between steps, never in the middle of an action.
   // P is picked up as a single key press (console only); the run stops once the current step has finished.
@@ -422,7 +460,7 @@ async function runCase({ file, doc }, config) {
   let failed = false;
   for (let i = 0; i < doc.steps.length; i++) {
     const step = doc.steps[i];
-    const desc = describeStep(step, ctx.vars);
+    const desc = describeStep(step, ctx.vars, ctx.params);
     const rec = { title: step.title, desc, status: 'skipped' };
     run.steps.push(rec);
     if (failed) continue;

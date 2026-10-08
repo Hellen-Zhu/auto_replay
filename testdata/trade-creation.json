@@ -1,0 +1,16 @@
+{
+  "defaults": {
+    "oldCounterpartyName": "MOCK BANK B"
+  },
+  "cases": [
+    { "id": "trade_creation_FX_CO_normal", "product": "FX_CO", "kind": "normal" },
+    { "id": "trade_creation_FX_CO_stepinFull", "product": "FX_CO", "kind": "stepinFull" },
+    { "id": "trade_creation_FX_CO_stepinPartial", "product": "FX_CO", "kind": "stepinPartial" },
+    { "id": "trade_creation_FX_TRF_normal", "product": "FX_TRF", "kind": "normal" },
+    { "id": "trade_creation_FX_TRF_stepinFull", "product": "FX_TRF", "kind": "stepinFull" },
+    { "id": "trade_creation_FX_TRF_stepinPartial", "product": "FX_TRF", "kind": "stepinPartial" },
+    { "id": "trade_creation_FX_FSB_normal", "product": "FX_FSB", "kind": "normal" },
+    { "id": "trade_creation_FX_FSB_stepinFull", "product": "FX_FSB", "kind": "stepinFull" },
+    { "id": "trade_creation_FX_FSB_stepinPartial", "product": "FX_FSB", "kind": "stepinPartial" }
+  ]
+}

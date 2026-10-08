@@ -29,12 +29,19 @@ export type Target = {
   exact?: boolean;
 };
 
-/** A value is either a plain string or a reference to local config: cfg('accounts.maker.email') */
-export type Val = string | { cfg: string };
+/** A reference instead of a literal value: local config - cfg('accounts.maker.email') - or case data from ui.params() */
+type Ref = { cfg: string } | { param: string };
+export type Val = string | Ref;
 export const cfg = (p: string): Val => ({ cfg: p });
 
-/** Like Target, but text fields may also reference local config, e.g. { role: 'option', name: cfg('tradeData.direction') } */
-export type TargetIn = { [K in keyof Target]: Target[K] | (Target[K] extends string | undefined ? { cfg: string } : never) };
+/**
+ * The parameters of a case: one per field of its data. Used as a value, a parameter is recorded as ${param:name}
+ * and its value goes into the params block of the case file, where the PO can see it and change it for a run.
+ */
+export type Params<T> = { readonly [K in keyof T]-?: Val };
+
+/** Like Target, but text fields may also be a reference, e.g. { role: 'menuitem', name: p.direction } */
+export type TargetIn = { [K in keyof Target]: Target[K] | (Target[K] extends string | undefined ? Ref : never) };
 
 /** Read a value from the response a click triggers; url is matched against the end of the request path */
 export type Capture = { url: string; method?: string; field: string; saveAs: string };
@@ -53,6 +60,8 @@ type Step = {
 export class UI {
   readonly steps: Step[] = [];
   readonly vars: Record<string, string> = {};
+  /** Case data handed out by params() so far: name -> value */
+  private readonly paramValues: Record<string, string> = {};
   private pendingTitle?: string;
 
   constructor(readonly page: Page, readonly config: any, readonly rootDir?: string) {}
@@ -76,6 +85,39 @@ export class UI {
   Then<R>(text: string, fn: () => Promise<R>) { return this.step(`Then ${text}`, fn); }
   And<R>(text: string, fn: () => Promise<R>) { return this.step(`And ${text}`, fn); }
   But<R>(text: string, fn: () => Promise<R>) { return this.step(`But ${text}`, fn); }
+
+  // ---------- Case data ----------
+  /**
+   * Case data as parameters: with p = ui.params(data), p.counterpartyName is recorded as ${param:counterpartyName}
+   * instead of its value. Read a field from data directly when it decides what the scenario does (which product,
+   * which variant): it is then recorded as it is, and the PO cannot change it.
+   */
+  params<T extends object>(data: T): Params<T> {
+    return new Proxy({}, {
+      get: (_, name) => {
+        if (typeof name !== 'string' || name === 'then' || name === 'toJSON') return undefined;
+        return { param: this.useParam(name, (data as Record<string, unknown>)[name]) };
+      },
+    }) as Params<T>;
+  }
+
+  private useParam(name: string, raw: unknown): string {
+    if (!/^[\w-]+$/.test(name)) throw new Error(`Test data name "${name}" may only contain letters, digits, _ and -`);
+    if (raw === undefined || raw === null || raw === '') {
+      throw new Error(`Test data "${name}" is not set: add it to the case's row or to "defaults" in its testdata file`);
+    }
+    if (typeof raw === 'object') throw new Error(`Test data "${name}" is a list or an object; a parameter must be text, a number or true / false`);
+    const value = String(raw);
+    for (const [p, secret] of secretEntries(this.config) as [string, string][]) {
+      if (value.includes(secret)) throw new Error(`Test data "${name}" contains the value of ${p}; passwords stay in config.local.json, use cfg('${p}')`);
+    }
+    const known = this.paramValues[name];
+    if (known !== undefined && known !== value) {
+      throw new Error(`Test data "${name}" has two different values in one case ("${known}" and "${value}"); give them different names`);
+    }
+    this.paramValues[name] = value;
+    return name;
+  }
 
   // ---------- Actions ----------
   goto(urlPath: string) {
@@ -117,7 +159,8 @@ export class UI {
 
   // ---------- Internals ----------
   private toPlaceholder(v: Val): string {
-    return typeof v === 'string' ? v : '${cfg:' + v.cfg + '}';
+    if (typeof v === 'string') return v;
+    return 'cfg' in v ? '${cfg:' + v.cfg + '}' : '${param:' + v.param + '}';
   }
 
   private toTarget(t: TargetIn): Target {
@@ -131,7 +174,7 @@ export class UI {
     const recorded: Step = this.variabilize(this.stripSecrets(step));
     const title = this.pendingTitle;
     this.pendingTitle = undefined; // the title is attached only to the first action of the group
-    const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, rootDir: this.rootDir });
+    const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, params: this.paramValues, rootDir: this.rootDir });
     this.steps.push(title ? { title, ...recorded } : recorded);
     return result;
   }
@@ -141,8 +184,12 @@ export class UI {
     if (!entries.length) return step;
     const swap = (s?: string) => {
       if (typeof s !== 'string') return s;
-      for (const [name, v] of entries) s = s.split(v).join('${var:' + name + '}');
-      return s;
+      // Only the literal text is checked: a placeholder that is already there (odd parts of the split) is left alone
+      return s.split(/(\$\{(?:var|cfg|param):[^}]+\})/).map((part, i) => {
+        if (i % 2) return part;
+        for (const [name, v] of entries) part = part.split(v).join('${var:' + name + '}');
+        return part;
+      }).join('');
     };
     const target = step.target ? Object.fromEntries(Object.entries(step.target).map(([k, v]) => [k, typeof v === 'string' ? swap(v) : v])) : undefined;
     return { ...step, value: swap(step.value), target: target as Target };
@@ -163,14 +210,18 @@ export class UI {
   }
 
   exportCase(file: string, meta: { name: string; description?: string; source: string }) {
+    const params = usedParams(this.steps, this.paramValues);
+    const hasParams = Object.keys(params).length > 0;
     const caseDoc = {
-      formatVersion: 1,
+      // Version 2 adds the params block. A case without case data is still version 1, which older runners can run too.
+      formatVersion: hasParams ? 2 : 1,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,
       codeVersion: gitVersion(),
       exportedAt: new Date().toISOString(),
-      requiredConfig: requiredConfig(this.steps),
+      requiredConfig: requiredConfig(this.steps, params),
+      ...(hasParams ? { params } : {}),
       steps: this.steps,
     };
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -186,12 +237,22 @@ function gitVersion(): string {
   }
 }
 
+/** Every text of the steps that may hold a placeholder: values and the text fields of targets */
+function stepTexts(steps: Step[]): string[] {
+  return steps.flatMap((s) => [s.value, ...Object.values(s.target ?? {})].filter((v) => typeof v === 'string') as string[]);
+}
+
+/** The case data the steps really use, in the order of first use; this becomes the params block of the case file */
+function usedParams(steps: Step[], values: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const t of stepTexts(steps)) for (const m of t.matchAll(/\$\{param:([^}]+)\}/g)) out[m[1]] = values[m[1]];
+  return out;
+}
+
 /** List the local config entries a case needs; the runner uses this to prompt the PO for missing ones */
-function requiredConfig(steps: Step[]): string[] {
+function requiredConfig(steps: Step[], params: Record<string, string>): string[] {
   const set = new Set<string>();
-  for (const s of steps) {
-    const texts = [s.value, ...Object.values(s.target ?? {})].filter((v) => typeof v === 'string') as string[];
-    for (const t of texts) for (const m of t.matchAll(/\$\{cfg:([^}]+)\}/g)) set.add(m[1]);
-  }
+  // Case data may point at local config too
+  for (const t of [...stepTexts(steps), ...Object.values(params)]) for (const m of t.matchAll(/\$\{cfg:([^}]+)\}/g)) set.add(m[1]);
   return [...set];
 }

@@ -6,6 +6,9 @@ const fs = require('fs');
 const path = require('path');
 const { expect } = require('@playwright/test');
 
+// Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name}
+const FORMAT_VERSION = 2;
+
 /**
  * Turn a target description from the JSON into a Playwright Locator.
  * Supported fields (in priority order): testId / role(+name) / label / placeholder / text / css
@@ -28,17 +31,20 @@ function resolveTarget(page, target) {
   return loc;
 }
 
+const showConfigRefs = (text) => String(text).replace(/\$\{cfg:([^}]+)\}/g, '[config $1]');
+
 /**
  * Make placeholders readable. A variable whose value is already known (vars) is shown as that value,
- * e.g. "TRD-123 (variable createdTradeId)"; config values are never printed, only their names.
+ * e.g. "TRD-123 (variable createdTradeId)", and case data (params) as "MOCK BANK A (case data counterpartyName)";
+ * config values are never printed, only their names.
  */
-function showPlaceholders(text, vars) {
-  return String(text)
-    .replace(/\$\{cfg:([^}]+)\}/g, '[config $1]')
-    .replace(/\$\{var:([^}]+)\}/g, (m, name) => (vars && vars[name] !== undefined ? `${vars[name]} (variable ${name})` : `[variable ${name}]`));
+function showPlaceholders(text, vars, params) {
+  return showConfigRefs(text)
+    .replace(/\$\{var:([^}]+)\}/g, (m, name) => (vars && vars[name] !== undefined ? `${vars[name]} (variable ${name})` : `[variable ${name}]`))
+    .replace(/\$\{param:([^}]+)\}/g, (m, name) => (params && params[name] !== undefined ? `${showConfigRefs(params[name])} (case data ${name})` : `[case data ${name}]`));
 }
 
-function describeTarget(target, vars) {
+function describeTarget(target, vars, params) {
   if (!target) return '';
   const base =
     (target.testId && `testId=${target.testId}`) ||
@@ -48,7 +54,7 @@ function describeTarget(target, vars) {
     (target.text && `text=${target.text}`) ||
     (target.css && `css=${target.css}`) ||
     '?';
-  return showPlaceholders(base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : ''), vars);
+  return showPlaceholders(base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : ''), vars, params);
 }
 
 /** Read a dotted path from an object: get({a:{b:1}}, 'a.b') => 1 */
@@ -56,15 +62,24 @@ function getPath(obj, path) {
   return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
-const PLACEHOLDER = /\$\{(var|cfg):([^}]+)\}/g;
+const PLACEHOLDER = /\$\{(var|cfg|param):([^}]+)\}/g;
+
+async function configValue(key, ctx) {
+  const v = getPath(ctx.config, key);
+  if (v !== undefined && v !== '') return v;
+  if (!ctx.askConfig) throw new Error(`Local config is missing ${key}; please add it to config.local.json`);
+  return ctx.askConfig(key);
+}
 
 /**
  * Resolve placeholders in a value:
  *   ${var:tradeId}                  a dynamic value read at run time (e.g. a trade ID)
  *   ${cfg:accounts.maker.password}  a value from local config (accounts, passwords, etc. - never stored in the case file)
+ *   ${param:counterpartyName}       case data: a value from the params block of the case file (ctx.params). The value
+ *                                   may itself point at local config with ${cfg:...}; nothing else is resolved inside it
  * ctx.askConfig(path) is optional: ask the user when config is missing a value (the runner uses it to prompt the PO for passwords)
  */
-async function resolveValue(value, ctx) {
+async function resolveValue(value, ctx, inParam) {
   if (typeof value !== 'string') return value;
   let out = '';
   let last = 0;
@@ -72,15 +87,17 @@ async function resolveValue(value, ctx) {
     out += value.slice(last, m.index);
     const [, kind, key] = m;
     let v;
-    if (kind === 'var') {
+    if (kind === 'cfg') {
+      v = await configValue(key, ctx);
+    } else if (inParam) {
+      v = m[0]; // case data is plain text apart from config references
+    } else if (kind === 'var') {
       v = ctx.vars[key];
       if (v === undefined) throw new Error(`Variable ${key} has not been read yet (check that an earlier read step saves it)`);
     } else {
-      v = getPath(ctx.config, key);
-      if (v === undefined || v === '') {
-        if (!ctx.askConfig) throw new Error(`Local config is missing ${key}; please add it to config.local.json`);
-        v = await ctx.askConfig(key);
-      }
+      v = ctx.params ? ctx.params[key] : undefined;
+      if (v === undefined) throw new Error(`Case data ${key} is not defined (the case file has no "${key}" in its params)`);
+      v = await resolveValue(String(v), ctx, true);
     }
     out += String(v);
     last = m.index + m[0].length;
@@ -241,10 +258,13 @@ async function executeStep(page, step, ctx) {
   }
 }
 
-/** One-line readable description of a step, used in logs and reports; pass the variables read so far to show their values */
-function describeStep(step, vars) {
-  const t = describeTarget(step.target, vars);
-  const v = step.secret ? '******' : typeof step.value === 'string' ? showPlaceholders(step.value, vars) : step.value;
+/**
+ * One-line readable description of a step, used in logs and reports; pass the variables read so far and
+ * the case data (params) to show their values
+ */
+function describeStep(step, vars, params) {
+  const t = describeTarget(step.target, vars, params);
+  const v = step.secret ? '******' : typeof step.value === 'string' ? showPlaceholders(step.value, vars, params) : step.value;
   switch (step.action) {
     case 'goto': return `Open page ${v}`;
     case 'fill': return `Type ${v} into ${t}`;
@@ -261,4 +281,6 @@ function describeStep(step, vars) {
   }
 }
 
-module.exports = { resolveDataFile, resolveTarget, describeTarget, resolveValue, resolveUrl, executeStep, describeStep, getPath };
+module.exports = {
+  FORMAT_VERSION, resolveDataFile, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, describeStep, getPath,
+};
