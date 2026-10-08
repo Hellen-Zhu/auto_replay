@@ -126,23 +126,54 @@ async function runCase({ file, doc }, config) {
   const dir = path.join(EVIDENCE_DIR, `${caseId}_${stamp}`);
   fs.mkdirSync(dir, { recursive: true });
 
-  // Ask the PO at run time for missing config (e.g. passwords); kept in memory only
-  const askConfig = async (key) => {
-    const v = /password|secret|token/i.test(key)
-      ? await askHidden(`Enter ${key} (input is hidden): `)
-      : await ask(`Enter ${key}: `);
+  const isSecret = (key) => /password|secret|token/i.test(key);
+  const getCfg = (key) => key.split('.').reduce((o, k) => (o == null ? undefined : o[k]), config);
+  const setCfg = (key, v) => {
     const parts = key.split('.');
     let o = config;
     for (const p of parts.slice(0, -1)) o = o[p] = o[p] || {};
     o[parts.at(-1)] = v;
+  };
+  const isEmpty = (v) => v === undefined || v === '';
+  const required = doc.requiredConfig || [];
+
+  // Ask the PO at run time for missing config (e.g. passwords); kept in memory only
+  const askConfig = async (key) => {
+    const v = isSecret(key)
+      ? await askHidden(`Enter ${key} (input is hidden): `)
+      : await ask(`Enter ${key}: `);
+    setCfg(key, v);
     return v;
   };
 
+  // When settings are already provided, show them and let the PO switch environment or account
+  // for this run without editing any file.
+  const editable = ['baseUrl', ...required.filter((k) => !isSecret(k))];
+  if (editable.some((k) => !isEmpty(getCfg(k)))) {
+    console.log('\nSettings for this run:');
+    for (const k of editable) console.log(`  ${k}: ${isEmpty(getCfg(k)) ? '(not set)' : getCfg(k)}`);
+    const answer = await ask('\nPress Enter to continue with these settings, or type C to change the environment or account: ');
+    if (answer.toLowerCase() === 'c') {
+      console.log('\nType a new value, or just press Enter to keep the current one.');
+      const secrets = required.filter(isSecret);
+      for (const k of editable) {
+        const cur = getCfg(k);
+        const v = await ask(`  ${k} [${isEmpty(cur) ? 'not set' : cur}]: `);
+        if (v === '' || v === cur) continue;
+        setCfg(k, v);
+        // A saved password belongs to the old environment/account: drop it so it is asked for again
+        // instead of being sent to the wrong place.
+        const scope = k === 'baseUrl' ? '' : k.slice(0, k.lastIndexOf('.') + 1);
+        for (const s of secrets) if (s.startsWith(scope)) setCfg(s, '');
+      }
+      console.log('  (These changes apply to this run only. To make them permanent, edit config.local.json.)\n');
+    }
+  }
+
   // Collect all required config up front so the run does not stop halfway
   if (!config.baseUrl) config.baseUrl = await ask('Enter the system address (e.g. https://xxx:8088): ');
-  for (const key of doc.requiredConfig || []) {
-    const v = key.split('.').reduce((o, k) => (o == null ? undefined : o[k]), config);
-    if (v === undefined || v === '') await askConfig(key);
+  for (const key of required) {
+    if (isEmpty(getCfg(key))) await askConfig(key);
   }
 
   console.log(`\n▶ Running: ${doc.name}\n  Evidence folder: ${dir}\n`);

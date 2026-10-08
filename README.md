@@ -85,7 +85,7 @@ This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, onl
 
 1. Unzip `UAT-Runner.zip` (nothing needs to be installed).
 2. Double-click **run-case.bat**, type a number and press Enter; or drag a case `.json` onto the bat file.
-3. The first run asks for the system address and password (the password is used for that run only and is not saved).
+3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account for this run (the password is then asked for again). Anything missing, such as the password, is prompted for; it is used for that run only and is not saved.
 4. Edge opens and runs the steps; when it finishes, the report opens automatically with a screenshot and result for every step.
 5. If something goes wrong, send the matching folder under `evidence/` to QA; its `trace.zip` can be replayed step by step.
 

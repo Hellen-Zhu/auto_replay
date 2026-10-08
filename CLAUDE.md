@@ -38,6 +38,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/*.json, calls step by s
 
 - After a test **passes**, `framework/fixtures.ts` exports `cases/<caseId>.json` automatically.
 - The runner lists the cases under `cases/`; the PO types a number (plain Enter = the first one) or drags a json onto the bat.
+- When settings are already provided, the runner shows them and lets the PO type `C` to change `baseUrl` and the non-secret account fields for that run only; changing the address or an account clears the matching saved password so it is asked for again.
 - Every replay produces `evidence/<caseId>_<timestamp>/`: `report.html` (per-step result + screenshot), `result.json`, `step-XX.png`, `trace.zip`.
 
 ## 4. Layout and responsibilities
