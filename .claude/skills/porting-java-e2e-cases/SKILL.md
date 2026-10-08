@@ -54,7 +54,7 @@ A line that matches no entry and is not a recognizable built-in step, or matches
 
 ## Built-in Genie steps
 
-Seen so far. The `UI` class has `goto`, `fill`, `click`, `clickAndCapture`, `upload`, `press`, `read`, `expectVisible`, `expectText`, `expectUrl` and nothing else.
+Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAndCapture`, `upload`, `press`, `read`, `expectVisible`, `expectText`, `expectUrl` and nothing else.
 
 | Genie step | Here |
 |---|---|
@@ -76,6 +76,8 @@ A built-in step that is not in this table is ported only when its wording maps o
 | `upload '<P>' dat file` | `newTrade.uploadDat(datFile(product))` |
 | `click save / book using configured risk engine mode for new trade creation` | `newTrade.clickSave()` / `newTrade.clickBook()`, no extra waits |
 | `confirm new trade creation and capture response as '<x>'` + `store e2e response field '<field>' from stored variable '<x>' as '<name>'` | `newTrade.confirmDialog.confirmAndCapture({ ...NewTradePage.createApi, saveAs: '<name>' })` |
+| `search for trade stored as '<name>' in blotter` | `trades.searchTrade(tradeId)` |
+| `open action menu item for new today blotter from stored variable '<name>'` | `trades.openActionMenu(tradeId)`: a right-click on the trade's row. Both together, as in `page trade portal searches and opens action menu for trade stored as '<name>'`: `flows.trades.openActionMenu(tradeId)` |
 
 Another Java step: read its method. Only browser actions on element keys (click, fill, set files, assert on a locator) are portable, as atomic operations; a capture of a response needs its URL, method and field from the Java source, kept as a `static` of the page like `NewTradePage.createApi`. A call to an API, a database, a file or anything outside the page is not portable: the case format has no such action.
 

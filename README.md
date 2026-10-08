@@ -28,7 +28,7 @@ Two kinds of data are kept apart:
 | `framework/components/` | Component objects: controls and regions shared by several pages (`TopBar`, `Combobox`, `ConfirmDialog`), atomic operations only |
 | `framework/pages/` | Page objects: one class per page, holding its locators (by element name, see `elements/`) and its atomic operations |
 | `framework/elements.ts` | `element('<name>')`: looks a locator up in `elements/` by the name the E2E project gives it |
-| `framework/app.ts` | `App`: one instance of every page and shared component |
+| `framework/app.ts` | `App`: one instance of every page and shared component, each created on first use |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
 | `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/` automatically after a test passes |
@@ -142,12 +142,16 @@ The framework follows the Page Object Model, in three layers. Each layer only ca
 // framework/pages/trades.page.ts
 export class TradesPage extends BasePage {
   static readonly path = '/trades';
-  protected readonly searchBox = element('trade_portal.search_input', { inner: 'input' });
-  protected readonly firstRowId = element('trade_portal.row_trade_id', { nth: 0 });
+  protected readonly searchInput = element('trade_portal.search_input', { inner: "input[part='input'], textarea[part='input']" });
+  protected readonly allTradesBlotter = element('trade_portal.all_trade_blotter');
 
-  async fillSearch(tradeId: Val) { await this.ui.fill(this.searchBox, tradeId); }
-  async submitSearch() { await this.ui.press(this.searchBox, 'Enter'); }
-  async expectFirstRow(tradeId: Val) { await this.ui.expectText(this.firstRowId, tradeId); }
+  // The first row of the blotter that shows this trade ID: the rows are only told apart by their text
+  protected row(tradeId: Val): TargetIn {
+    return { ...this.allTradesBlotter, inner: 'role=row', hasText: tradeId, nth: 0 };
+  }
+
+  async searchTrade(tradeId: Val) { await this.ui.fill(this.searchInput, tradeId); }
+  async openActionMenu(tradeId: Val) { await this.ui.rightClick(this.row(tradeId)); }   // the action menu is a context menu
 }
 ```
 
@@ -160,11 +164,11 @@ A form with many fields is a table instead of one operation per field: `NewTrade
 ```ts
 // framework/flows/trades.flow.ts
 export class TradesFlow extends BaseFlow {
-  async searchTrade(tradeId: string, keyword: Keyword = 'When') {
+  async openActionMenu(tradeId: string, keyword: Keyword = 'When') {
     const { trades } = this.app;
-    await this.ui[keyword]('I search for the trade', async () => {
-      await trades.fillSearch(tradeId);        // becomes ${var:createdTradeId} automatically
-      await trades.submitSearch();
+    await this.ui[keyword]('I search for the trade and open its action menu', async () => {
+      await trades.searchTrade(tradeId);       // becomes ${var:createdTradeId} automatically
+      await trades.openActionMenu(tradeId);
     });
   }
 }
@@ -190,8 +194,7 @@ test('[TC-TRADE-SEARCH-FX_TRF-UI-001] Checker finds a new FX_TRF trade', async (
   const tradeId = await flows.tradeCreation.createTrade('FX_TRF', data);           // When I open the New Trade form ... And I book the trade and confirm
   await flows.tradeCreation.expectPendingApproval(tradeId);                        // Then the trade is created with pending approval status
   await flows.auth.login('checker', 'And');                                        // And I log in as checker
-  await flows.trades.searchTrade(tradeId);                                         // When I search for the trade
-  await flows.trades.expectListedFirst(tradeId);                                   // Then the trade is listed first
+  await flows.trades.openActionMenu(tradeId);                                      // When I search for the trade and open its action menu
 });
 ```
 
@@ -208,6 +211,8 @@ Key points:
 - OREO inputs are web components and the real `<input>` sits in the shadow DOM, so input targets need `inner: 'input'`; buttons can be clicked on the host element directly.
 - In a page or component, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
 - Text fields of a target can be a parameter or a config reference too: `{ role: 'menuitem', name: p.direction }`.
+- A target can be narrowed by the text it contains: `{ ...blotter, inner: 'role=row', hasText: tradeId, nth: 0 }` is the first row of the blotter that shows that trade ID (`inner`, then `hasText`, then `nth`). `hasText` matches a part of the text, so the ID `T12` also finds the row of `T123`: search for the trade first.
+- `ui.rightClick(target)` clicks with the right mouse button, which opens a context menu such as the action menu of a blotter row.
 - Only **passing** cases are exported.
 
 ## QA: porting a case from the E2E project
@@ -244,7 +249,13 @@ npm run build:portable -- --no-zip        # produce the folder only, no zip
 
 This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported `cases/*.json` files need to be sent to the PO, who drops them into their `cases` folder (plus any new file under `data/` that a case uploads). `testdata/` is not part of the package: a case file carries the data it uses.
 
-Case files with case data are format version 2 and need a runner built from this version or later; an older runner must be replaced with a new package. Version 1 files (cases without case data) run on both.
+A case file is written in the lowest format version that can express it, and a runner refuses a file newer than itself with a message asking for the current package:
+
+| Version | The case uses | Runs on |
+|---|---|---|
+| 1 | Steps only | Every runner |
+| 2 | Case data (`params`) | A runner built since case data was added |
+| 3 | A right-click, or a target narrowed with `hasText` (any case that works on a blotter row) | A runner built from this version or later: send the PO a new package |
 
 ## PO: how to use it
 

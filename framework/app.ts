@@ -6,17 +6,21 @@ import { TopBar } from './components/top-bar';
 import { LoginPage, TradesPage, NewTradePage, TradeDetailPage } from './pages';
 
 export class App {
-  readonly topBar: TopBar;
-  readonly login: LoginPage;
-  readonly trades: TradesPage;
-  readonly newTrade: NewTradePage;
-  readonly tradeDetail: TradeDetailPage;
+  // A page looks its elements up when it is created, so each one is created on first use: a case then needs
+  // only the elements of the pages it really works on
+  private readonly created: {
+    topBar?: TopBar;
+    login?: LoginPage;
+    trades?: TradesPage;
+    newTrade?: NewTradePage;
+    tradeDetail?: TradeDetailPage;
+  } = {};
 
-  constructor(readonly ui: UI) {
-    this.topBar = new TopBar(ui);
-    this.login = new LoginPage(ui);
-    this.trades = new TradesPage(ui);
-    this.newTrade = new NewTradePage(ui);
-    this.tradeDetail = new TradeDetailPage(ui);
-  }
+  constructor(readonly ui: UI) {}
+
+  get topBar() { return (this.created.topBar ??= new TopBar(this.ui)); }
+  get login() { return (this.created.login ??= new LoginPage(this.ui)); }
+  get trades() { return (this.created.trades ??= new TradesPage(this.ui)); }
+  get newTrade() { return (this.created.newTrade ??= new NewTradePage(this.ui)); }
+  get tradeDetail() { return (this.created.tradeDetail ??= new TradeDetailPage(this.ui)); }
 }

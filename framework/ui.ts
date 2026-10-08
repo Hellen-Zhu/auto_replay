@@ -25,6 +25,8 @@ export type Target = {
   text?: string;
   css?: string;
   inner?: string;
+  /** Keeps only the elements that contain this text, e.g. the row of a list that shows a trade ID (after inner, before nth) */
+  hasText?: string;
   nth?: number;
   exact?: boolean;
 };
@@ -54,6 +56,7 @@ type Step = {
   value?: string;
   saveAs?: string;
   capture?: Capture;
+  button?: 'right';
   exact?: boolean;
   secret?: boolean;
 };
@@ -139,6 +142,10 @@ export class UI {
   }
   click(target: TargetIn) {
     return this.run({ action: 'click', target: this.toTarget(target) });
+  }
+  /** Click with the right mouse button, which opens a context menu such as the action menu of a blotter row */
+  rightClick(target: TargetIn) {
+    return this.run({ action: 'click', button: 'right', target: this.toTarget(target) });
   }
   /**
    * Click and capture a value from the response the click triggers (e.g. the ID of a trade that was just created).
@@ -226,8 +233,10 @@ export class UI {
     const params = usedParams(this.steps, this.paramValues);
     const hasParams = Object.keys(params).length > 0;
     const caseDoc = {
-      // Version 2 adds the params block. A case without case data is still version 1, which older runners can run too.
-      formatVersion: hasParams ? 2 : 1,
+      // A case is written in the lowest version that can express it, so that an older runner still runs what it can
+      // and refuses the rest: 2 adds the params block; 3 adds hasText in a target and button on a click, which a
+      // version 2 runner would ignore without a word (any row, a normal click)
+      formatVersion: this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,

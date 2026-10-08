@@ -6,13 +6,16 @@ const fs = require('fs');
 const path = require('path');
 const { expect } = require('@playwright/test');
 
-// Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name}
-const FORMAT_VERSION = 2;
+// Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name};
+// 3 = adds hasText in a target and button on a click
+const FORMAT_VERSION = 3;
 
 /**
  * Turn a target description from the JSON into a Playwright Locator.
  * Supported fields (in priority order): testId / role(+name) / label / placeholder / text / css
- * Extra fields: inner (locate again inside the host element, e.g. the input in a web component's shadow DOM), nth
+ * Extra fields, applied in this order: inner (locate again inside the host element, e.g. the input in a web
+ * component's shadow DOM), hasText (keep only the elements that contain this text), nth
+ * A row of a list found by a text it shows: { testId: '<list>', inner: 'role=row', hasText: '${var:tradeId}', nth: 0 }
  */
 function resolveTarget(page, target) {
   if (!target) throw new Error('Step is missing a target');
@@ -27,6 +30,7 @@ function resolveTarget(page, target) {
 
   // CSS locators pierce open shadow roots automatically, so inner: 'input' finds the native input inside sc-text-input
   if (target.inner) loc = loc.locator(target.inner);
+  if (target.hasText) loc = loc.filter({ hasText: target.hasText });
   if (target.nth !== undefined && target.nth !== null) loc = loc.nth(target.nth);
   return loc;
 }
@@ -54,7 +58,8 @@ function describeTarget(target, vars, params) {
     (target.text && `text=${target.text}`) ||
     (target.css && `css=${target.css}`) ||
     '?';
-  return showPlaceholders(base + (target.inner ? ` >> ${target.inner}` : '') + (target.nth !== undefined ? ` [${target.nth}]` : ''), vars, params);
+  const within = (target.inner ? ` >> ${target.inner}` : '') + (target.hasText ? ` containing "${target.hasText}"` : '');
+  return showPlaceholders(base + within + (target.nth !== undefined ? ` [${target.nth}]` : ''), vars, params);
 }
 
 /** Read a dotted path from an object: get({a:{b:1}}, 'a.b') => 1 */
@@ -131,7 +136,7 @@ function resolveDataFile(rootDir, rel) {
  * url is matched against the end of the request path, so no server address is needed. It may carry a query
  * ('/trades/create?tradeAction=SUBMIT'): those parameters must then be present on the request with the same values.
  */
-async function clickAndCapture(page, loc, capture, ctx, timeout) {
+async function clickAndCapture(page, loc, capture, ctx, timeout, button) {
   const method = capture.method ? String(capture.method).toUpperCase() : '';
   const what = `${method || 'request'} ...${capture.url}`;
   const [wantPath, wantQuery = ''] = String(capture.url).split('?');
@@ -165,7 +170,7 @@ async function clickAndCapture(page, loc, capture, ctx, timeout) {
   let res;
   try {
     await cdp.send('Fetch.enable', { patterns: [{ urlPattern: `*${wantPath.replace(/\/+$/, '')}*`, requestStage: 'Response' }] });
-    await loc.click({ timeout });
+    await loc.click({ timeout, button });
     let timer;
     const late = new Promise((resolve) => { timer = setTimeout(() => resolve(null), timeout); });
     res = await Promise.race([seen, late]);
@@ -210,8 +215,9 @@ async function executeStep(page, step, ctx) {
       await resolveTarget(page, step.target).fill(value, { timeout });
       return;
     case 'click':
-      if (step.capture) return clickAndCapture(page, resolveTarget(page, step.target), step.capture, ctx, timeout);
-      await resolveTarget(page, step.target).click({ timeout });
+      // button: 'right' opens a context menu, e.g. the action menu of a blotter row; without it, a normal click
+      if (step.capture) return clickAndCapture(page, resolveTarget(page, step.target), step.capture, ctx, timeout, step.button);
+      await resolveTarget(page, step.target).click({ timeout, button: step.button });
       return;
     case 'upload': {
       const file = resolveDataFile(ctx.rootDir, value);
@@ -268,7 +274,10 @@ function describeStep(step, vars, params) {
   switch (step.action) {
     case 'goto': return `Open page ${v}`;
     case 'fill': return `Type ${v} into ${t}`;
-    case 'click': return step.capture ? `Click ${t} and save ${step.capture.field} from the response as ${step.capture.saveAs}` : `Click ${t}`;
+    case 'click': {
+      const click = step.button === 'right' ? 'Right-click' : 'Click';
+      return step.capture ? `${click} ${t} and save ${step.capture.field} from the response as ${step.capture.saveAs}` : `${click} ${t}`;
+    }
     case 'upload': return `Upload file ${v} to ${t}`;
     case 'press': return `Press ${v} on ${t}`;
     case 'select': return `Select ${v} in ${t}`;
