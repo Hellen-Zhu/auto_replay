@@ -1,8 +1,6 @@
 import { NewTradePage, TradeDetailPage } from '../pages';
 import { BaseFlow, type Keyword } from './base.flow';
 
-export type TradeKind = 'normal' | 'stepinFull' | 'stepinPartial';
-
 /** The data of one trade creation case: its row of testdata/trade-creation.json */
 export interface TradeCreationData {
   counterpartyName: string;
@@ -15,49 +13,73 @@ export interface TradeCreationData {
 /** The product's .dat file, shipped with the cases in data/ (same names as the E2E project's ProductDatFiles) */
 export const datFile = (product: string) => `data/${product}.dat`;
 
-/** Booking a new trade through the New Trade form */
+/**
+ * Booking a new trade through the New Trade form, mirroring the E2E project's trade_creation snippets.
+ * The product type is what is typed as the Product ID and it names the dat file; the data is recorded as case
+ * data (${param:name}), which the PO can change for a run. Each create flow ends when the booking is confirmed
+ * and returns the new trade ID (recorded as ${var:createdTradeId}); the outcome is asserted by the case, e.g.
+ * with expectPendingApproval(tradeId).
+ */
 export class TradeCreationFlow extends BaseFlow {
-  /**
-   * Maker creates a trade for a product, mirroring the E2E project's trade_creation snippets:
-   * a normal trade, or a StepIn full / StepIn partial trade. The product (typed as the Product ID, and the name
-   * of the dat file) and the kind decide the scenario; the data is recorded as case data (${param:name}), which the PO can change for a run.
-   * Ends when the booking is confirmed and returns the new trade ID (recorded as ${var:createdTradeId});
-   * the outcome is asserted by the case, e.g. with expectPendingApproval(tradeId).
-   */
-  async createTrade(product: string, kind: TradeKind, data: TradeCreationData): Promise<string> {
-    const { ui } = this;
-    const { topBar, newTrade } = this.app;
-    const p = this.params(data);
-    const selectBasicInfo = () =>
-      ui.And('I select the basic mandatory info', async () => {
-        await newTrade.counterparty.select(p.counterpartyName);
-        await newTrade.portfolio.select(p.portfolioId);
-        await newTrade.productId.select(product); // the product type is what is typed as the Product ID
-        await newTrade.direction.select(p.direction);
-      });
-    const uploadDat = () => ui.And(`I upload the ${product} dat file`, () => newTrade.uploadDat(datFile(product)));
+  /** Maker creates a normal trade for a product */
+  async createTrade(product: string, data: TradeCreationData): Promise<string> {
+    await this.openNewTradeForm();
+    await this.selectBasicInfo(product, data);
+    await this.uploadDat(product);
+    return this.bookAndConfirm();
+  }
 
-    await ui.When('I open the New Trade form', async () => {
+  /** Maker creates a StepIn full trade for a product */
+  async createStepInFullTrade(product: string, data: TradeCreationData): Promise<string> {
+    return this.createStepInTrade(product, data, true);
+  }
+
+  /** Maker creates a StepIn partial trade for a product */
+  async createStepInPartialTrade(product: string, data: TradeCreationData): Promise<string> {
+    return this.createStepInTrade(product, data, false);
+  }
+
+  private async createStepInTrade(product: string, data: TradeCreationData, full: boolean): Promise<string> {
+    const { newTrade } = this.app;
+    const p = this.params(data);
+    await this.openNewTradeForm();
+    await this.uploadDat(product);
+    await this.selectBasicInfo(product, data);
+    await this.ui.And(`I enable StepIn ${full ? 'full' : 'partial'} and select the old counterparty`, async () => {
+      await newTrade.toggleStepIn();
+      await (full ? newTrade.chooseStepInFull() : newTrade.chooseStepInPartial());
+      await newTrade.oldCounterparty.select(p.oldCounterpartyName);
+    });
+    return this.bookAndConfirm();
+  }
+
+  private async openNewTradeForm() {
+    const { topBar, newTrade } = this.app;
+    await this.ui.When('I open the New Trade form', async () => {
       await topBar.clickNewTrade();
       await newTrade.expectOpen();
     });
+  }
 
-    if (kind === 'normal') {
-      await selectBasicInfo();
-      await uploadDat();
-    } else {
-      await uploadDat();
-      await selectBasicInfo();
-      const full = kind === 'stepinFull';
-      await ui.And(`I enable StepIn ${full ? 'full' : 'partial'} and select the old counterparty`, async () => {
-        await newTrade.toggleStepIn();
-        await (full ? newTrade.chooseStepInFull() : newTrade.chooseStepInPartial());
-        await newTrade.oldCounterparty.select(p.oldCounterpartyName);
-      });
-    }
+  private async selectBasicInfo(product: string, data: TradeCreationData) {
+    const { newTrade } = this.app;
+    const p = this.params(data);
+    await this.ui.And('I select the basic mandatory info', async () => {
+      await newTrade.counterparty.select(p.counterpartyName);
+      await newTrade.portfolio.select(p.portfolioId);
+      await newTrade.productId.select(product); // the product type is what is typed as the Product ID
+      await newTrade.direction.select(p.direction);
+    });
+  }
 
+  private async uploadDat(product: string) {
+    await this.ui.And(`I upload the ${product} dat file`, () => this.app.newTrade.uploadDat(datFile(product)));
+  }
+
+  private async bookAndConfirm(): Promise<string> {
+    const { newTrade } = this.app;
     let tradeId = '';
-    await ui.And('I book the trade and confirm', async () => {
+    await this.ui.And('I book the trade and confirm', async () => {
       await newTrade.clickBook();
       await newTrade.confirmDialog.expectVisible();
       tradeId = await newTrade.confirmDialog.confirmAndCapture({ ...NewTradePage.createApi, saveAs: 'createdTradeId' });

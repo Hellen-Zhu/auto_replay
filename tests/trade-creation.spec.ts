@@ -1,34 +1,56 @@
 import fs from 'fs';
 import path from 'path';
 import { test } from '../framework/fixtures';
-import { datFile, type TradeCreationData, type TradeKind } from '../framework/flows';
+import { datFile, type TradeCreationData } from '../framework/flows';
 
-// Mirrors trade_creation.feature of the E2E project. To cover another product, add it here, add the rows of its
-// case IDs to testdata/trade-creation.json and put its data/<PRODUCT>.dat in place; the product type is also
-// what is typed into the Product ID field.
+// Mirrors trade_creation.feature of the E2E project: one test per scenario, each with its own list of products,
+// since not every product supports StepIn full / partial. To cover another product, add it to the lists of the
+// scenarios it supports, add the rows of those case IDs to testdata/trade-creation.json and put its
+// data/<PRODUCT>.dat in place; the product type is also what is typed into the Product ID field.
 const PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
+const STEPIN_FULL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
+const STEPIN_PARTIAL_PRODUCTS = ['FX_CO', 'FX_TRF', 'FX_FSB'];
 
-const KINDS: { kind: TradeKind; no: string; label: string }[] = [
-  { kind: 'normal', no: '001', label: 'trade' },
-  { kind: 'stepinFull', no: '002', label: 'StepIn full trade' },
-  { kind: 'stepinPartial', no: '003', label: 'StepIn partial trade' },
-];
+/** Skips the case when the product's dat file is not there, and sets the description shown to the PO */
+function prepare(product: string, what: string) {
+  test.skip(!fs.existsSync(path.resolve(__dirname, '..', datFile(product))), `${datFile(product)} is missing`);
+  test.info().annotations.push({
+    type: 'description',
+    description: `Maker books a new ${product} ${what} from its dat file and verifies it is created with pending approval status`,
+  });
+}
 
 test.describe('Trade creation', () => {
   for (const product of PRODUCTS) {
-    for (const { kind, no, label } of KINDS) {
-      test(`[TC-TRADE-CREATION-${product}-UI-${no}] Maker creates a new ${product} ${label}`, async ({ flows, testData }) => {
-        test.skip(!fs.existsSync(path.resolve(__dirname, '..', datFile(product))), `${datFile(product)} is missing`);
-        test.info().annotations.push({
-          type: 'description',
-          description: `Maker books a new ${product} ${label} from its dat file and verifies it is created with pending approval status`,
-        });
-        const data = testData<TradeCreationData>(); // the row of testdata/trade-creation.json with this case ID
+    test(`[TC-TRADE-CREATION-${product}-UI-001] Maker creates a new ${product} trade`, async ({ flows, testData }) => {
+      prepare(product, 'trade');
+      const data = testData<TradeCreationData>();
 
-        await flows.auth.login('maker');
-        const tradeId = await flows.tradeCreation.createTrade(product, kind, data);
-        await flows.tradeCreation.expectPendingApproval(tradeId);
-      });
-    }
+      await flows.auth.login('maker');
+      const tradeId = await flows.tradeCreation.createTrade(product, data);
+      await flows.tradeCreation.expectPendingApproval(tradeId);
+    });
+  }
+
+  for (const product of STEPIN_FULL_PRODUCTS) {
+    test(`[TC-TRADE-CREATION-${product}-UI-002] Maker creates a new ${product} StepIn full trade`, async ({ flows, testData }) => {
+      prepare(product, 'StepIn full trade');
+      const data = testData<TradeCreationData>();
+
+      await flows.auth.login('maker');
+      const tradeId = await flows.tradeCreation.createStepInFullTrade(product, data);
+      await flows.tradeCreation.expectPendingApproval(tradeId);
+    });
+  }
+
+  for (const product of STEPIN_PARTIAL_PRODUCTS) {
+    test(`[TC-TRADE-CREATION-${product}-UI-003] Maker creates a new ${product} StepIn partial trade`, async ({ flows, testData }) => {
+      prepare(product, 'StepIn partial trade');
+      const data = testData<TradeCreationData>();
+
+      await flows.auth.login('maker');
+      const tradeId = await flows.tradeCreation.createStepInPartialTrade(product, data);
+      await flows.tradeCreation.expectPendingApproval(tradeId);
+    });
   }
 });
