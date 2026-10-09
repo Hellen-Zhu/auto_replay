@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PO-side runner: reads case files from cases/ and really executes them in the local browser.
 // Usage:
-//   double-click run-case.bat               -> browse the folders under cases/ or search, type a number to run a case
+//   double-click run-case.bat               -> browse the folders under cases/ or search, type a number to run a case;
+//                                              after the run the window goes back to the list for the next case
 //   drag a case .json onto run-case.bat     -> run that case directly
 //   node runner/runner.js cases/<folder>/xxx.json
 //   double-click view-trace.bat             -> serve reports and full replays (trace viewer) of earlier runs
@@ -28,6 +29,8 @@ const interactive = !!process.stdin.isTTY;
 // Read line by line through the async iterator: input is buffered, so no line is lost to prompt timing
 const lines = rl[Symbol.asyncIterator]();
 let typedLines = 0, readLines = 0;
+// Set once the input has ended (piped input used up, console closed): nothing more can be asked
+let inputEnded = false;
 rl.on('line', () => { typedLines++; });
 async function readLine(q, hidden, optional) {
   rl.output.write(q);
@@ -37,6 +40,7 @@ async function readLine(q, hidden, optional) {
   muted = quietKeys;
   if (hidden) rl.output.write('\n');
   if (done) {
+    inputEnded = true;
     if (optional) { rl.output.write('\n'); return ''; }
     throw new Error('Input ended before the required information was provided');
   }
@@ -122,6 +126,10 @@ function printEntries(entries, dir) {
   return shown;
 }
 
+// Where the PO is in the case list: the folder, the folders above it and the search text. Kept while the window is
+// open, so that after a run the list comes back at the same place: the next case is usually next to the one just run
+let place = null;
+
 async function chooseCase(argPath) {
   if (argPath) {
     const file = path.resolve(argPath);
@@ -142,9 +150,11 @@ async function chooseCase(argPath) {
       dir = entries[0].folder;
     }
   };
-  let dir = open('');
-  const back = []; // the folders the PO came through, for B
-  let search = '';
+  // The case files may have changed since the last run in this window: a folder that is gone means starting at the top
+  if (!place || !cases.some((c) => inFolder(c, place.dir))) place = { dir: open(''), back: [], search: '' };
+  let { dir, search } = place;
+  const back = place.back; // the folders the PO came through, for B
+  if (search && !searchCases(cases, dir, search).length) search = '';
   let shown, question;
   for (let list = true; ; ) {
     if (list) {
@@ -180,6 +190,7 @@ async function chooseCase(argPath) {
     }
     if (!picked.folder) {
       console.log(`\nSelected: ${picked.doc.name || picked.id}`);
+      place = { dir, back, search };
       return picked;
     }
     back.push(dir);
@@ -379,6 +390,10 @@ function saveConfig(file, values) {
 }
 
 // ---------------- Execution ----------------
+// Set while a run has a browser open: closes it and gives the keyboard back. A run does that itself when it ends;
+// main() calls this when a run ends with an error instead, since the window then goes on with the next case.
+let releaseRun = null;
+
 async function runCase({ file, doc }, config) {
   if (Number(doc.formatVersion) > FORMAT_VERSION) {
     throw new Error(`${path.basename(file)} is case format version ${doc.formatVersion}; this runner supports up to version ${FORMAT_VERSION}. Ask QA for the current UAT-Runner package.`);
@@ -419,14 +434,15 @@ async function runCase({ file, doc }, config) {
   const paramNames = Object.keys(params);
   const showData = (v) => showPlaceholders(v); // a value that points at local config is shown by its name
 
-  // When settings are already provided, show them and let the PO switch environment or account
-  // for this run without editing any file.
+  // When settings are already provided, show them and let the PO switch environment or account without editing
+  // any file. config is the same object for every run of this window, so a change stays for the cases run after it.
   const editable = ['baseUrl', ...required.filter((k) => !isSecret(k))];
   const hasSettings = editable.some((k) => !isEmpty(getCfg(k)));
   if (hasSettings || paramNames.length) {
     if (hasSettings) {
       console.log('\nSettings for this run:');
-      for (const k of editable) console.log(`  ${k}: ${isEmpty(getCfg(k)) ? '(not set)' : getCfg(k)}`);
+      // a password is listed too, masked: one that is set is used without asking, C lets the PO type it again
+      for (const k of ['baseUrl', ...required]) console.log(`  ${k}: ${isEmpty(getCfg(k)) ? '(not set)' : isSecret(k) ? '******' : getCfg(k)}`);
     }
     if (paramNames.length) {
       console.log('\nCase data:');
@@ -448,6 +464,13 @@ async function runCase({ file, doc }, config) {
         // instead of being sent to the wrong place.
         const scope = k === 'baseUrl' ? '' : k.slice(0, k.lastIndexOf('.') + 1);
         for (const s of secrets) if (s.startsWith(scope)) { setCfg(s, ''); toSave[s] = ''; }
+      }
+      // A password is not shown, but it can be typed again: the one of an earlier run in this window is still in use,
+      // also when that run failed on it. A password that was just dropped above is asked for below anyway.
+      for (const s of secrets) {
+        if (isEmpty(getCfg(s))) continue;
+        const v = await askHidden(`  ${s} [Enter keeps the current one; input is hidden]: `);
+        if (v !== '') setCfg(s, v);
       }
     }
     if (paramNames.length && chose('d')) {
@@ -482,10 +505,10 @@ async function runCase({ file, doc }, config) {
         saveConfig(config.__file, toSave);
         console.log(`  Saved to ${config.__file}`);
       } catch (e) {
-        console.log(`  Could not save (${String(e.message).split('\n')[0]}); the settings still apply to this run.`);
+        console.log(`  Could not save (${String(e.message).split('\n')[0]}); the settings still apply while this window is open.`);
       }
     } else {
-      console.log('  Not saved; the settings apply to this run only.');
+      console.log('  Not saved; the settings apply until this window is closed.');
     }
   }
 
@@ -508,7 +531,12 @@ async function runCase({ file, doc }, config) {
 
   const viewport = { width: 1280, height: 720 };
   let browser = await chromium.launch(launchOptions(config));
-  let context, page;
+  let context, page, onKey;
+  releaseRun = async () => {
+    if (onKey) process.stdin.off('keypress', onKey);
+    setQuietKeys(false);
+    await browser.close().catch(() => {});
+  };
   if (config.evidence?.video === true) {
     try {
       context = await browser.newContext({ viewport, recordVideo: { dir, size: viewport } });
@@ -532,7 +560,7 @@ async function runCase({ file, doc }, config) {
   // Pausing only ever happens between steps, never in the middle of an action.
   // P is picked up as a single key press (console only); the run stops once the current step has finished.
   let pauseRequested = false, pausing = false;
-  const onKey = (s, key) => {
+  onKey = (s, key) => {
     if (pausing || pauseRequested || !key || key.ctrl || key.meta || key.name !== 'p') return;
     pauseRequested = true;
     console.log('\n    (Pause requested: the run will stop after the current step)');
@@ -610,6 +638,7 @@ async function runCase({ file, doc }, config) {
   const video = page.video();
   await context.close();
   await browser.close();
+  releaseRun = null;
   if (video) {
     try {
       const vp = await video.path();
@@ -807,6 +836,14 @@ async function recordSession(config) {
   return { dir, pendingEnter: endedBy === 'closed' && interactive ? enter : undefined };
 }
 
+function printError(e) {
+  console.error('\nRunner error:', String((e && e.message) || e).split('\n').slice(0, 3).join('\n'));
+  const first = String((e && e.message) || '').split('\n')[0];
+  if (/browserType\.launch/.test(first) && /Executable doesn't exist|Chromium distribution|is not found/i.test(first)) {
+    console.error('Hint: no browser was found. Make sure Edge is installed on this computer, or change browser.channel in config.local.json to "chrome".');
+  }
+}
+
 async function main() {
   const config = loadConfig(ROOT);
   if (process.argv[2] === '--view') {
@@ -821,22 +858,47 @@ async function main() {
     await serveUntilEnter(config, pendingEnter);
     return 0;
   }
-  const chosen = await chooseCase(process.argv[2]);
-  if (!chosen) return 2;
-  const { run, dir } = await runCase(chosen, config);
-  if (!process.env.OREO_NO_OPEN) openFile(path.join(dir, 'report.html'));
-  await serveUntilEnter(config);
-  return run.status === 'passed' ? 0 : 1;
+
+  // One window runs as many cases as the PO wants: after a run it goes back to the case list instead of closing.
+  // config is the same object for all of them, so what was typed in for one run (address, account, password) is not
+  // asked for again; it stays in memory only. The links of every run work until the window is closed.
+  // With piped input there is nobody to ask: one case, as before.
+  let server = null, failed = false;
+  for (let first = true; ; first = false) {
+    let ran = false;
+    try {
+      const chosen = await chooseCase(first ? process.argv[2] : undefined);
+      if (!chosen) { if (first) return 2; break; }
+      const { run, dir } = await runCase(chosen, config);
+      ran = true;
+      if (run.status !== 'passed') failed = true;
+      if (!process.env.OREO_NO_OPEN) openFile(path.join(dir, 'report.html'));
+    } catch (e) {
+      // A case that cannot be run (a file of a newer format, a missing data file, a browser closed by hand) ends
+      // that case, not the window
+      if (releaseRun) { await releaseRun(); releaseRun = null; }
+      if (!interactive || inputEnded) throw e;
+      failed = true;
+      printError(e);
+    }
+    if (ran && !server) {
+      server = await startViewServer(config);
+      if (!server) console.log(`   (Port ${viewPort(config)} is already in use - normally by another runner or view-trace window, which keeps the links working.)`);
+    }
+    if (!interactive) break;
+    if (ran && server) console.log('\nThe links above work while this window stays open.');
+    await discardTyped(); // an Enter pressed while the case was running must not answer this
+    const answer = await askOptional(`${ran && server ? '' : '\n'}Press Enter to choose another case, or type Q to close: `);
+    if (inputEnded || /^(q|quit|exit)$/i.test(answer)) break;
+  }
+  if (server) { server.closeAllConnections?.(); server.close(); }
+  return failed ? 1 : 0;
 }
 
 main()
   .then((code) => { rl.close(); process.exitCode = code; })
   .catch((e) => {
     rl.close();
-    console.error('\nRunner error:', String((e && e.message) || e).split('\n').slice(0, 3).join('\n'));
-    const first = String((e && e.message) || '').split('\n')[0];
-    if (/browserType\.launch/.test(first) && /Executable doesn't exist|Chromium distribution|is not found/i.test(first)) {
-      console.error('Hint: no browser was found. Make sure Edge is installed on this computer, or change browser.channel in config.local.json to "chrome".');
-    }
+    printError(e);
     process.exitCode = 3;
   });
