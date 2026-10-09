@@ -941,8 +941,11 @@ let openRuns = 0;
 /**
  * Runs one case in a browser of its own and writes its evidence folder. With quiet nothing is printed and nothing
  * is asked (cases running at the same time: the batch prints one line per case).
+ * With keepOpen the browser is not closed when the run ends: it is returned as `browser`, on the last page, and
+ * the caller closes it. The evidence is complete by then, so what is done in that browser afterwards is in no
+ * report and no trace. Not with video: the video file is only written when the browser closes.
  */
-async function executeCase({ file, doc }, config, { params = paramsOf(doc), stepByStep = false, askConfig, quiet = false, slot = 0 } = {}) {
+async function executeCase({ file, doc }, config, { params = paramsOf(doc), stepByStep = false, askConfig, quiet = false, slot = 0, keepOpen = false } = {}) {
   const caseData = caseDataOf(doc, params);
   const say = (text) => { if (!quiet) console.log(text); };
   // Created only now, after everything was asked: the timestamp is the start of the run, and a run that is given up
@@ -971,6 +974,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
 
   const viewport = { width: 1280, height: 720 };
   let browser, context, page, onKey;
+  let kept = false;
   openRuns++;
   // However the run ends (also with an error, e.g. a browser closed by hand): the browser is closed and the
   // keyboard given back, since the window goes on with the next case
@@ -1078,8 +1082,11 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
 
     await context.tracing.stop({ path: path.join(dir, 'trace.zip') });
     const video = page.video();
-    await context.close();
-    await browser.close();
+    kept = keepOpen && !video;
+    if (!kept) {
+      await context.close();
+      await browser.close();
+    }
     if (video) {
       try {
         const vp = await video.path();
@@ -1097,7 +1104,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
     openRuns--;
     if (onKey) process.stdin.off('keypress', onKey);
     if (!quiet) setQuietKeys(false);
-    if (browser) await browser.close().catch(() => {});
+    if (browser && !kept) await browser.close().catch(() => {});
   }
 
   say(run.status === 'passed' ? '\n✅ Run passed' : '\n❌ Run failed');
@@ -1105,7 +1112,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
   say(`   Report:      ${reportUrl(config, path.basename(dir))}`);
   say('   Full replay: "Open trace viewer" link at the bottom of the report');
   say(`   Folder:      ${dir}`);
-  return { run, dir };
+  return { run, dir, browser: kept ? browser : null };
 }
 
 /** One case: its settings and case data are asked, then it runs with every step shown */
@@ -1113,7 +1120,8 @@ async function runCase(chosen, config) {
   checkCase(chosen);
   const { params, askConfig, stepByStep } = await askSettings([chosen], config);
   checkCase(chosen, params);
-  return executeCase(chosen, config, { params, stepByStep, askConfig });
+  // On a console the browser stays open after the run, so that the PO can look at the page the case ended on
+  return executeCase(chosen, config, { params, stepByStep, askConfig, keepOpen: interactive });
 }
 
 // ---------------- Running several cases ----------------
@@ -1542,6 +1550,7 @@ async function main() {
   let server = null;
   for (let first = true; ; first = false) {
     let ran = false;
+    let kept = null; // the browser of the case that just ran, left open until the PO goes on
     try {
       const chosen = first && args.length ? casesFromArgs(args) : await chooseCases();
       if (chosen === QUIT) break;
@@ -1552,6 +1561,7 @@ async function main() {
         const one = await runCase(chosen[0], config);
         status = one.run.status;
         dir = one.dir;
+        kept = one.browser;
       } else {
         ({ status, dir } = await runBatch(chosen, config));
       }
@@ -1572,7 +1582,14 @@ async function main() {
     if (!interactive) break;
     if (ran && server) console.log('\nThe links above work while this window stays open.');
     await discardTyped(); // an Enter pressed while the case was running must not answer this
-    const answer = await askOptional(`${ran && server ? '' : '\n'}Press Enter to choose another case, or type Q to close: `);
+    // A browser closed by hand in the meantime is no longer connected: there is nothing to say or to close then
+    if (kept && !kept.isConnected()) kept = null;
+    if (kept) {
+      console.log('\nThe browser stays open on the page the case ended on, so you can look at it or go on by hand.');
+      console.log('What you do there now is not part of the report or the full replay.');
+    }
+    const answer = await askOptional(`${(ran && server) || kept ? '' : '\n'}Press Enter to ${kept ? 'close the browser and ' : ''}choose another case, or type Q to close: `);
+    if (kept) await kept.close().catch(() => {});
     if (inputEnded || /^(q|quit|exit)$/i.test(answer)) break;
   }
   if (server) { server.closeAllConnections?.(); server.close(); }
