@@ -3,9 +3,9 @@
 QA runs a case locally with Playwright → once it passes, a **case file** (JSON) is exported automatically → the PO double-clicks the **portable runner** to replay it, really driving Edge on their own computer and producing an execution report with screenshots.
 
 ```
-QA: npx playwright test  ──export──►  cases/TC-TRADE-CREATION-FX_TRF-UI-001.json
+QA: npx playwright test  ──export──►  cases/trade-creation/TC-TRADE-CREATION-FX_TRF-UI-001.json
                                           │ put on the shared drive
-PO: double-click run-case.bat → pick a number → Edge opens and runs → evidence/xxx/report.html
+PO: double-click run-case.bat → pick a folder and a case, or search → Edge opens and runs → evidence/xxx/report.html
 ```
 
 A case file contains **no server address and no password**, only relative paths and config references (`${cfg:accounts.maker.password}`). Those values live in each computer's own `config.local.json`.
@@ -32,7 +32,7 @@ Two kinds of data are kept apart:
 | `framework/app.ts` | `App`: one instance of every page and shared component, each created on first use |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
 | `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
-| `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/` automatically after a test passes |
+| `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/<spec name>/` automatically after a test passes |
 | `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`) |
 | `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`; `support.ts` holds what the specs share |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
@@ -57,10 +57,12 @@ copy config.local.example.json config.local.json
 Edit `config.local.json`: fill in `baseUrl` (the real server address), `apiBaseUrl` (the address of the API **including its path prefix**, e.g. `https://<api host>/api/v1`; it is not the pages' address, and only cases that call the API need it) and the account and password for each role. The file is in `.gitignore` and is never committed.
 
 ```bash
-npx playwright test                    # run every case; passing ones are exported to cases/
+npx playwright test                    # run every case; passing ones are exported to cases/<spec name>/
 npx playwright test --headed           # watch the browser while it runs
 npm run replay                         # replay with the runner, exactly what the PO sees
 ```
+
+Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/trade-cancellation.spec.ts` exports to `cases/trade-cancellation/<case ID>.json`, the same name as its test data file. Nothing has to be set up for a new spec: its folder is created by the first export. The runner shows these folders to the PO instead of one long list (see "PO: how to use it").
 
 > To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173`, `apiBaseUrl` to `http://localhost:4173/api/v1` and the maker password to `maker1`. The values in `testdata/` are those of the real system; the mock offers them too. The mock's header comment says which of its testids are real and which are only its own guess.
 
@@ -103,7 +105,7 @@ Case data lives in `testdata/`, not in `config.local.json`:
 (The real files are plain JSON, without comments.)
 
 - A case gets `common.json`, then `defaults` of its spec's file, then its own row: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once. **A case that needs nothing different has no row at all** (only the Sell case has one); `cases`, `defaults` and even the file are optional.
-- `id` is the full case ID. **The data is matched at run time**: a test title starts with its case ID in `[ ]` (the spec may build it, e.g. `[TC-TRADE-CREATION-${product}-UI-001]`), and the `testData` fixture looks that ID up in `testdata/<spec file name>.json` (`tests/trade-creation.spec.ts` → `testdata/trade-creation.json`). Take care with the spelling of an `id`: a row that matches no case is simply not used. The ID is also the exported file name (`cases/<id>.json`).
+- `id` is the full case ID. **The data is matched at run time**: a test title starts with its case ID in `[ ]` (the spec may build it, e.g. `[TC-TRADE-CREATION-${product}-UI-001]`), and the `testData` fixture looks that ID up in `testdata/<spec file name>.json` (`tests/trade-creation.spec.ts` → `testdata/trade-creation.json`). Take care with the spelling of an `id`: a row that matches no case is simply not used. The ID is also the exported file name (`cases/<spec file name>/<id>.json`).
 - In the test: `const data = testData<TradeCreationData>()`, then hand it to the flow.
 - In the flow, `const p = this.params(data)` turns the data into parameters. `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value is written into the `params` block of the case file, so the PO sees it before the run and can change it for one run. Only the parameters a case really uses are written.
 - What decides **the scenario itself** (which steps, which file, which title: the product) stays in the spec and is passed to the flow as a plain argument; each scenario is its own test and its own flow (`createTrade`, `createStepInFullTrade`, `createStepInPartialTrade`). It is recorded as it is and the PO cannot change it.
@@ -291,7 +293,7 @@ npm run build:portable -- --with-config   # include your baseUrl and accounts (p
 npm run build:portable -- --no-zip        # produce the folder only, no zip
 ```
 
-This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported `cases/*.json` files need to be sent to the PO, who drops them into their `cases` folder (plus any new file under `data/` that a case uploads). `testdata/` is not part of the package: a case file carries the data it uses.
+This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported case files need to be sent to the PO, who drops them into the same folder under their `cases` folder, e.g. `cases/trade-cancellation/` (plus any new file under `data/` that a case uploads). The runner finds a case file anywhere under `cases/`, at any depth, so a file dropped directly into `cases` runs as well; it is just listed outside the folders. `testdata/` is not part of the package: a case file carries the data it uses.
 
 A case file is written in the lowest format version that can express it, and a runner refuses a file newer than itself with a message asking for the current package:
 
@@ -305,7 +307,10 @@ A case file is written in the lowest format version that can express it, and a r
 ## PO: how to use it
 
 1. Unzip `UAT-Runner.zip` (nothing needs to be installed).
-2. Double-click **run-case.bat**, type a number and press Enter; or drag a case `.json` onto the bat file.
+2. Double-click **run-case.bat** and choose the case; or drag a case `.json` onto the bat file.
+   - The cases are grouped in folders, one per kind of event (trade creation, trade cancellation...). Type the number of a folder to open it, then the number of the case. Plain Enter takes number 1; `B` goes back.
+   - Or **type text instead of a number to search**, at any of these prompts: a product (`trf`), part of a case ID (`cancellation-fx_trf`) or several words (`cancel pscript`: every word must match). Inside a folder the search covers that folder, at the first list it covers everything.
+   - A list of more than 40 cases is cut; type text to narrow it.
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account for this run (the password is then asked for again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
    If the case comes with **case data** (counterparty, portfolio...), it is listed there too. Type `D` to change a value for this run, e.g. to book against another counterparty; `CD` changes both settings and data. The case file itself is not modified, and the report shows the data the run used and marks what was changed.
    A case that prepares its data through the API also needs the **API address** (`apiBaseUrl`, with its path prefix such as `/api/v1`); it is shown, asked for and saved like the system address.

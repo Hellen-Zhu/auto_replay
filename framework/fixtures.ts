@@ -1,5 +1,5 @@
 // Auto fixtures: inject flows (business steps), app (pages and components) and ui (actions + recording)
-// into every test, and export the case file to cases/ once the test passes
+// into every test, and export the case file to cases/<spec name>/ once the test passes
 
 import { test as base, expect } from '@playwright/test';
 import path from 'path';
@@ -14,6 +14,12 @@ const ROOT = path.resolve(__dirname, '..');
 const CASES_DIR = process.env.OREO_CASES_DIR || path.join(ROOT, 'cases');
 
 const CASE_TAG = /@case:([\w-]+)/;
+
+/**
+ * The name of a spec: tests/trade-creation.spec.ts -> trade-creation. One spec covers one lifecycle event, and its
+ * name is also the name of its test data file (testdata/trade-creation.json) and of its folder under cases/
+ */
+const specNameOf = (file: string) => path.basename(file).replace(/\.spec\.[cm]?[jt]s$/, '');
 
 /** Export file name: the case ID in [ ] at the start of the title, or an @case:xxx tag; falls back to the title */
 function exportIdOf(title: string): string {
@@ -44,7 +50,7 @@ export const test = base.extend<{ ui: UI; app: App; flows: Flows; testData: Test
     await use(<T extends object>() => {
       const id = caseIdOf(testInfo.title);
       if (!id) throw new Error(`The test title must start with its case ID in [ ] to use test data: "${testInfo.title}"`);
-      return findCase<T>(path.basename(testInfo.file).replace(/\.spec\.[cm]?[jt]s$/, ''), id);
+      return findCase<T>(specNameOf(testInfo.file), id);
     });
   },
 
@@ -53,18 +59,20 @@ export const test = base.extend<{ ui: UI; app: App; flows: Flows; testData: Test
     const ui = new UI(page, loadConfig(ROOT), ROOT);
     await use(ui);
 
-    // Export only passing cases, so a half-finished flow never reaches the PO
+    // Export only passing cases, so a half-finished flow never reaches the PO. The cases of a spec share a folder,
+    // so that the hundreds of cases of all events and products stay easy to find, for QA and in the runner's menu
     if (testInfo.status === 'passed') {
       const id = exportIdOf(testInfo.title);
       const name = testInfo.title.replace(CASE_TAG, '').trim();
-      const file = path.join(CASES_DIR, `${id}.json`);
+      const file = path.join(CASES_DIR, specNameOf(testInfo.file), `${id}.json`);
       ui.exportCase(file, {
         name,
         description: testInfo.annotations.find((a) => a.type === 'description')?.description,
         source: `${path.relative(ROOT, testInfo.file).replace(/\\/g, '/')} › ${testInfo.title}`,
       });
-      testInfo.annotations.push({ type: 'exported-case', description: path.relative(ROOT, file) });
-      console.log(`  ✔ Exported case: ${path.relative(ROOT, file)}`);
+      const shown = path.relative(ROOT, file).replace(/\\/g, '/');
+      testInfo.annotations.push({ type: 'exported-case', description: shown });
+      console.log(`  ✔ Exported case: ${shown}`);
     }
   },
 

@@ -130,7 +130,7 @@ Never, whatever the reason:
    - `npx tsc -p .`
    - `npm run sync:elements` (no path: check only)
    - `npx playwright test tests/<spec> --list`: the titles must start with the feature's case IDs.
-6. Run the new cases only when `config.local.json` points at the real system and the `.dat` is there: `npx playwright test -g "<case ID>"`. Every run books real UAT trades: at most three runs per case. Fix only what the port got wrong (a missing `inner`, a wrong entry role); never loosen a check. A case file appears in `cases/` only after a pass.
+6. Run the new cases only when `config.local.json` points at the real system and the `.dat` is there: `npx playwright test -g "<case ID>"`. Every run books real UAT trades: at most three runs per case. Fix only what the port got wrong (a missing `inner`, a wrong entry role); never loosen a check. A case file appears in `cases/<spec name>/` only after a pass.
 7. Report.
 
 ## Report
