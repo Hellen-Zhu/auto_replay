@@ -27,8 +27,6 @@ export class TradeProvisioningFlow extends BaseFlow {
   async provisionLiveTrade(product: string, data: TradeProvisioningData, keyword: Keyword = 'Given'): Promise<string> {
     const p = this.params(data);
     const { tradesApi } = this.app;
-    // Without the approval request the trade would stay pending: fail before one is created on every run
-    tradesApi.requireApprove();
 
     const { tradeId, taskId } = await this.ui[keyword](`I submit a new ${product} trade through the API as maker`, () =>
       tradesApi.submitTrade(

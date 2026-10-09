@@ -10,9 +10,11 @@
 //   comments textarea): they are marked "mock testid" below. Point the element names at them with a scratch elements
 //   folder (OREO_ELEMENTS_DIR) when running a case against the mock;
 // - the toast only copies the two attributes the E2E project reads (data-title, data-description);
-// - API: create (path, X-User-Id header, multipart parts "trade" + "datFile", data.trade.id and
-//   data.checkerContext.taskId in the response) is like the real one. The approval endpoint under /api/v1/mock/, the
-//   body of trigger-event and the status LIVE are this mock's own.
+// - API, served under /api/v1 (so apiBaseUrl for the mock is http://localhost:4173/api/v1): create (path, X-User-Id
+//   header, multipart parts "trade" + "datFile", data.trade.id and data.checkerContext.taskId in the response) and
+//   the checker's approve / reject of a task (path, JSON body, { code, status: 'SUCCESS', data: <the trade> } in the
+//   response) are like the real ones. The body of trigger-event, the statuses LIVE and REJECTED and the rule that the
+//   submitter cannot decide on the own task are this mock's own.
 
 const http = require('http');
 const PORT = Number(process.env.PORT || 4173);
@@ -368,15 +370,19 @@ http.createServer((req, res) => {
         data: { checkerContext: { taskId, submittedBy: caller }, trade: TRADES[id] } });
     });
   }
-  // Mock only: the real approval request is not known yet. Another user than the submitter approves the task
-  const approve = req.method === 'POST' && req.url.match(/^\/api\/v1\/mock\/tasks\/([^/]+)\/approve$/);
-  if (approve) {
-    const task = TASKS[approve[1]];
-    if (!task) return json(res, 404, { message: 'Task not found' });
-    if (task.submittedBy === caller) return json(res, 403, { message: 'A task cannot be approved by the user who submitted it' });
-    delete TASKS[approve[1]];
-    TRADES[task.tradeId].status = 'LIVE';
-    return json(res, 200, { code: 200, status: 'APPROVED', data: { trade: TRADES[task.tradeId] } });
+  // The checker decides on a task: approve makes the trade live, reject does not. The request has a JSON body
+  const decide = req.method === 'POST' && req.url.match(/^\/api\/v1\/checker\/tasks\/([^/]+)\/(approve|reject)$/);
+  if (decide) {
+    return readBody((body) => {
+      try { JSON.parse(body); } catch { return json(res, 400, { message: 'The request body must be JSON' }); }
+      const task = TASKS[decide[1]];
+      if (!task) return json(res, 404, { message: 'Task not found' });
+      if (task.submittedBy === caller) return json(res, 403, { message: 'A task cannot be decided by the user who submitted it' });
+      delete TASKS[decide[1]];
+      const t = TRADES[task.tradeId];
+      t.status = decide[2] === 'approve' ? 'LIVE' : 'REJECTED';
+      json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: { id: t.id, basic: { counterpartyName: t.counterparty, portfolioId: t.portfolio, productId: t.productId, direction: t.direction }, trace: [] } });
+    });
   }
   // The path and method are the real ones; the body and the response are this mock's own
   if (req.method === 'POST' && req.url === '/api/v1/trades/trigger-event') {
@@ -389,6 +395,8 @@ http.createServer((req, res) => {
       json(res, 200, { code: 200, status: 'PENDING APPROVAL', data: { trade: t } });
     });
   }
+  // Nothing else is served under the API prefix: without this an unknown API path would be answered with a page
+  if (req.url.startsWith('/api/v1/')) return json(res, 404, { message: 'Not found' });
   if (req.method === 'GET' && req.url === '/api/trades') return json(res, 200, { data: { trades: Object.values(TRADES).reverse() } });
   if (req.method === 'GET' && req.url.startsWith('/api/trades/')) {
     const t = TRADES[req.url.split('/').pop()];

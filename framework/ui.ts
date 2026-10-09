@@ -52,7 +52,8 @@ export type Capture = { url: string; method?: string; field: string; saveAs: str
 export type ApiPart = { json: unknown } | { file: string };
 
 /**
- * A call to the system's API. path is relative to apiBaseUrl of the local config, never a full address.
+ * A call to the system's API. path is relative to apiBaseUrl of the local config, never a full address;
+ * apiBaseUrl ends with the prefix all requests share (.../api/v1), so a path starts after it: /trades/create.
  * A text anywhere inside headers, body or a JSON part may be a reference: cfg('accounts.maker.email') or a parameter.
  * save names the fields of the JSON response to keep as variables: { createdTradeId: 'data.trade.id' }.
  */
@@ -246,6 +247,11 @@ export class UI {
     this.pendingSubstep = undefined;
     const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, params: this.paramValues, rootDir: this.rootDir });
     this.steps.push({ ...group, ...recorded });
+    // Show what the step read or received, e.g. the ID of the trade it created: in the console and in Playwright's report
+    for (const [name, value] of Object.entries(core.savedValues(recorded, result))) {
+      console.log(`  ${name} = ${value}`);
+      test.info().annotations.push({ type: 'value', description: `${name} = ${value}` });
+    }
     return result;
   }
 

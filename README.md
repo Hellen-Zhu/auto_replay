@@ -54,7 +54,7 @@ npm install                            # uses the local Edge, no browser downloa
 copy config.local.example.json config.local.json
 ```
 
-Edit `config.local.json`: fill in `baseUrl` (the real server address), `apiBaseUrl` (the address of the API, which is not the pages' address; only cases that call the API need it) and the account and password for each role. The file is in `.gitignore` and is never committed.
+Edit `config.local.json`: fill in `baseUrl` (the real server address), `apiBaseUrl` (the address of the API **including its path prefix**, e.g. `https://<api host>/api/v1`; it is not the pages' address, and only cases that call the API need it) and the account and password for each role. The file is in `.gitignore` and is never committed.
 
 ```bash
 npx playwright test                    # run every case; passing ones are exported to cases/
@@ -62,7 +62,7 @@ npx playwright test --headed           # watch the browser while it runs
 npm run replay                         # replay with the runner, exactly what the PO sees
 ```
 
-> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` and `apiBaseUrl` to `http://localhost:4173` and the maker password to `maker1`. The values in `testdata/` are those of the real system; the mock offers them too. The mock's header comment says which of its testids are real and which are only its own guess.
+> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173`, `apiBaseUrl` to `http://localhost:4173/api/v1` and the maker password to `maker1`. The values in `testdata/` are those of the real system; the mock offers them too. The mock's header comment says which of its testids are real and which are only its own guess.
 
 ### Trade creation cases
 
@@ -77,10 +77,9 @@ To add a product, add one line to the registry in `framework/products.ts` with t
 
 `tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: one test per product with the `cancel` capability, `[TC-TRADE-CANCELLATION-<product>-UI-001]`. Its `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
 
-1. Set `apiBaseUrl` in `config.local.json` and make sure the `checker` account has its e-mail there (its password is not needed: the API takes no login).
+1. Set `apiBaseUrl` in `config.local.json`, with its prefix (`.../api/v1`), and make sure the `checker` account has its e-mail there (its password is not needed: the API takes no login).
 2. Copy the product `.dat` files into `data/`, as for trade creation.
 3. Run `npm run sync:elements -- <E2E project>`: the trade portal and confirmation dialog elements this case uses come from the E2E project's element files.
-4. **Fill in `TradesApi.approve` in `framework/api/trades.api.ts`**: the request that approves a task was not available when this was written, so the case stops with a message saying so, before it creates anything.
 
 Its data is in `testdata/trade-cancellation.json` (the trade that is created, the cancellation reason and comments). Parts of this case were written from what is known of the E2E project and still have to be checked on the real system; they are listed in `CLAUDE.md`, section 10.
 
@@ -234,7 +233,8 @@ A case that works on an existing trade (cancel, approve, step in...) does not ha
 ```ts
 // framework/api/trades.api.ts: the request and one atomic operation for it
 export class TradesApi extends BaseApi {
-  static readonly submit: ApiRequest = { method: 'POST', path: '/api/v1/trades/create?tradeAction=SUBMIT' };
+  static readonly submit: ApiRequest = { method: 'POST', path: '/trades/create?tradeAction=SUBMIT' };
+  static readonly approve = (taskId: string): ApiRequest => ({ method: 'POST', path: `/checker/tasks/${taskId}/approve`, body: {} });
 
   async submitTrade(role: string, basic: TradeBasic, file: string) {
     const saved = await this.ui.api({
@@ -250,8 +250,10 @@ export class TradesApi extends BaseApi {
 
 - API objects are the same layer as pages and components: they hold the requests (path, method, fields of the response) and one operation per request, built on `this.ui.api(...)`. A flow composes them into a business step (`flows.tradeProvisioning.provisionLiveTrade(product, data)`); a case never calls them. A new API object extends `BaseApi` and is registered in `App`.
 - **The API has no login**: a request only says who sends it, with that user's e-mail in the `X-User-Id` header. `this.as('maker')` writes it as a reference to `accounts.maker.email`, so the e-mail is never in the case file.
-- `path` is always relative; the address is `apiBaseUrl` in `config.local.json` (the API is not on the pages' address). A full address in a path is refused.
+- `path` is always relative and **starts after the prefix all requests share**: the address is `apiBaseUrl` in `config.local.json`, which ends with that prefix (`.../api/v1`), so a path is `/trades/create`, never `/api/v1/trades/create` (the API is not on the pages' address). A full address in a path is refused. A wrong `apiBaseUrl` shows as HTTP 404 or "did not return JSON", with a hint to check it.
+- `TradesApi` so far: `submitTrade(role, basic, file)`, `approveTask(role, taskId)`, `rejectTask(role, taskId)`. Approve and reject were taken from the browser's Network tab; their body is an empty JSON object, which is inferred from the request's content length and still has to be confirmed by the first run on the real system.
 - `save` keeps fields of the JSON response as variables. Used later, on a page or in another API call, they become `${var:createdTradeId}` by themselves, like a value from `ui.read()`.
+- **Every value a step saves is shown**, so the trade a run created can be looked up in the system: the test output prints `createdTradeId = TRD-...` (and the test gets a `value` annotation); the PO's replay prints it under the step and again after "Run passed", shows it in the report (under the step and in the "Values from this run" table) and writes it to `result.json` (`values`). The same goes for a value from `ui.read()` or from a captured response.
 - A text inside `headers`, `body` or a JSON part can be a parameter or a config reference (`p.counterpartyName`, `cfg(...)`). A number is recorded as it is, since a parameter is always text: the PO cannot change it for a run.
 - A file part is a file under `data/` (`{ file: 'data/FX_TRF.dat' }`), like an upload.
 - The request is sent with Playwright's own request client (`page.request`), from Node, not by the page: there is no screenshot for it, and the report shows the call and the values it saved. Any answer other than 2xx fails the step with the status and the start of the response.
@@ -306,10 +308,10 @@ A case file is written in the lowest format version that can express it, and a r
 2. Double-click **run-case.bat**, type a number and press Enter; or drag a case `.json` onto the bat file.
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account for this run (the password is then asked for again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
    If the case comes with **case data** (counterparty, portfolio...), it is listed there too. Type `D` to change a value for this run, e.g. to book against another counterparty; `CD` changes both settings and data. The case file itself is not modified, and the report shows the data the run used and marks what was changed.
-   A case that prepares its data through the API also needs the **API address** (`apiBaseUrl`); it is shown, asked for and saved like the system address.
+   A case that prepares its data through the API also needs the **API address** (`apiBaseUrl`, with its path prefix such as `/api/v1`); it is shown, asked for and saved like the system address.
 4. Press Enter to run, or type `S` to run **step by step**: the run then stops after each Given / When / Then block until you press Enter.
 5. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail.
-6. When it finishes, the report opens automatically. It reads as the scenario: one row per Given / When / Then step with its result and a screenshot (pauses and their length are shown too); click "N actions" under a step to see the individual actions behind it.
+6. When it finishes, the report opens automatically. It reads as the scenario: one row per Given / When / Then step with its result and a screenshot (pauses and their length are shown too); click "N actions" under a step to see the individual actions behind it. Values the run produced, such as the ID of the trade it created, are listed above the steps ("Values from this run") and under the step that produced them.
 7. The console and the bottom of the report give two links: **Report** (the report as a URL) and **Full replay** (Playwright's trace viewer for this run: every action with before / after snapshots, console and network). They are `http://127.0.0.1:9400/...` addresses served by the runner itself, so they work only on this computer and only while the runner window stays open (press Enter in it to close).
 8. To open an earlier run later, double-click **view-trace.bat**: it opens a page listing every run with its Report and Full replay links.
 9. If something goes wrong, send the matching folder under `evidence/` to QA; they can drop it into their own `evidence/` folder and open it the same way.

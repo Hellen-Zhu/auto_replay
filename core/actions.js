@@ -217,11 +217,12 @@ function dataFilesOf(step) {
 
 /**
  * Call the system's API directly, without the page, e.g. to prepare the trade a case works on:
- *   { action: 'api', method: 'POST', value: '/api/v1/trades/create?tradeAction=SUBMIT',
+ *   { action: 'api', method: 'POST', value: '/trades/create?tradeAction=SUBMIT',
  *     headers: { 'X-User-Id': '${cfg:accounts.maker.email}' },
  *     multipart: { trade: { json: { basic: { productId: 'FX_TRF' } } }, datFile: { file: 'data/FX_TRF.dat' } },
  *     save: { createdTradeId: 'data.trade.id' } }
  * value is a path on apiBaseUrl of the local config: the API may be served from another address than the pages.
+ * apiBaseUrl includes the prefix every request shares (e.g. .../api/v1), so that prefix is not part of value.
  * The request carries multipart (each part a JSON document or a file of the data folder), or body (JSON), or nothing.
  * Any answer other than 2xx fails the step. save stores fields of the JSON response as variables: name -> field.
  * The request is sent by Playwright's own API client, not by the page; it is listed in the trace.
@@ -252,12 +253,15 @@ async function callApi(page, step, apiPath, ctx, timeout) {
   try { res = await page.request.fetch(url, options); }
   catch (e) { throw new Error(`${what} could not be sent: ${String(e.message || e).split('\n')[0]}`); }
   const text = await res.text();
-  if (!res.ok()) throw new Error(`${what} returned HTTP ${res.status()}${text ? ': ' + text.slice(0, 300) : ''}`);
+  // The usual reason for a 404 or for a page instead of JSON: apiBaseUrl is not the API's address, or the prefix all
+  // requests share (e.g. /api/v1) is missing from it or repeated in the path
+  const hint = ' (check that apiBaseUrl in config.local.json is the address of the API including its prefix, e.g. .../api/v1)';
+  if (!res.ok()) throw new Error(`${what} returned HTTP ${res.status()}${text ? ': ' + text.slice(0, 300) : ''}${res.status() === 404 ? hint : ''}`);
   const saved = {};
   const fields = Object.entries(step.save || {});
   if (fields.length) {
     let body;
-    try { body = JSON.parse(text); } catch { throw new Error(`${what} did not return JSON`); }
+    try { body = JSON.parse(text); } catch { throw new Error(`${what} did not return JSON${hint}`); }
     for (const [name, field] of fields) {
       const v = getPath(body, field);
       if (v === undefined || v === null || v === '') throw new Error(`${what} response has no ${field}`);
@@ -346,6 +350,18 @@ async function executeStep(page, step, ctx) {
 }
 
 /**
+ * The values a step produced, by variable name: what a read step read, what a click captured from a response,
+ * what an api step saved from its response. result is what executeStep returned. Empty for any other step.
+ * A run shows them (a new trade's ID above all) so that the data it created can be found in the system afterwards.
+ */
+function savedValues(step, result) {
+  if (step.action === 'read') return { [step.saveAs]: result };
+  if (step.capture) return { [step.capture.saveAs]: result };
+  if (step.action === 'api') return result || {};
+  return {};
+}
+
+/**
  * One-line readable description of a step, used in logs and reports; pass the variables read so far and
  * the case data (params) to show their values
  */
@@ -382,5 +398,5 @@ function describeStep(step, vars, params) {
 }
 
 module.exports = {
-  FORMAT_VERSION, resolveDataFile, dataFilesOf, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, describeStep, getPath,
+  FORMAT_VERSION, resolveDataFile, dataFilesOf, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath,
 };

@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { chromium } = require('@playwright/test');
-const { FORMAT_VERSION, executeStep, describeStep, showPlaceholders, resolveDataFile, dataFilesOf } = require('../core/actions');
+const { FORMAT_VERSION, executeStep, savedValues, describeStep, showPlaceholders, resolveDataFile, dataFilesOf } = require('../core/actions');
 const { loadConfig, launchOptions, secretEntries } = require('../core/config');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -119,6 +119,8 @@ function groupSteps(steps) {
     g.error = failed && failed.error;
     // The screenshot that represents the step: where it failed, otherwise how the page looked when it finished
     g.screenshot = (failed || [...g.actions].reverse().find((a) => a.screenshot) || {}).screenshot;
+    // What the step read or received (e.g. the ID of a trade it created), shown in its row
+    g.saved = Object.assign({}, ...g.actions.map((a) => a.saved || {}));
     g.pausedSec = g.actions.reduce((sum, a) => sum + (a.pausedSec || 0), 0);
     g.paused = g.actions.some((a) => a.pausedSec !== undefined);
   }
@@ -135,7 +137,7 @@ function writeReport(dir, run) {
     return `
     <tr class="${g.status}">
       <td>${i + 1}</td>
-      <td><div class="step">${bdd(g.title) || esc(g.actions[0].desc)}</div>${g.error ? `<pre>${esc(g.error)}</pre>` : ''}${g.paused ? `<div class="paused">Paused for ${fmtSec(g.pausedSec)} during this step</div>` : ''}
+      <td><div class="step">${bdd(g.title) || esc(g.actions[0].desc)}</div>${Object.entries(g.saved).map(([k, v]) => `<div class="saved">${esc(k)}: <b>${esc(v)}</b></div>`).join('')}${g.error ? `<pre>${esc(g.error)}</pre>` : ''}${g.paused ? `<div class="paused">Paused for ${fmtSec(g.pausedSec)} during this step</div>` : ''}
         <details${g.status === 'failed' ? ' open' : ''}><summary>${g.actions.length} action${g.actions.length === 1 ? '' : 's'}</summary><ul>${actions}</ul></details></td>
       <td>${STATUS_TEXT[g.status]}</td>
       <td>${shot(g.screenshot)}</td>
@@ -146,6 +148,12 @@ function writeReport(dir, run) {
   // The data the case ran with; a value the PO changed for this run is flagged, with the value of the case file
   const caseData = run.caseData && run.caseData.length ? `<table class="data"><caption>Case data</caption><tbody>${run.caseData.map((d) => `
     <tr><td>${esc(d.name)}</td><td>${esc(d.value)}${d.changedFrom !== undefined ? ` <span class="changed">changed for this run (case file: ${esc(d.changedFrom)})</span>` : ''}</td></tr>`).join('')}
+</tbody></table>
+` : '';
+  // What the run read or received from the system, above all the IDs of what it created
+  const values = Object.entries(run.values || {});
+  const runValues = values.length ? `<table class="data"><caption>Values from this run</caption><tbody>${values.map(([k, v]) => `
+    <tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}
 </tbody></table>
 ` : '';
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -164,7 +172,7 @@ function writeReport(dir, run) {
   .no{color:#9ca3af} .st{color:#16a34a} li.failed .st{color:#dc2626} li.skipped .st{color:#9ca3af}
   img{max-width:240px;border:1px solid #e5e7eb;border-radius:4px}
   pre{white-space:pre-wrap;color:#b91c1c;font-size:12px;margin:6px 0 0}
-  .paused{color:#b45309;font-size:12px;margin-top:6px}
+  .paused{color:#b45309;font-size:12px;margin-top:6px} .saved{font-size:12px;margin-top:4px;color:#374151}
   table.data{width:auto;margin-bottom:16px} table.data caption{text-align:left;font-weight:600;padding:0 8px 2px}
   table.data td{padding:4px 8px} table.data td:first-child{color:#6b7280} .changed{color:#b45309}
   video{max-width:100%;margin-top:16px;border:1px solid #e5e7eb}
@@ -172,7 +180,7 @@ function writeReport(dir, run) {
 <h1><span class="kw">Scenario:</span> ${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
 ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
 <div class="meta">${summary} · Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
-${caseData}<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
+${caseData}${runValues}<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
 <p class="meta">Full replay: <a href="${esc(run.traceUrl)}">Open trace viewer</a><br>
 Opens the trace viewer (every action with page snapshots, console and network). The link works while the runner window is still open; later, double-click view-trace.bat first. The same data is in trace.zip in this folder.</p>
@@ -309,7 +317,7 @@ async function runCase({ file, doc }, config) {
   const askConfig = async (key) => {
     const v = isSecret(key)
       ? await askHidden(`Enter ${key} (input is hidden): `)
-      : await ask(key === 'apiBaseUrl' ? 'Enter the API address (e.g. https://xxx:port): ' : `Enter ${key}: `);
+      : await ask(key === 'apiBaseUrl' ? 'Enter the API address, with its path prefix (e.g. https://xxx:port/api/v1): ' : `Enter ${key}: `);
     setCfg(key, v);
     if (!isSecret(key) && v !== '') toSave[key] = v;
     return v;
@@ -402,6 +410,7 @@ async function runCase({ file, doc }, config) {
   const run = {
     caseName: doc.name, description: doc.description, caseFile: path.basename(file), source: doc.source, codeVersion: doc.codeVersion,
     machine: require('os').hostname(), startedAt: new Date().toLocaleString(), status: 'passed', stepByStep, pausedSec: 0, steps: [],
+    values: {}, // what the steps read or received during the run (name -> value), e.g. createdTradeId
     traceUrl: traceUrl(config, path.basename(dir)),
     ...(caseData.length ? { caseData } : {}),
   };
@@ -477,6 +486,13 @@ async function runCase({ file, doc }, config) {
       else if (step.capture) rec.desc += ` (captured: ${r})`;
       else if (step.action === 'api' && r && Object.keys(r).length) rec.desc += ` (saved: ${Object.entries(r).map(([k, v]) => `${k} = ${v}`).join(', ')})`;
       console.log('✔');
+      // What the step read or received, e.g. the ID of the trade it created: shown right away and kept for the report
+      const saved = savedValues(step, r);
+      if (Object.keys(saved).length) {
+        rec.saved = saved;
+        Object.assign(run.values, saved);
+        for (const [k, v] of Object.entries(saved)) console.log(`          ${k} = ${v}`);
+      }
     } catch (e) {
       rec.status = 'failed';
       rec.error = String(e.message || e).split('\n').slice(0, 6).join('\n');
@@ -515,9 +531,12 @@ async function runCase({ file, doc }, config) {
   // Time spent paused is reported separately, so the duration reflects the run itself
   run.pausedSec = Math.round(pausedMs / 1000);
   run.durationSec = Math.round((Date.now() - t0 - pausedMs) / 1000);
+  const values = Object.entries(run.values);
+  if (!values.length) delete run.values;
   writeReport(dir, run);
 
   console.log(run.status === 'passed' ? '\n✅ Run passed' : '\n❌ Run failed');
+  for (const [k, v] of values) console.log(`   ${k}: ${v}`);
   console.log(`   Report:      ${reportUrl(config, path.basename(dir))}`);
   console.log('   Full replay: "Open trace viewer" link at the bottom of the report');
   console.log(`   Folder:      ${dir}`);
