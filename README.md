@@ -102,6 +102,31 @@ A case is repeated for every product only where the product changes what is test
 
 Its data is in `testdata/trade-cancellation.json` (the trade that is created, the cancellation reason and comments). Parts of this case were written from what is known of the E2E project and still have to be checked on the real system; they are listed in `CLAUDE.md`, section 10.
 
+### Cases on an existing trade
+
+`tests/existing-trade.spec.ts` holds cases that go on with a trade that is **already in the system** instead of creating their own, for a PO who has worked on a trade and wants to continue with it. They are an addition to the cases above, which prepare their own trade and can be repeated.
+
+| Case | Who | The given trade must be | Afterwards |
+|---|---|---|---|
+| `[TC-EXISTING-TRADE-UI-001]` | checker approves the new trade | `PARV` | `LIVE` |
+| `[TC-EXISTING-TRADE-UI-002]` | checker rejects the new trade | `PARV` | `DRFT` |
+| `[TC-EXISTING-TRADE-UI-003]` | maker cancels the trade | `LIVE` | `PARV` / `Cancelled` |
+| `[TC-EXISTING-TRADE-UI-004]` | checker approves the cancellation | `PARV` / `Cancelled` | `DEAD` / `Cancelled` |
+| `[TC-EXISTING-TRADE-UI-005]` | checker rejects the cancellation | `PARV` / `Cancelled` | `LIVE` / `New` |
+
+- The trade ID is **case data that is entered for every run** (`tradeId`): the runner asks the PO "Enter tradeId:" before the run. The exported case file holds the name with an empty value, never an ID.
+- After the login the case first checks that the trade is in the state of the table; a trade in another state fails there and nothing is done to it.
+- QA gives the ID in the environment variable `OREO_TRADE_ID`; without it these cases are skipped, so a normal `npx playwright test` is not affected. A run changes the trade, so run one case at a time, each with a trade in the right state:
+
+  ```bash
+  # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-EXISTING-TRADE-UI-003"
+  OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-EXISTING-TRADE-UI-003"
+  ```
+
+- They need no `.dat` file and no `apiBaseUrl`, and are not per product: the given trade decides the product. The checker must not be the user who submitted the trade or the cancellation.
+- In a flow: `const tradeId = flows.trades.existingTrade(<the ID>)`; from then on every use of that ID is recorded as `${param:tradeId}`. Such a case file is format version 6 and needs a runner package built from this version.
+- They cannot be part of a run of several cases (a batch asks nothing per case): the runner leaves them out and says so.
+
 ## QA: test data
 
 Case data lives in `testdata/`, not in `config.local.json`:
@@ -347,6 +372,7 @@ A case file is written in the lowest format version that can express it, and a r
    - In a very small window the runner shows a plain numbered list instead: type the number of a folder, then the number of the case (plain Enter = number 1, `B` goes back, any other text is a search). If the keyboard list does not look right on a computer, set the environment variable `OREO_PLAIN_MENU=1` before starting the bat to always get the numbered list.
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account (a password that no longer matches is then asked for again, and the current one can be typed again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
    If the case comes with **case data** (counterparty, portfolio...), it is listed there too. Type `D` to change a value for this run, e.g. to book against another counterparty; `CD` changes both settings and data. The case file itself is not modified, and the report shows the data the run used and marks what was changed.
+   A case **on an existing trade** (folder `existing-trade`) then asks for the trade: `Enter tradeId:`. Type the ID of a trade that is in the state the case starts from (its description says which); the case checks that state first and stops if it is another one.
    A case that books a trade or triggers an event lists **riskEngine** there: `real` waits for the system's risk calculation, `mock` answers it without the risk engine (type `C` to change it). The report says when a run used `mock`.
    A case that prepares its data through the API also needs the **API address** (`apiBaseUrl`, with its path prefix such as `/api/v1`); it is shown, asked for and saved like the system address.
    The case starts as soon as this prompt is answered. (Not mentioned on the screen: typing `S` at this prompt runs the case **step by step**, stopping before each Given / When / Then block until Enter is pressed.)
@@ -365,7 +391,7 @@ A case file is written in the lowest format version that can express it, and a r
 - Then choose how to run them:
   - **Enter: one after another**, each exactly as when it is run alone (every step on the screen, `P` pauses);
   - **a number, e.g. `4`: that many at the same time** (at most 8), each in an Edge window of its own. The console then shows one line when a case starts and one when it ends. `P` is not available; Ctrl+C stops everything.
-- A case that cannot be run (its file needs a newer runner, a data file is missing) is left out and listed; the others run.
+- A case that cannot be run (its file needs a newer runner, a data file is missing, it needs a value typed in such as the ID of an existing trade) is left out and listed; the others run.
 - Every case gets its own evidence folder and report as usual. At the end a **summary** opens (`evidence/batch_<time>/report.html`): one row per case with its result, duration, the values it produced (e.g. the trade ID) and the links to its report and full replay. Ctrl+C during the run still writes the summary of what was done so far.
 - Running at the same time logs the same account in from several browsers at once. Start with 2 and check that the system accepts it before using more.
 
@@ -397,5 +423,6 @@ Notes:
 - The login page path is `/login` (`LoginPage.path` in `framework/pages/login.page.ts`). The root `/` is not used: for a user who is signed in it opens the trade portal.
 - A replay really operates in UAT (real bookings, real approvals); make sure the environment can take repeated runs. A case with API steps creates a new trade on every replay.
 - The risk engine mode (`riskEngine`: `real` / `mock`) was verified on the mock only. With `mock` the risk calculation is not sent at all, so such a run does not prove the risk engine works; the report says so. Case files that wait for the calculation are format version 5 and need a runner package built from this version.
+- The cases on an existing trade (`existing-trade`) were verified on the mock only. They check the trade's state as text in its blotter row; what a pending new trade shows as event status on the real system is not known, so only its status `PARV` is checked.
 - An API step has no screenshot: the report shows the call and the values it saved (e.g. the new trade ID), and the following steps show the result in the browser.
 - API calls are sent from Node, not from Edge, so they do not use the certificates Windows trusts. If the API address is `https` with a company certificate and the call fails with a certificate error, tell QA: this is not handled yet.

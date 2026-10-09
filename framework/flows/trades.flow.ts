@@ -10,6 +10,14 @@ export class TradesFlow extends BaseFlow {
     });
   }
 
+  /**
+   * A case that works on a trade which is already in the system, instead of creating its own: the PO enters the
+   * trade's ID before the run (case data "tradeId"). Returns the ID for the flows that follow.
+   */
+  existingTrade(tradeId: string): string {
+    return this.input('tradeId', tradeId);
+  }
+
   /** Where every action on an existing trade starts: its row in the blotter, with the action menu open */
   async openActionMenu(tradeId: string, keyword: Keyword = 'When') {
     const { trades } = this.app;
@@ -30,6 +38,16 @@ export class TradesFlow extends BaseFlow {
       await trades.expectRowShows(tradeId, status);
       if (eventStatus) await trades.expectRowShows(tradeId, eventStatus);
     });
+  }
+
+  /** The trade is waiting for the checker's decision */
+  async expectPendingApproval(tradeId: string, keyword: Keyword = 'Then') {
+    await this.expectStatusInBlotter(tradeId, TradesPage.status.pendingApproval, undefined, keyword);
+  }
+
+  /** The trade is live */
+  async expectLive(tradeId: string, keyword: Keyword = 'Then') {
+    await this.expectStatusInBlotter(tradeId, TradesPage.status.live, undefined, keyword);
   }
 
   /** The trade is live and no event is under way on it */

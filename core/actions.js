@@ -7,8 +7,9 @@ const path = require('path');
 const { expect } = require('@playwright/test');
 
 // Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name};
-// 3 = adds hasText in a target and button on a click; 4 = adds the api action; 5 = adds request on a click
-const FORMAT_VERSION = 5;
+// 3 = adds hasText in a target and button on a click; 4 = adds the api action; 5 = adds request on a click;
+// 6 = adds case data without a value (an empty text in params), which is asked for before the run
+const FORMAT_VERSION = 6;
 
 /**
  * Turn a target description from the JSON into a Playwright Locator.
@@ -102,6 +103,7 @@ async function resolveValue(value, ctx, inParam) {
     } else {
       v = ctx.params ? ctx.params[key] : undefined;
       if (v === undefined) throw new Error(`Case data ${key} is not defined (the case file has no "${key}" in its params)`);
+      if (String(v) === '') throw new Error(`Case data ${key} has no value: it has to be entered before the run`);
       v = await resolveValue(String(v), ctx, true);
     }
     out += String(v);

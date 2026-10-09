@@ -105,6 +105,8 @@ export class UI {
   readonly vars: Record<string, string> = {};
   /** Case data handed out by params() so far: name -> value */
   private readonly paramValues: Record<string, string> = {};
+  /** Case data the PO has to enter for a run (input()): name -> the value of this run */
+  private readonly inputs: Record<string, string> = {};
   private pendingTitle?: string;
   private pendingSubstep?: string;
   private depth = 0;
@@ -170,6 +172,18 @@ export class UI {
     }
     this.paramValues[name] = value;
     return name;
+  }
+
+  /**
+   * Case data that only the person who runs the case knows, e.g. the ID of an existing trade to work on. The value
+   * given here is the one of this run; wherever a later step uses it, it is recorded as ${param:name}. The case file
+   * gets the name with an empty value, and the runner asks the PO for the value before every run.
+   */
+  input(name: string, value: string): string {
+    this.useParam(name, value);
+    if (value.length < 4) throw new Error(`The value of "${name}" is too short to be told apart from other text (at least 4 characters)`);
+    this.inputs[name] = value;
+    return value;
   }
 
   // ---------- Actions ----------
@@ -275,14 +289,18 @@ export class UI {
   }
 
   private variabilize(step: Step): Step {
-    const entries = Object.entries(this.vars).filter(([, v]) => v && v.length >= 4);
+    // A value the PO enters for a run (input()) is case data: it is rewritten in the same way, to ${param:name}
+    const entries = [
+      ...Object.entries(this.vars).filter(([, v]) => v && v.length >= 4).map(([name, v]) => [v, '${var:' + name + '}']),
+      ...Object.entries(this.inputs).map(([name, v]) => [v, '${param:' + name + '}']),
+    ];
     if (!entries.length) return step;
     const swap = (s?: string) => {
       if (typeof s !== 'string') return s;
       // Only the literal text is checked: a placeholder that is already there (odd parts of the split) is left alone
       return s.split(/(\$\{(?:var|cfg|param):[^}]+\})/).map((part, i) => {
         if (i % 2) return part;
-        for (const [name, v] of entries) part = part.split(v).join('${var:' + name + '}');
+        for (const [v, placeholder] of entries) part = part.split(v).join(placeholder);
         return part;
       }).join('');
     };
@@ -310,12 +328,16 @@ export class UI {
   exportCase(file: string, meta: { name: string; description?: string; source: string }) {
     const params = usedParams(this.steps, this.paramValues);
     const hasParams = Object.keys(params).length > 0;
+    // A value the PO enters is written empty: the one of this run (a trade that is used up by now) is of no use
+    const asked = Object.keys(params).filter((name) => name in this.inputs);
+    for (const name of asked) params[name] = '';
     const caseDoc = {
       // A case is written in the lowest version that can express it, so that an older runner still runs what it can
       // and refuses the rest: 2 adds the params block; 3 adds hasText in a target and button on a click, which a
       // version 2 runner would ignore without a word (any row, a normal click); 4 adds the api action; 5 adds the
-      // request a click waits for (an older runner would click and never mock it)
-      formatVersion: this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
+      // request a click waits for (an older runner would click and never mock it); 6 adds case data without a value,
+      // which the runner asks for (an older runner would run with the empty text, e.g. find any trade's row)
+      formatVersion: asked.length ? 6 : this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,

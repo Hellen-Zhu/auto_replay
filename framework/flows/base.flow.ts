@@ -24,4 +24,12 @@ export abstract class BaseFlow {
   protected params<T extends object>(data: T): Params<T> {
     return this.ui.params(data);
   }
+
+  /**
+   * A value that only the person who runs the case knows (the ID of an existing trade): it is recorded as
+   * ${param:name} wherever it is used, and the runner asks the PO for it before the run. Returns the value.
+   */
+  protected input(name: string, value: string): string {
+    return this.ui.input(name, value);
+  }
 }

@@ -738,8 +738,11 @@ const paramsOf = (doc) => Object.fromEntries(Object.entries(doc.params || {}).ma
 // changed for the run comes with the one of the case file
 const caseDataOf = (doc, params) => Object.keys(params).map((name) => {
   const original = String(doc.params[name]);
-  return { name, value: showPlaceholders(params[name]), ...(params[name] !== original ? { changedFrom: showPlaceholders(original) } : {}) };
+  // a value that was entered for the run (empty in the case file) is not a change
+  return { name, value: showPlaceholders(params[name]), ...(params[name] !== original && original !== '' ? { changedFrom: showPlaceholders(original) } : {}) };
 });
+// Case data without a value in the case file (version 6): what only the PO knows, e.g. the ID of an existing trade
+const askedParamsOf = (doc) => Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '');
 
 // Fails when this runner cannot run the case, before anything is asked or opened
 function checkCase({ file, doc }) {
@@ -797,7 +800,7 @@ async function askSettings(list, config) {
   }
   if (paramNames.length) {
     console.log('\nCase data:');
-    for (const k of paramNames) console.log(`  ${k}: ${showData(params[k])}`);
+    for (const k of paramNames) console.log(`  ${k}: ${params[k] === '' ? '(to be entered below)' : showData(params[k])}`);
   }
   if (!single && list.some((c) => Object.keys(c.doc.params || {}).length)) {
     console.log('\nCase data: each case runs with the values of its own case file. To change a value, run that case on its own.');
@@ -805,8 +808,9 @@ async function askSettings(list, config) {
   // Step by step (the run stops before each Given / When / Then block and each substep, so the PO can look at the
   // page) is not offered on the screen: S at the prompt below turns it on
   let stepByStep = false;
-  if (hasSettings || paramNames.length) {
-    const choices = [hasSettings && 'C to change the environment or account', paramNames.length && 'D to change the case data'].filter(Boolean).join(', ');
+  const changeable = paramNames.filter((n) => params[n] !== ''); // a value that is still to be entered is asked for anyway
+  if (hasSettings || changeable.length) {
+    const choices = [hasSettings && 'C to change the environment or account', changeable.length && 'D to change the case data'].filter(Boolean).join(', ');
     const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or type ${choices}: `)).toLowerCase();
     const chose = (letter) => /^[cds\s,+]+$/.test(answer) && answer.includes(letter);
     stepByStep = chose('s');
@@ -832,12 +836,20 @@ async function askSettings(list, config) {
         if (v !== '') set(s, v);
       }
     }
-    if (paramNames.length && chose('d')) {
+    if (changeable.length && chose('d')) {
       console.log('\nType a new value, or just press Enter to keep the current one. Changes apply to this run only.');
-      for (const k of paramNames) {
+      for (const k of changeable) {
         const v = await ask(`  ${k} [${showData(params[k])}]: `);
         if (v !== '') params[k] = v;
       }
+    }
+  }
+
+  // Case data the case file leaves empty must be entered: the case has nothing to work on without it
+  for (const k of paramNames.filter((n) => params[n] === '')) {
+    while (params[k] === '') {
+      params[k] = (await ask(`Enter ${k}: `)).trim();
+      if (params[k] === '' && inputEnded) throw new Error(`Case data ${k} was not entered`);
     }
   }
 
@@ -1078,7 +1090,12 @@ async function runBatch(list, config) {
     chosen, id: chosen.id || path.basename(chosen.file, '.json'), name: (chosen.doc && chosen.doc.name) || '', status: 'notrun',
   }));
   for (const it of items) {
-    try { checkCase(it.chosen); } catch (e) { it.error = firstLine(e); }
+    try {
+      checkCase(it.chosen);
+      // a batch asks nothing per case, so a case that needs a value typed in cannot be part of it
+      const asked = askedParamsOf(it.chosen.doc);
+      if (asked.length) throw new Error(`needs ${asked.join(', ')} to be entered: run this case on its own`);
+    } catch (e) { it.error = firstLine(e); }
   }
   const ready = items.filter((it) => !it.error);
   const bad = items.filter((it) => it.error);
