@@ -93,14 +93,6 @@ function listCases(dir = CASES_DIR) {
     });
 }
 
-// A case file directly in cases/ whose ID a folder holds too is the copy an export left there before the cases had
-// folders (an export never deletes a file). The one in the folder is the current one, so the other is not listed;
-// dragged onto run-case.bat by itself it still runs.
-function withoutOldCopies(cases) {
-  const inFolders = new Set(cases.filter((c) => c.dir).map((c) => c.id));
-  return cases.filter((c) => c.dir || !inFolders.has(c.id));
-}
-
 // A list longer than this is cut: with hundreds of cases the PO narrows it by typing text instead of scrolling
 const LIST_MAX = 40;
 const inFolder = (c, dir) => !dir || c.dir === dir || c.dir.startsWith(`${dir}/`);
@@ -501,7 +493,7 @@ function printSelected(list) {
 
 /** The cases the PO wants to run: null when there are none to choose from, QUIT when the PO closes the list */
 async function chooseCases() {
-  const cases = withoutOldCopies(listCases().filter((c) => !c.error));
+  const cases = listCases().filter((c) => !c.error);
   if (!cases.length) {
     console.log(`\nThere are no cases in the cases folder. Put the .json case files provided by QA into:\n  ${CASES_DIR}\n`);
     return null;
@@ -521,7 +513,7 @@ function casesFromArgs(args) {
   for (const arg of args) {
     const file = path.resolve(arg);
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
-      for (const c of withoutOldCopies(listCases(file))) {
+      for (const c of listCases(file)) {
         if (c.error) console.log(`Skipped ${path.basename(c.file)}: it is not a case file (${c.error.split('\n')[0]})`);
         else list.push(c);
       }
@@ -809,10 +801,14 @@ async function askSettings(list, config) {
   if (!single && list.some((c) => Object.keys(c.doc.params || {}).length)) {
     console.log('\nCase data: each case runs with the values of its own case file. To change a value, run that case on its own.');
   }
+  // Step by step (the run stops before each Given / When / Then block and each substep, so the PO can look at the
+  // page) is not offered on the screen: S at the prompt below turns it on
+  let stepByStep = false;
   if (hasSettings || paramNames.length) {
     const choices = [hasSettings && 'C to change the environment or account', paramNames.length && 'D to change the case data'].filter(Boolean).join(', ');
     const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or type ${choices}: `)).toLowerCase();
-    const chose = (letter) => /^[cd\s,+]+$/.test(answer) && answer.includes(letter);
+    const chose = (letter) => /^[cds\s,+]+$/.test(answer) && answer.includes(letter);
+    stepByStep = chose('s');
     if (hasSettings && chose('c')) {
       console.log('\nType a new value, or just press Enter to keep the current one.');
       const secrets = required.filter(isSecret);
@@ -869,7 +865,7 @@ async function askSettings(list, config) {
       console.log('  Not saved; the settings apply until this window is closed.');
     }
   }
-  return { params, askConfig };
+  return { params, askConfig, stepByStep };
 }
 
 // A new folder evidence/<name>_<timestamp>. The timestamp has seconds only, so two runs of one case that start in
@@ -1058,9 +1054,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
 /** One case: its settings and case data are asked, then it runs with every step shown */
 async function runCase(chosen, config) {
   checkCase(chosen);
-  const { params, askConfig } = await askSettings([chosen], config);
-  // Step-by-step mode stops after each titled group (Given / When / Then ...) and each substep, so the PO can look at the page
-  const stepByStep = /^s/i.test(await askOptional('\nPress Enter to run, or type S to run step by step (pause after each Given / When / Then): '));
+  const { params, askConfig, stepByStep } = await askSettings([chosen], config);
   return executeCase(chosen, config, { params, stepByStep, askConfig });
 }
 
@@ -1087,22 +1081,19 @@ async function runBatch(list, config) {
   }
   if (!ready.length) throw new Error('None of the selected cases can be run');
   const total = ready.length;
-  const { params, askConfig } = await askSettings(ready.map((it) => it.chosen), config);
+  const { params, askConfig, stepByStep } = await askSettings(ready.map((it) => it.chosen), config);
 
   // One after another unless the PO asks for more: whether the system takes the same account working in several
   // browsers at once is for the PO to decide
   const most = Math.min(total, MAX_PARALLEL);
-  let parallel = 1, stepByStep = false;
-  if (most < 2) {
-    stepByStep = /^s/i.test(await askOptional('\nPress Enter to run, or type S to run step by step (pause after each Given / When / Then): '));
-  } else {
+  let parallel = 1;
+  if (most >= 2 && !stepByStep) {
     const together = most === 2 ? 'type 2 to run both at the same time' : `type a number (2-${most}) to run that many at the same time`;
     for (;;) {
-      const answer = await askOptional(`\nPress Enter to run the ${total} cases one after another, or ${together}, or S to run them step by step: `);
+      const answer = await askOptional(`\nPress Enter to run the ${total} cases one after another, or ${together}: `);
       if (answer === '') break;
-      if (/^s/i.test(answer)) { stepByStep = true; break; }
       if (/^\d+$/.test(answer) && Number(answer) >= 1 && Number(answer) <= most) { parallel = Number(answer); break; }
-      console.log(`  Please type ${most === 2 ? '2' : `a number from 2 to ${most}`}, S, or just press Enter.`);
+      console.log(`  Please type ${most === 2 ? '2' : `a number from 2 to ${most}`}, or just press Enter.`);
     }
   }
 
@@ -1178,7 +1169,7 @@ async function runBatch(list, config) {
     }
   } else {
     console.log('  Each case runs in its own browser window and only its result is shown here; the steps are in its report.');
-    console.log('  Pausing (P) and step by step are not available while cases run at the same time. Ctrl+C stops the batch.\n');
+    console.log('  Pausing (P) is not available while cases run at the same time. Ctrl+C stops the batch.\n');
     setQuietKeys(true);
     const tag = (i) => `  [${String(i + 1).padStart(String(total).length)}/${total}]`;
     let next = 0;
