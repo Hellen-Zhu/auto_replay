@@ -9,14 +9,13 @@
 export type Capability =
   | 'create' // book a normal trade
   | 'stepInFull'
-  | 'stepInPartial'
-  | 'cancel'; // cancel a live trade from the trade portal
+  | 'stepInPartial';
 
 /** Product type (also what is typed as the Product ID, and the name of the dat file) -> supported capabilities */
 export const PRODUCTS: Record<string, readonly Capability[]> = {
-  FX_PSCRIPT: ['create', 'stepInFull', 'stepInPartial', 'cancel'],
-  FX_TRF: ['create', 'stepInFull', 'stepInPartial', 'cancel'],
-  FX_PSCRIPT_FSKO: ['create', 'stepInFull', 'stepInPartial', 'cancel'],
+  FX_PSCRIPT: ['create', 'stepInFull', 'stepInPartial'],
+  FX_TRF: ['create', 'stepInFull', 'stepInPartial'],
+  FX_PSCRIPT_FSKO: ['create', 'stepInFull', 'stepInPartial'],
 };
 
 /** The products that support a capability, in the order of the registry */

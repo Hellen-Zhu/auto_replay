@@ -30,6 +30,6 @@ export class Flows {
 export { BaseFlow, type Keyword } from './base.flow';
 export { datFile } from '../products';
 export { type TradeCreationData } from './trade-creation.flow';
-export { type TradeProvisioningData } from './trade-provisioning.flow';
+export { type TradeProvisioningData, type StepInProvisioningData } from './trade-provisioning.flow';
 export { type TradeCancellationData } from './trade-cancellation.flow';
 export { AuthFlow, TradesFlow, TradeCreationFlow, TradeProvisioningFlow, TradeCancellationFlow, TradeApprovalFlow };

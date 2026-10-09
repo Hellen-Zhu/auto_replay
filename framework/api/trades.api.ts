@@ -11,6 +11,15 @@ export interface TradeBasic {
   /** A number in the request, so it cannot be a case parameter (those are text) */
   premiumAmount: number;
   premiumCurrency: Val;
+  /** Only a StepIn trade has it: the E2E project's templates REQ-TPL-TRADE-CREATION-STEPIN-FULL / -PARTIAL-API-001 */
+  udf?: TradeUdf[];
+}
+
+/** One user-defined field of a trade, as the "udf" list of the request carries it */
+export interface TradeUdf {
+  key: string;
+  value: Val;
+  type: 'Text' | 'Date';
 }
 
 /**

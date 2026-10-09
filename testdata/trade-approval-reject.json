@@ -1,0 +1,11 @@
+{
+  "defaults": {
+    "portfolioId": "ABS_EQF",
+    "counterpartyFmId": "300036958",
+    "premiumAmount": 10000,
+    "premiumCurrency": "USD",
+    "oldCounterpartyName": "10 AM JAK",
+    "oldCounterpartyFmId": "300036957",
+    "novationDate": "2026-06-10"
+  }
+}

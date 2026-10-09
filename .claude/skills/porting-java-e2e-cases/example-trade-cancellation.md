@@ -221,7 +221,7 @@ And the cancellation request is pending checker approval
 - The accounts in the Java source became roles: `this.as('maker')`, `this.as('checker')`. The checker never logs in: there is one user in the browser.
 - The template's values became `defaults` of `testdata/trade-cancellation.json` under flat names. `portfolioId` is there although `common.json` has one: the template's value differs from the one the UI cases use, so this spec keeps its own. `counterpartyName` and `direction` are the same as in `common.json` and are not repeated.
 - `productId` is not data: it is the flow's argument. `premiumAmount` is a number in the request: it is passed as `data.premiumAmount` and recorded as it is, the texts go through `p.<name>` and are recorded as parameters.
-- `FX_CO` and `FX_FSB` of the Examples are `FX_PSCRIPT` and `FX_PSCRIPT_FSKO`: the test loops `productsWith('cancel')` and the old names appear nowhere.
+- `FX_CO` and `FX_FSB` of the Examples are `FX_PSCRIPT` and `FX_PSCRIPT_FSKO`: the old names appear nowhere. (The spec has since been reduced to one product, `FX_TRF`: see "Coverage" in `README.md`.)
 - The literals of the snippet (`DEALER_ERROR`, `cancellation for test`) became the test data `cancelReason` and `cancelComments`.
 - `type value '...' into '...comments_textarea'` fills the control inside the element: `{ inner: INNER_INPUT }`, although the key ends in `_textarea`.
 - Weaker than the Java side, and reported as "to verify": the confirm step is a plain click (no wait for the `trigger-event` answer), the toast's type is not checked, and the blotter check is "the row contains the text" instead of one column.

@@ -9,10 +9,10 @@ import { BasePage } from './base.page';
 export class TradesPage extends BasePage {
   static readonly path = '/trades';
   /**
-   * What the blotter shows in a trade's row. PARV, LIVE and DEAD are the E2E project's; DRAFT is what the user said
-   * a rejected new trade goes back to, and the text the blotter shows for it has not been seen yet.
+   * What the blotter shows in a trade's row. PARV, LIVE and DEAD are the E2E project's; DRFT (a draft, what a
+   * rejected new trade goes back to) was stated by the user.
    */
-  static readonly status = { pendingApproval: 'PARV', live: 'LIVE', dead: 'DEAD', draft: 'DRAFT' };
+  static readonly status = { pendingApproval: 'PARV', live: 'LIVE', dead: 'DEAD', draft: 'DRFT' };
   static readonly eventStatus = { cancelled: 'Cancelled', new: 'New' };
 
   // The search box is a web component: the real control is in its shadow root

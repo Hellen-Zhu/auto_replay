@@ -20,8 +20,8 @@
 // - the checker's decision in the browser: the Approve / Reject entries are in the row's action menu and open a
 //   dialog with a confirm button, as the E2E project's steps use them; how that dialog looks is this mock's own.
 //   What a decision does to a trade: an approved cancellation gives DEAD / Cancelled and a rejected one LIVE / New,
-//   as in the E2E project; an approved new trade is LIVE (real); a rejected new trade is shown as DRAFT, which is
-//   only what the user described, not a text seen on the real system;
+//   as in the E2E project; an approved new trade is LIVE (real); a rejected new trade is shown as DRFT (the text is
+//   real; that it stays in this blotter is this mock's own). The "udf" list of a StepIn trade is accepted and ignored;
 // - API, served under /api/v1 (so apiBaseUrl for the mock is http://localhost:4173/api/v1): create (path, X-User-Id
 //   header, multipart parts "trade" + "datFile", data.trade.id and data.checkerContext.taskId in the response) and
 //   the checker's approve / reject of a task (path, JSON body, { code, status: 'SUCCESS', data: <the trade> } in the
@@ -446,7 +446,7 @@ http.createServer((req, res) => {
       delete t.taskId;
       const approved = decide[2] === 'approve';
       if (task.kind === 'cancel') Object.assign(t, approved ? { status: 'DEAD' } : { status: 'LIVE', eventStatus: 'New' });
-      else t.status = approved ? 'LIVE' : 'DRAFT';
+      else t.status = approved ? 'LIVE' : 'DRFT';
       json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: { id: t.id, basic: { counterpartyName: t.counterparty, portfolioId: t.portfolio, productId: t.productId, direction: t.direction }, trace: [] } });
     });
   }

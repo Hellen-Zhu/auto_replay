@@ -82,11 +82,19 @@ Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/tr
 
 To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`) and put its `.dat` file in `data/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
 
-`[TC-TRADE-CREATION-<product>-UI-005]` and `-UI-006` continue a normal creation with the checker: the checker logs in to the trade portal and approves the new trade (it becomes `LIVE`) or rejects it (it goes back to a draft). They need the `checker` account with its password in `config.local.json`.
+`[TC-TRADE-CREATION-FX_TRF-UI-005]` is the one journey that goes through the pages from end to end: the maker books a normal trade, the checker logs in to the trade portal and approves it, the trade is `LIVE` / `New`. It needs the `checker` account with its password in `config.local.json`.
+
+### Coverage: where a case is repeated per product
+
+A case is repeated for every product only where the product changes what is tested. Creating a trade does (the dat file, the product ID), so the creation cases loop the registry. The checker's decision and the cancellation use the same pages for every product, so they run for one product (`FX_TRF`), with one case per kind of trade or outcome that differs. A case tests one thing: the trade it needs beforehand is created through the API, and only `-UI-005` above repeats the creation in the browser.
+
+### Trade approval and rejection cases
+
+`tests/trade-approval-reject.spec.ts` holds the checker's decision on a new trade, for `FX_TRF`: `[TC-TRADE-APPROVAL-REJECT-FX_TRF-UI-002]` (a normal trade is rejected and is a draft again, `DRFT`), `-UI-003` (a StepIn full trade is approved and is `LIVE`) and `-UI-004` (the same for StepIn partial). The pending trade of the `Given` is submitted through the API; a StepIn trade carries a `udf` list (`stepInType`, `oldCptyName`, `oldCptyFmId`, `novationDate`) in its `basic` block, whose values are in `testdata/trade-approval-reject.json`. The feature's `-UI-001` (a normal trade is approved) is `-UI-005` of the creation cases. They need `apiBaseUrl` and both accounts, like the cancellation cases.
 
 ### Trade cancellation cases
 
-`tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: two tests per product with the `cancel` capability. In both the maker cancels a live trade; then the checker logs in and, in `[TC-TRADE-CANCELLATION-<product>-UI-001]`, approves the cancellation (the trade ends as `DEAD` / `Cancelled`) or, in `-UI-002`, rejects it (the trade is `LIVE` / `New` again). Their `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
+`tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: two tests, for `FX_TRF` only (see "Coverage" above). In both the maker cancels a live trade; then the checker logs in and, in `[TC-TRADE-CANCELLATION-<product>-UI-001]`, approves the cancellation (the trade ends as `DEAD` / `Cancelled`) or, in `-UI-002`, rejects it (the trade is `LIVE` / `New` again). Their `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
 
 1. Set `apiBaseUrl` in `config.local.json`, with its prefix (`.../api/v1`), and make sure the `checker` account has its e-mail there and its password (the checker also logs in to the trade portal).
 2. Copy the product `.dat` files into `data/`, as for trade creation.

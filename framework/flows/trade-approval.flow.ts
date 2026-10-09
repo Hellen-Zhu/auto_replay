@@ -1,4 +1,5 @@
 import { Toast } from '../components/toast';
+import { TradesPage } from '../pages';
 import { BaseFlow, type Keyword } from './base.flow';
 import { TradesFlow } from './trades.flow';
 
@@ -44,5 +45,15 @@ export class TradeApprovalFlow extends BaseFlow {
     await this.ui[keyword]('I see the message that the trade is rejected', () =>
       this.app.toast.expectTitle(Toast.title.tradeRejected),
     );
+  }
+
+  /** After the checker approved a new trade: it is live in the blotter */
+  async expectLive(tradeId: string, keyword: Keyword = 'Then') {
+    await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.live, undefined, keyword);
+  }
+
+  /** After the checker rejected a new trade: it is a draft again in the blotter */
+  async expectDraft(tradeId: string, keyword: Keyword = 'Then') {
+    await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.draft, undefined, keyword);
   }
 }
