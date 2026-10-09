@@ -814,8 +814,9 @@ async function askSettings(list, config) {
   const hasSettings = editable.some((k) => !isEmpty(get(k)));
   if (hasSettings) {
     console.log('\nSettings for this run:');
-    // a password is listed too, masked: one that is set is used without asking, C lets the PO type it again
-    for (const k of ['baseUrl', ...required]) console.log(`  ${k}: ${isEmpty(get(k)) ? '(not set)' : isSecret(k) ? '******' : get(k)}`);
+    // a password is listed too, masked: one typed in for an earlier case of this window is used without asking,
+    // C lets the PO type it again; one that is not set is asked for below
+    for (const k of ['baseUrl', ...required]) console.log(`  ${k}: ${isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k)}`);
   }
   if (paramNames.length) {
     console.log('\nCase data:');
@@ -1523,6 +1524,15 @@ async function main() {
     if (!process.env.OREO_NO_OPEN) openFile(path.join(dir, 'report.html'));
     await serveUntilEnter(config, pendingEnter);
     return 0;
+  }
+
+  // A login password is never taken from the config file: whoever runs a case types it, at a hidden prompt. It is
+  // asked for once per window and kept in memory only. (A recording above keeps them: there they are only used to
+  // mask what is typed.)
+  const ignored = secretEntries(config).map(([key]) => key);
+  for (const key of ignored) setCfg(config, key, '');
+  if (ignored.length) {
+    console.log(`\nNote: the passwords in ${path.basename(config.__file)} are not used (${ignored.join(', ')}). You will be asked to type the password of each account a case logs in with.`);
   }
 
   // One window runs as many cases as the PO wants: after a run it goes back to the case list instead of closing.
