@@ -744,6 +744,24 @@ const caseDataOf = (doc, params) => Object.keys(params).map((name) => {
 // Case data without a value in the case file (version 6): what only the PO knows, e.g. the ID of an existing trade
 const askedParamsOf = (doc) => Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '');
 
+// Case data that names a data file (data/${param:product}.dat) can only be what has such a file in the package:
+// name -> the values to choose from, in alphabetical order
+function choicesOf(doc) {
+  const out = {};
+  for (const s of doc.steps) for (const f of dataFilesOf(s)) {
+    const m = /^([^$]*)\$\{param:([^}]+)\}([^$]*)$/.exec(String(f));
+    if (!m) continue;
+    const [, before, name, after] = m;
+    const cut = before.lastIndexOf('/') + 1;
+    let files = [];
+    try { files = fs.readdirSync(path.join(ROOT, before.slice(0, cut))); } catch { /* no such folder: nothing to choose */ }
+    const found = files.filter((n) => n.startsWith(before.slice(cut)) && n.endsWith(after) && n.length > before.length - cut + after.length)
+      .map((n) => n.slice(before.length - cut, n.length - after.length)).sort();
+    out[name] = out[name] ? out[name].filter((v) => found.includes(v)) : found;
+  }
+  return out;
+}
+
 // Fails when this runner cannot run the case, before anything is asked or opened
 function checkCase({ file, doc }, params) {
   if (!doc || !Array.isArray(doc.steps)) throw new Error(`${path.basename(file)} is not a case file (it has no steps)`);
@@ -839,9 +857,24 @@ async function askSettings(list, config) {
     }
     if (changeable.length && chose('d')) {
       console.log('\nType a new value, or just press Enter to keep the current one. Changes apply to this run only.');
+      const choices = choicesOf(single);
       for (const k of changeable) {
-        const v = await ask(`  ${k} [${showData(params[k])}]: `);
-        if (v !== '') params[k] = v;
+        const list = choices[k];
+        if (!list || !list.length) {
+          const v = await ask(`  ${k} [${showData(params[k])}]: `);
+          if (v !== '') params[k] = v;
+          continue;
+        }
+        // a value that needs its data file: the PO picks one of those that came with the package
+        console.log(`  ${k}: the values that have a data file in this package`);
+        list.forEach((v, i) => console.log(`    ${i + 1}. ${v}${v === params[k] ? '  (current)' : ''}`));
+        for (;;) {
+          const v = (await ask(`  ${k} [${showData(params[k])}], number or name: `)).trim();
+          const picked = /^\d+$/.test(v) ? list[Number(v) - 1] : list.find((x) => x.toLowerCase() === v.toLowerCase());
+          if (picked) params[k] = picked;
+          if (v === '' || picked || inputEnded) break;
+          console.log(`    "${v}" has no data file: type one of the numbers or names above, or press Enter to keep ${params[k]}.`);
+        }
       }
     }
   }
