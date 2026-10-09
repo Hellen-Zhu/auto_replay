@@ -59,8 +59,11 @@ Edit `config.local.json`: fill in `baseUrl` (the real server address), `apiBaseU
 ```bash
 npx playwright test                    # run every case; passing ones are exported to cases/<spec name>/
 npx playwright test --headed           # watch the browser while it runs
+npx playwright test --workers=4        # run 4 cases at a time (one at a time by default)
 npm run replay                         # replay with the runner, exactly what the PO sees
 ```
+
+**Running cases side by side.** The cases do not depend on each other (each creates its own trade and exports its own case file), so `--workers=<n>` runs `n` of them at a time, each in its own browser; with `--headed` that is `n` windows. The exported case files are the same as in a run one by one, and each `createdTradeId = ...` line in the console then starts with its case ID. It is one at a time by default because the UAT environment is shared: on the mock 13 cases take 18 s with 4 workers instead of 53 s, but it has not been tried on the real system, where every case logs in with the same account at the same time. Start with 2 or 3 workers; if cases then fail at the login or lose their session, go back to the default and tell us what the system showed.
 
 Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/trade-cancellation.spec.ts` exports to `cases/trade-cancellation/<case ID>.json`, the same name as its test data file. Nothing has to be set up for a new spec: its folder is created by the first export. The runner shows these folders to the PO instead of one long list (see "PO: how to use it").
 

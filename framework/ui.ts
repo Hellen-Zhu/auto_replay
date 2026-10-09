@@ -5,6 +5,7 @@ import { Page, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { caseIdOf } from './data';
 // Shares the same execution core as the runner
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const core = require('../core/actions');
@@ -247,10 +248,13 @@ export class UI {
     this.pendingSubstep = undefined;
     const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, params: this.paramValues, rootDir: this.rootDir });
     this.steps.push({ ...group, ...recorded });
-    // Show what the step read or received, e.g. the ID of the trade it created: in the console and in Playwright's report
+    // Show what the step read or received, e.g. the ID of the trade it created: in the console and in Playwright's report.
+    // With several workers the lines of different cases are mixed in the console, so each says which case it is from
+    const info = test.info();
+    const owner = info.config.workers > 1 ? `[${caseIdOf(info.title) || info.title}] ` : '';
     for (const [name, value] of Object.entries(core.savedValues(recorded, result))) {
-      console.log(`  ${name} = ${value}`);
-      test.info().annotations.push({ type: 'value', description: `${name} = ${value}` });
+      console.log(`  ${owner}${name} = ${value}`);
+      info.annotations.push({ type: 'value', description: `${name} = ${value}` });
     }
     return result;
   }
