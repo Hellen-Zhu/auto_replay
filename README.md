@@ -44,6 +44,7 @@ Two kinds of data are kept apart:
 | `portable/view-trace.bat` | Opens the list of earlier runs with their report and trace viewer links |
 | `scripts/build-portable.js` | Builds the portable runner |
 | `scripts/sync-elements.js` | Refreshes `elements/` from the E2E project and checks it against the page objects |
+| `scripts/export-existing-trade-cases.js` | Runs the five cases on an existing trade once each, on trades it creates, so that their case files are exported |
 | `mock-oreo/` | Mock OREO pages, for local demos only |
 | `.claude/skills/porting-java-e2e-cases/` | Claude Code skill: implements a case of the E2E project here, see "QA: porting a case from the E2E project" |
 
@@ -125,6 +126,7 @@ Its data is in `testdata/trade-cancellation.json` (the trade that is created, th
   OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-EXISTING-TRADE-UI-003"
   ```
 
+- To export all five in one go: `npm run export:existing-trade` (add `-- --headed` to watch, `-- --product=<PRODUCT>` for another product than `FX_TRF`). It creates three trades with the trade creation case of the product (so that product's `.dat` is needed) and runs each case on a trade in the right state: trade 1 `001 -> 003 -> 004`, trade 2 `002`, trade 3 `001 -> 003 -> 005`. It books three real trades per run and stops at the first case that does not pass.
 - They need no `.dat` file and no `apiBaseUrl`, and are not per product: the given trade decides the product. The checker must not be the user who submitted the trade or the cancellation.
 - In a flow: `const tradeId = flows.trades.existingTrade(<the ID>)`; from then on every use of that ID is recorded as `${param:tradeId}`. Such a case file is format version 6 and needs a runner package built from this version.
 - They cannot be part of a run of several cases (a batch asks nothing per case): the runner leaves them out and says so.

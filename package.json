@@ -9,6 +9,7 @@
     "record": "node runner/runner.js --record",
     "build:portable": "node scripts/build-portable.js",
     "sync:elements": "node scripts/sync-elements.js",
+    "export:existing-trade": "node scripts/export-existing-trade-cases.js",
     "mock": "node mock-oreo/server.js"
   },
   "license": "ISC",
