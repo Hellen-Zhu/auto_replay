@@ -5,3 +5,4 @@ playwright-report/
 evidence/
 dist/
 .DS_Store
+.history
