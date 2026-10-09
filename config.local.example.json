@@ -1,5 +1,6 @@
 {
   "baseUrl": "https://oreo-uat.example.internal:8088",
+  "apiBaseUrl": "https://oreo-uat-api.example.internal",
   "accounts": {
     "maker": {
       "email": "maker@test.com",

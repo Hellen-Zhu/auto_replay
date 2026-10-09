@@ -6,6 +6,7 @@ const path = require('path');
 
 const DEFAULTS = {
   baseUrl: '',
+  apiBaseUrl: '', // address of the API, which may differ from the pages' address; only cases with api steps need it
   accounts: {},
   browser: {
     channel: 'msedge', // use the Edge already on the computer; "chrome" also works, or "" together with executablePath
@@ -33,6 +34,7 @@ function loadConfig(dir) {
     user = JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, ''));
   }
   if (process.env.OREO_BASE_URL) user.baseUrl = process.env.OREO_BASE_URL;
+  if (process.env.OREO_API_BASE_URL) user.apiBaseUrl = process.env.OREO_API_BASE_URL;
   const cfg = deepMerge(DEFAULTS, user);
   cfg.__file = file;
   return cfg;

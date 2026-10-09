@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { chromium } = require('@playwright/test');
-const { FORMAT_VERSION, executeStep, describeStep, showPlaceholders, resolveDataFile } = require('../core/actions');
+const { FORMAT_VERSION, executeStep, describeStep, showPlaceholders, resolveDataFile, dataFilesOf } = require('../core/actions');
 const { loadConfig, launchOptions, secretEntries } = require('../core/config');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -285,8 +285,8 @@ async function runCase({ file, doc }, config) {
   if (Number(doc.formatVersion) > FORMAT_VERSION) {
     throw new Error(`${path.basename(file)} is case format version ${doc.formatVersion}; this runner supports up to version ${FORMAT_VERSION}. Ask QA for the current UAT-Runner package.`);
   }
-  // Fail before asking for anything if a file the case uploads did not come with the package
-  for (const s of doc.steps) if (s.action === 'upload') resolveDataFile(ROOT, s.value);
+  // Fail before asking for anything if a file the case uploads or sends to the API did not come with the package
+  for (const s of doc.steps) for (const f of dataFilesOf(s)) resolveDataFile(ROOT, f);
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const caseId = path.basename(file, '.json');
@@ -309,7 +309,7 @@ async function runCase({ file, doc }, config) {
   const askConfig = async (key) => {
     const v = isSecret(key)
       ? await askHidden(`Enter ${key} (input is hidden): `)
-      : await ask(`Enter ${key}: `);
+      : await ask(key === 'apiBaseUrl' ? 'Enter the API address (e.g. https://xxx:port): ' : `Enter ${key}: `);
     setCfg(key, v);
     if (!isSecret(key) && v !== '') toSave[key] = v;
     return v;
@@ -475,6 +475,7 @@ async function runCase({ file, doc }, config) {
       rec.status = 'passed';
       if (step.action === 'read') rec.desc += ` (read: ${r})`;
       else if (step.capture) rec.desc += ` (captured: ${r})`;
+      else if (step.action === 'api' && r && Object.keys(r).length) rec.desc += ` (saved: ${Object.entries(r).map(([k, v]) => `${k} = ${v}`).join(', ')})`;
       console.log('✔');
     } catch (e) {
       rec.status = 'failed';
@@ -484,11 +485,14 @@ async function runCase({ file, doc }, config) {
       console.log('✘');
       console.log(`\n    Failure reason: ${rec.error}\n`);
     }
-    try {
-      const shot = `step-${String(i + 1).padStart(2, '0')}.png`;
-      await page.screenshot({ path: path.join(dir, shot) });
-      rec.screenshot = shot;
-    } catch { /* ignore cases such as the page already being closed */ }
+    // An API call does not touch the page, so it has no picture: what it sent and received is in the trace
+    if (step.action !== 'api') {
+      try {
+        const shot = `step-${String(i + 1).padStart(2, '0')}.png`;
+        await page.screenshot({ path: path.join(dir, shot) });
+        rec.screenshot = shot;
+      } catch { /* ignore cases such as the page already being closed */ }
+    }
 
     const next = doc.steps[i + 1];
     if (!failed && next && (pauseRequested || (stepByStep && (next.title || next.substep)))) await pause(rec, i + 1);

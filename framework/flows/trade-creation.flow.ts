@@ -1,4 +1,5 @@
 import { NewTradePage, TradeDetailPage, type NewTradeField, type NewTradeFieldDef } from '../pages';
+import { datFile } from '../products';
 import type { Val } from '../ui';
 import { BaseFlow, type Keyword } from './base.flow';
 
@@ -20,9 +21,6 @@ const DATA_FIELDS = FIELD_NAMES.filter((name) => !fieldDef(name).scenario);
 const BASIC_FIELDS = FIELD_NAMES.filter((name) => fieldDef(name).required || fieldDef(name).scenario);
 /** Filled in one step after the basic ones, each only when the case has a value for it */
 const OPTIONAL_FIELDS = DATA_FIELDS.filter((name) => !fieldDef(name).required && !fieldDef(name).when);
-
-/** The product's .dat file, shipped with the cases in data/ (same names as the E2E project's ProductDatFiles) */
-export const datFile = (product: string) => `data/${product}.dat`;
 
 /**
  * Booking a new trade through the New Trade form, mirroring the E2E project's trade_creation snippets.

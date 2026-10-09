@@ -1,18 +1,31 @@
 import type { TargetIn, Val } from '../ui';
 import { element } from '../elements';
+import { TradeChangeConfirmation } from '../components/trade-change-confirmation';
 import { BasePage } from './base.page';
 
 /** Trades page (the trade portal): the landing page after login, with the search box and the blotters */
 export class TradesPage extends BasePage {
   static readonly path = '/trades';
+  /** What the blotter shows in a trade's row */
+  static readonly status = { pendingApproval: 'PARV' };
+  static readonly eventStatus = { cancelled: 'Cancelled' };
 
   // The search box is a web component: the real control in its shadow root is an input or a textarea
   protected readonly searchInput = element('trade_portal.search_input', { inner: "input[part='input'], textarea[part='input']" });
   protected readonly allTradesBlotter = element('trade_portal.all_trade_blotter');
+  // An entry of a row's action menu
+  protected readonly cancelAction = element('trade_portal.row_action_cancel');
+
+  /** The dialog that an action on a trade (cancel, ...) opens */
+  readonly confirmDialog = new TradeChangeConfirmation(this.ui);
 
   /** The first row of the blotter that shows this trade ID: the rows are only told apart by their text */
   protected row(tradeId: Val): TargetIn {
     return { ...this.allTradesBlotter, inner: 'role=row', hasText: tradeId, nth: 0 };
+  }
+
+  async open() {
+    await this.ui.goto(TradesPage.path);
   }
 
   async expectOpen() {
@@ -27,5 +40,19 @@ export class TradesPage extends BasePage {
   /** Opens the action menu of the trade's row; in the blotter that is a right-click on the row */
   async openActionMenu(tradeId: Val) {
     await this.ui.rightClick(this.row(tradeId));
+  }
+
+  /** The action menu must be open */
+  async expectCancelActionVisible() {
+    await this.ui.expectVisible(this.cancelAction);
+  }
+
+  async clickCancelAction() {
+    await this.ui.click(this.cancelAction);
+  }
+
+  /** The trade's row shows this text (e.g. a status) in one of its columns */
+  async expectRowShows(tradeId: Val, text: Val) {
+    await this.ui.expectText(this.row(tradeId), text);
   }
 }

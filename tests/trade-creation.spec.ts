@@ -1,22 +1,15 @@
-import fs from 'fs';
-import path from 'path';
 import { test } from '../framework/fixtures';
-import { datFile, type TradeCreationData } from '../framework/flows';
+import type { TradeCreationData } from '../framework/flows';
 import { productsWith } from '../framework/products';
+import { prepare as prepareCase } from './support';
 
 // Mirrors trade_creation.feature of the E2E project, steps included: one test per scenario, each looping the products that
 // support it (framework/products.ts), since not every product supports StepIn full / partial. To cover another
 // product, add it to that registry and put its data/<PRODUCT>.dat in place; nothing changes here (a case needs a
 // row in testdata/trade-creation.json only for values that differ from the shared ones).
 
-/** Skips the case when the product's dat file is not there, and sets the description shown to the PO */
-function prepare(product: string, what: string) {
-  test.skip(!fs.existsSync(path.resolve(__dirname, '..', datFile(product))), `${datFile(product)} is missing`);
-  test.info().annotations.push({
-    type: 'description',
-    description: `Maker books a new ${product} ${what} from its dat file and verifies it is created with pending approval status`,
-  });
-}
+const prepare = (product: string, what: string) =>
+  prepareCase(product, `Maker books a new ${product} ${what} from its dat file and verifies it is created with pending approval status`);
 
 test.describe('Trade creation', () => {
   for (const product of productsWith('create')) {

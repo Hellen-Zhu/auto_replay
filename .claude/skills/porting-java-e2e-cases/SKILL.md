@@ -54,7 +54,7 @@ A line that matches no entry and is not a recognizable built-in step, or matches
 
 ## Built-in Genie steps
 
-Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAndCapture`, `upload`, `press`, `read`, `expectVisible`, `expectText`, `expectUrl` and nothing else.
+Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAndCapture`, `upload`, `press`, `read`, `expectVisible`, `expectText`, `expectUrl` for the page, plus `api` for a request to the system's API, and nothing else.
 
 | Genie step | Here |
 |---|---|
@@ -78,8 +78,9 @@ A built-in step that is not in this table is ported only when its wording maps o
 | `confirm new trade creation and capture response as '<x>'` + `store e2e response field '<field>' from stored variable '<x>' as '<name>'` | `newTrade.confirmDialog.confirmAndCapture({ ...NewTradePage.createApi, saveAs: '<name>' })` |
 | `search for trade stored as '<name>' in blotter` | `trades.searchTrade(tradeId)` |
 | `open action menu item for new today blotter from stored variable '<name>'` | `trades.openActionMenu(tradeId)`: a right-click on the trade's row. Both together, as in `page trade portal searches and opens action menu for trade stored as '<name>'`: `flows.trades.openActionMenu(tradeId)` |
+| `a Live '<P>' trade exists in the blotter` (`TradeProvisioningSteps`: the maker submits the trade through the API, the checker approves its task) | `flows.tradeProvisioning.provisionLiveTrade(product, data)`, returning the trade ID. It fails until `TradesApi.approve` is filled in: report that instead of porting around it |
 
-Another Java step: read its method. Only browser actions on element keys (click, fill, set files, assert on a locator) are portable, as atomic operations; a capture of a response needs its URL, method and field from the Java source, kept as a `static` of the page like `NewTradePage.createApi`. A call to an API, a database, a file or anything outside the page is not portable: the case format has no such action.
+Another Java step: read its method. Only browser actions on element keys (click, fill, set files, assert on a locator) are portable, as atomic operations; a capture of a response needs its URL, method and field from the Java source, kept as a `static` of the page like `NewTradePage.createApi`. A call to the system's API is portable only as an operation of an API object in `framework/api/` (see `TradesApi`, and "QA: preparing data through the API" in `README.md`), and only when its method, path, headers and body are all readable in the Java source: a request that is partly hidden behind a helper or a template that cannot be found is not guessed. An address or an account that the Java source hard-codes is never copied: the address is `apiBaseUrl` of the local config, the sender `this.as('<role>')`. A check against a database, a file or anything else outside the page and the API is not portable: the case format has no such action.
 
 ## Stored variables
 
@@ -105,7 +106,7 @@ Another Java step: read its method. Only browser actions on element keys (click,
 
 Skip the whole scenario (a case that silently lacks a step claims a coverage it does not have) and go on with the others:
 
-- a custom Java step without an equivalent, or any API / database / file check;
+- a custom Java step without an equivalent, an API call whose request is not fully known, or any database / file check;
 - an element key that is not in `elements/` after the sync, an element whose `findBy` is not `testId`, a locator with a placeholder. Supporting another `findBy` is the user's decision, not a hand-written CSS / XPath;
 - a control this project cannot operate yet (date picker, Yes / No toggle, grid cell editing): its real DOM is needed;
 - a second login in one scenario, unless the Java side does it purely with UI steps (log out, log in) on defined elements; a new browser session per user cannot be expressed in a case file;

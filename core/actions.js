@@ -7,8 +7,8 @@ const path = require('path');
 const { expect } = require('@playwright/test');
 
 // Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name};
-// 3 = adds hasText in a target and button on a click
-const FORMAT_VERSION = 3;
+// 3 = adds hasText in a target and button on a click; 4 = adds the api action
+const FORMAT_VERSION = 4;
 
 /**
  * Turn a target description from the JSON into a Playwright Locator.
@@ -110,10 +110,13 @@ async function resolveValue(value, ctx, inParam) {
   return out + value.slice(last);
 }
 
-/** Join baseUrl and a relative path; case files store only relative paths, never the server address */
-function resolveUrl(baseUrl, path) {
+/**
+ * Join a configured address and a relative path; case files store only relative paths, never the server address.
+ * key names the config entry the address comes from (baseUrl for pages, apiBaseUrl for api steps), for the error message
+ */
+function resolveUrl(baseUrl, path, key = 'baseUrl') {
   if (/^https?:\/\//i.test(path)) return path;
-  if (!baseUrl) throw new Error('baseUrl is not configured; please set it in config.local.json');
+  if (!baseUrl) throw new Error(`${key} is not configured; please set it in config.local.json`);
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
@@ -189,13 +192,89 @@ async function clickAndCapture(page, loc, capture, ctx, timeout, button) {
   return String(v);
 }
 
+/** Resolve the placeholders of every text inside a JSON value (the headers, body and JSON parts of an api step) */
+async function resolveDeep(value, ctx) {
+  if (typeof value === 'string') return resolveValue(value, ctx);
+  if (Array.isArray(value)) {
+    const out = [];
+    for (const v of value) out.push(await resolveDeep(v, ctx));
+    return out;
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = await resolveDeep(v, ctx);
+    return out;
+  }
+  return value;
+}
+
+/** The files of the data folder a step needs: what an upload step uploads and the file parts of an api step */
+function dataFilesOf(step) {
+  if (step.action === 'upload') return [step.value];
+  if (step.action === 'api') return Object.values(step.multipart || {}).filter((p) => p && p.file).map((p) => p.file);
+  return [];
+}
+
+/**
+ * Call the system's API directly, without the page, e.g. to prepare the trade a case works on:
+ *   { action: 'api', method: 'POST', value: '/api/v1/trades/create?tradeAction=SUBMIT',
+ *     headers: { 'X-User-Id': '${cfg:accounts.maker.email}' },
+ *     multipart: { trade: { json: { basic: { productId: 'FX_TRF' } } }, datFile: { file: 'data/FX_TRF.dat' } },
+ *     save: { createdTradeId: 'data.trade.id' } }
+ * value is a path on apiBaseUrl of the local config: the API may be served from another address than the pages.
+ * The request carries multipart (each part a JSON document or a file of the data folder), or body (JSON), or nothing.
+ * Any answer other than 2xx fails the step. save stores fields of the JSON response as variables: name -> field.
+ * The request is sent by Playwright's own API client, not by the page; it is listed in the trace.
+ */
+async function callApi(page, step, apiPath, ctx, timeout) {
+  const method = String(step.method || 'GET').toUpperCase();
+  const what = `${method} ${apiPath}`;
+  const url = resolveUrl(ctx.config.apiBaseUrl, apiPath, 'apiBaseUrl');
+  const options = { method, timeout, headers: { accept: 'application/json', ...(await resolveDeep(step.headers || {}, ctx)) } };
+  if (step.multipart) {
+    options.multipart = {};
+    for (const [name, part] of Object.entries(step.multipart)) {
+      if (part && part.file) {
+        const file = resolveDataFile(ctx.rootDir, part.file);
+        options.multipart[name] = { name: path.basename(file), mimeType: 'application/octet-stream', buffer: fs.readFileSync(file) };
+      } else if (part && part.json !== undefined) {
+        // Sent the way a browser sends a JSON Blob in a form: its own content type and the file name "blob"
+        const json = JSON.stringify(await resolveDeep(part.json, ctx));
+        options.multipart[name] = { name: 'blob', mimeType: 'application/json', buffer: Buffer.from(json, 'utf-8') };
+      } else {
+        throw new Error(`Part ${name} of ${what} must be { "json": ... } or { "file": "data/..." }`);
+      }
+    }
+  } else if (step.body !== undefined) {
+    options.data = await resolveDeep(step.body, ctx);
+  }
+  let res;
+  try { res = await page.request.fetch(url, options); }
+  catch (e) { throw new Error(`${what} could not be sent: ${String(e.message || e).split('\n')[0]}`); }
+  const text = await res.text();
+  if (!res.ok()) throw new Error(`${what} returned HTTP ${res.status()}${text ? ': ' + text.slice(0, 300) : ''}`);
+  const saved = {};
+  const fields = Object.entries(step.save || {});
+  if (fields.length) {
+    let body;
+    try { body = JSON.parse(text); } catch { throw new Error(`${what} did not return JSON`); }
+    for (const [name, field] of fields) {
+      const v = getPath(body, field);
+      if (v === undefined || v === null || v === '') throw new Error(`${what} response has no ${field}`);
+      ctx.vars[name] = saved[name] = String(v);
+    }
+  }
+  return saved;
+}
+
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
  * Execute one step. The step's value may contain placeholders, which are resolved here.
- * Returns the text that was read for a read step or captured by a click, undefined otherwise.
+ * Returns the text that was read for a read step or captured by a click, the saved variables (name -> value)
+ * for an api step, undefined otherwise.
  */
 async function executeStep(page, step, ctx) {
   const timeout = step.timeout ?? ctx.config?.timeouts?.step ?? 15000;
@@ -259,6 +338,8 @@ async function executeStep(page, step, ctx) {
     case 'wait':
       await page.waitForTimeout(Number(value) || 0);
       return;
+    case 'api':
+      return callApi(page, step, value, ctx, timeout);
     default:
       throw new Error(`Unsupported action: ${step.action}`);
   }
@@ -286,10 +367,20 @@ function describeStep(step, vars, params) {
     case 'expectText': return `Verify ${t} ${step.exact ? 'equals' : 'contains'} ${v}`;
     case 'expectUrl': return `Verify current page is ${v}`;
     case 'wait': return `Wait ${v} ms`;
+    case 'api': {
+      // Header values are shown like any other text: a config reference by its name, never by its value
+      const headers = Object.entries(step.headers || {}).map(([k, h]) => `${k}: ${showPlaceholders(h, vars, params)}`);
+      const files = dataFilesOf(step);
+      const saved = Object.entries(step.save || {}).map(([name, field]) => `${field} as ${name}`);
+      return `Call API ${String(step.method || 'GET').toUpperCase()} ${v}`
+        + (headers.length ? ` (${headers.join(', ')})` : '')
+        + (files.length ? ` with file ${files.join(', ')}` : '')
+        + (saved.length ? ` and save ${saved.join(', ')}` : '');
+    }
     default: return step.action;
   }
 }
 
 module.exports = {
-  FORMAT_VERSION, resolveDataFile, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, describeStep, getPath,
+  FORMAT_VERSION, resolveDataFile, dataFilesOf, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, describeStep, getPath,
 };

@@ -2,6 +2,17 @@
 // The structure mirrors the real pages: sc-text-input / sc-button are web components with an open shadow root,
 // and the data-testid values match the real system.
 // Start: npm run mock  ->  http://localhost:4173
+//
+// What is real and what is only this mock's guess:
+// - real testids: login-*, layout-*, create-trade-*, trade-file-upload, trade-detail-*, trade-change-confirmation-dialog,
+//   trade-change-confirm-btn, trade-row-action-cancellation;
+// - testids made up here because the real ones are not known yet (search box, all-trades blotter, reason select,
+//   comments textarea): they are marked "mock testid" below. Point the element names at them with a scratch elements
+//   folder (OREO_ELEMENTS_DIR) when running a case against the mock;
+// - the toast only copies the two attributes the E2E project reads (data-title, data-description);
+// - API: create (path, X-User-Id header, multipart parts "trade" + "datFile", data.trade.id and
+//   data.checkerContext.taskId in the response) is like the real one. The approval endpoint under /api/v1/mock/, the
+//   body of trigger-event and the status LIVE are this mock's own.
 
 const http = require('http');
 const PORT = Number(process.env.PORT || 4173);
@@ -61,6 +72,27 @@ class ScCombobox extends HTMLElement {
   }
   get value() { return this.selected || ''; }
 }
+// Dropdown without typing: a click opens the list; the entries are sl-menu-item like the combobox's
+class ScSelect extends HTMLElement {
+  connectedCallback() {
+    const r = this.attachShadow({ mode: 'open' });
+    r.innerHTML = '<div part="base"><button part="display" type="button">Select...</button><div role="menu" hidden></div></div>' +
+      '<style>div[part]{position:relative}button{width:200px;padding:6px;border:1px solid #ccc;background:#fff;text-align:left;font-size:13px;cursor:pointer}' +
+      '[role=menu]{position:absolute;z-index:5;background:#fff;border:1px solid #ccc;width:198px}' +
+      'sl-menu-item{display:block;padding:6px;font-size:13px;cursor:pointer}sl-menu-item:hover{background:#e0e7ff}</style>';
+    const btn = r.querySelector('button'), list = r.querySelector('[role=menu]');
+    for (const o of (this.getAttribute('options') || '').split('|')) {
+      const d = document.createElement('sl-menu-item');
+      d.setAttribute('role', 'menuitem');
+      d.textContent = o;
+      d.addEventListener('click', () => { this.selected = o; btn.textContent = o; list.hidden = true; });
+      list.appendChild(d);
+    }
+    btn.addEventListener('click', () => { list.hidden = !list.hidden; });
+  }
+  get value() { return this.selected || ''; }
+  reset() { this.selected = ''; this.shadowRoot.querySelector('button').textContent = 'Select...'; }
+}
 class SlMenuItem extends HTMLElement {
   connectedCallback() {
     if (this.shadowRoot) return;
@@ -80,6 +112,7 @@ class ScModal extends HTMLElement {
 customElements.define('sc-modal', ScModal);
 customElements.define('sl-menu-item', SlMenuItem);
 customElements.define('sc-combobox', ScCombobox);
+customElements.define('sc-select', ScSelect);
 customElements.define('sc-text-input', ScTextInput);
 customElements.define('sc-button', ScButton);
 </script>`;
@@ -101,13 +134,17 @@ document.querySelector('[data-testid=login-sign-in-to-portal-btn]').addEventList
   const r = await fetch('/api/login', { method: 'POST', body: JSON.stringify({ email, pwd }) });
   if (!r.ok) { document.getElementById('err').textContent = 'Invalid email or password'; return; }
   const u = await r.json();
-  setTimeout(() => { sessionStorage.setItem('user', u.name); location.href = '/trades'; }, 400); // simulate login latency
+  setTimeout(() => { sessionStorage.setItem('user', u.name); sessionStorage.setItem('userEmail', email); location.href = '/trades'; }, 400); // simulate login latency
 });
 </script></body></html>`;
 
 const tradesPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>OREO</title>${components}
 <style>body{font-family:system-ui;margin:0}header{display:flex;justify-content:space-between;align-items:center;padding:10px 24px;border-bottom:1px solid #ddd}
-.actions{display:flex;gap:8px}sc-button{display:inline-block}table{border-collapse:collapse;margin:24px;font-size:13px}td,th{padding:6px 12px;border-bottom:1px solid #eee;text-align:left}</style></head>
+.actions{display:flex;gap:8px}sc-button{display:inline-block}table{border-collapse:collapse;margin:8px 24px 24px;font-size:13px}td,th{padding:6px 12px;border-bottom:1px solid #eee;text-align:left}
+h3{margin:24px 24px 0}.search{margin:16px 24px 0}.row{display:flex;align-items:center;gap:16px;margin-bottom:14px}.row>label{width:90px;font-size:13px}
+#err{color:#b91c1c;font-size:13px;margin:8px 0}#rowmenu{position:fixed;z-index:9;background:#fff;border:1px solid #ccc;box-shadow:0 2px 8px #0003;font-size:13px}
+#rowmenu[hidden]{display:none}#rowmenu [role=menuitem]{padding:8px 16px;cursor:pointer}#rowmenu [role=menuitem]:hover{background:#e0e7ff}
+#toaster{position:fixed;right:16px;bottom:16px;list-style:none;margin:0;padding:0}#toaster li{background:#fff;border:1px solid #16a34a;border-radius:8px;padding:10px 16px;margin-top:8px;font-size:13px;box-shadow:0 2px 8px #0003}</style></head>
 <body><header data-testid="layout-topnav-container"><b>OREO 0.2.17</b>
 <div class="actions">
   <sc-button data-testid="layout-new-trade-btn">+ New Trade</sc-button>
@@ -115,15 +152,91 @@ const tradesPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
   <sc-button data-testid="layout-theme-toggle-btn" title="Switch to dark mode">Dark</sc-button>
   <sc-button class="relative" data-testid="layout-user-menu-btn"><span class="hidden sm:inline" id="uname"></span></sc-button>
 </div></header>
-<h3 style="margin:24px 24px 0">Validation Blotter</h3>
+<!-- mock testid -->
+<div class="search"><sc-text-input data-testid="trade-portal-search-input" placeholder="Search by Trade ID..."></sc-text-input></div>
+<h3>Validation Blotter</h3>
 <table><thead><tr><th>Trade ID</th><th>Product ID</th><th>Portfolio</th><th>Deal Date</th><th>Currency</th></tr></thead>
 <tbody><tr><td>TRD-1791369475907O6B14DDE</td><td>FX_TRF</td><td>ABS_CR_UK_ETFBB</td><td>10/07/2026</td><td>USDJPY</td></tr></tbody></table>
+<h3>All Trades</h3>
+<!-- mock testid -->
+<div data-testid="trade-portal-all-trades-blotter">
+<table><thead><tr><th>Trade ID</th><th>Product ID</th><th>Counterparty</th><th>Status</th><th>Event Status</th></tr></thead><tbody></tbody></table></div>
+<!-- the action menu of a row: opens on a right-click -->
+<div id="rowmenu" role="menu" hidden>
+  <div role="menuitem">View Details</div>
+  <div role="menuitem" data-testid="trade-row-action-cancellation">Cancellation</div>
+</div>
+<sc-modal data-testid="trade-change-confirmation-dialog" hidden><div slot="header"><h2>Confirm Trade Changes</h2>
+  <p>Review the changes and risk impact before saving</p></div>
+  <div><h2>Updated Risk Calculation</h2>
+    <!-- mock testids -->
+    <div class="row"><label>Reason</label><sc-select data-testid="trade-change-reason-select" options="DEALER_ERROR|CLIENT_REQUEST|MOCK_OTHER"></sc-select></div>
+    <div class="row"><label>Comments</label><textarea data-testid="trade-change-comments-textarea" rows="3" cols="28"></textarea></div>
+    <div id="err"></div>
+    <sc-button data-testid="trade-change-confirm-btn">Confirm &amp; Save</sc-button></div></sc-modal>
+<ol id="toaster"></ol>
 <script>
-const u = sessionStorage.getItem('user');
+const u = sessionStorage.getItem('user'), email = sessionStorage.getItem('userEmail');
 if (!u) location.href = '/';
 // simulate async loading of user info
 setTimeout(() => { document.getElementById('uname').textContent = u; }, 300);
-document.querySelector('[data-testid=layout-new-trade-btn]').addEventListener('click', () => { location.href = '/trades/new'; });
+const $ = (id) => document.querySelector('[data-testid=' + id + ']');
+$('layout-new-trade-btn').addEventListener('click', () => { location.href = '/trades/new'; });
+
+const api = (path, init) => fetch(path, { ...init, headers: { 'X-User-Id': email } });
+const search = $('trade-portal-search-input'), tbody = $('trade-portal-all-trades-blotter').querySelector('tbody');
+const menu = document.getElementById('rowmenu'), cancelEntry = $('trade-row-action-cancellation');
+const dialog = $('trade-change-confirmation-dialog'), err = document.getElementById('err');
+const reason = $('trade-change-reason-select'), comments = $('trade-change-comments-textarea');
+let trades = [], current = null;
+
+function render() {
+  const q = search.value.trim().toLowerCase();
+  tbody.innerHTML = '';
+  for (const t of trades.filter((x) => x.id.toLowerCase().includes(q))) {
+    const tr = document.createElement('tr');
+    for (const v of [t.id, t.productId, t.counterparty, t.status, t.eventStatus]) tr.appendChild(Object.assign(document.createElement('td'), { textContent: v }));
+    tr.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      current = t;
+      cancelEntry.hidden = t.status !== 'LIVE'; // only a live trade can be cancelled
+      menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
+      menu.hidden = false;
+    });
+    tbody.appendChild(tr);
+  }
+}
+async function load() { trades = (await (await api('/api/trades')).json()).data.trades; render(); }
+setTimeout(load, 300); // simulate async loading of the blotter
+search.addEventListener('input', render);
+document.addEventListener('mousedown', (e) => { if (!menu.contains(e.target)) menu.hidden = true; });
+
+// Like Sonner: one <li> per toast, its texts in [data-title] and [data-description], gone after a few seconds
+function toast(type, title, description) {
+  const li = document.createElement('li');
+  li.setAttribute('data-sonner-toast', ''); li.setAttribute('data-type', type);
+  li.innerHTML = '<div data-content><div data-title></div><div data-description></div></div>';
+  li.querySelector('[data-title]').textContent = title;
+  li.querySelector('[data-description]').textContent = description;
+  document.getElementById('toaster').appendChild(li);
+  setTimeout(() => li.remove(), 5000);
+}
+
+cancelEntry.addEventListener('click', () => {
+  menu.hidden = true;
+  reason.reset(); comments.value = ''; err.textContent = '';
+  // simulate the risk calculation that runs before the confirmation dialog
+  setTimeout(() => { dialog.hidden = false; }, 400);
+});
+$('trade-change-confirm-btn').addEventListener('click', async () => {
+  const r = await api('/api/v1/trades/trigger-event', { method: 'POST',
+    body: JSON.stringify({ tradeId: current.id, event: 'CANCEL', reason: reason.value, comments: comments.value }) });
+  const body = await r.json();
+  if (!r.ok) { err.textContent = body.message; return; }
+  dialog.hidden = true;
+  toast('success', 'Success', 'Cancellation completed successfully');
+  load();
+});
 </script></body></html>`;
 
 const pageHead = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>OREO</title>${components}
@@ -183,7 +296,7 @@ $('trade-change-confirm-btn').addEventListener('click', async () => {
   const form = new FormData();
   form.append('trade', JSON.stringify(collect()));
   form.append('file', $('trade-file-upload').querySelector('input').files[0]);
-  const r = await fetch('/api/v1/trades/create?tradeAction=SUBMIT', { method: 'POST', body: form });
+  const r = await fetch('/api/v1/trades/create?tradeAction=SUBMIT', { method: 'POST', body: form, headers: { 'X-User-Id': sessionStorage.getItem('userEmail') } });
   const body = await r.json();
   dialog.hidden = true;
   if (!r.ok) { err.textContent = body.message; return; }
@@ -209,6 +322,7 @@ setTimeout(async () => {
 </script></main></body></html>`;
 
 const TRADES = {}; // trades booked in this mock session, kept in memory only
+const TASKS = {}; // approval tasks that are still open: task ID -> { tradeId, submittedBy }
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
 
 http.createServer((req, res) => {
@@ -223,22 +337,59 @@ http.createServer((req, res) => {
     });
     return;
   }
+  // Like the real API, /api/v1 has no login: the caller only names itself with its e-mail in X-User-Id
+  const caller = req.headers['x-user-id'];
+  if (req.url.startsWith('/api/v1/') && !USERS[caller]) return json(res, 401, { message: 'X-User-Id is missing or not a known user' });
+  const readBody = (then) => { let body = ''; req.on('data', (c) => (body += c)); req.on('end', () => then(body)); };
+
   if (req.method === 'POST' && req.url === '/api/v1/trades/create?tradeAction=SUBMIT') {
-    let body = '';
-    req.on('data', (c) => (body += c));
-    req.on('end', () => {
+    return readBody((body) => {
       const field = (name) => (body.match(new RegExp('name="' + name + '"[^\\r\\n]*\\r\\n(?:[^\\r\\n]+\\r\\n)*\\r\\n([\\s\\S]*?)\\r\\n--')) || [])[1];
-      const t = JSON.parse(field('trade') || '{}');
-      if (!field('file')) return json(res, 400, { message: 'The trade data file is missing or empty' });
+      let t = JSON.parse(field('trade') || '{}');
+      if (t.basic) {
+        // The real request (what a case sends through the API): { basic: {...} } plus the file part "datFile"
+        const b = t.basic;
+        if (!field('datFile')) return json(res, 400, { message: 'Invalid dat file: empty or null bytes' });
+        if (typeof b.premiumAmount !== 'number') return json(res, 400, { message: 'premiumAmount must be a number' });
+        t = { counterparty: b.counterpartyName, portfolio: b.portfolioId, productId: b.productId, direction: b.direction,
+          fileName: (body.match(/name="datFile"; filename="([^"]*)"/) || [])[1], stepIn: null, oldCounterparty: '' };
+      } else if (!field('file')) {
+        // The simplified request of this mock's own New Trade page
+        return json(res, 400, { message: 'The trade data file is missing or empty' });
+      }
       if (!t.counterparty || !t.portfolio || !t.productId || !t.direction) return json(res, 400, { message: 'Basic mandatory info is incomplete' });
       if (t.fileName !== t.productId + '.dat') return json(res, 400, { message: `The uploaded file does not match product ${t.productId}` });
       if (t.stepIn !== null && (!t.stepIn || !t.oldCounterparty)) return json(res, 400, { message: 'StepIn info is incomplete' });
-      const id = 'TRD-' + Date.now() + Math.random().toString(16).slice(2, 10).toUpperCase();
-      TRADES[id] = { ...t, id, status: 'PARV' };
-      json(res, 200, { data: { trade: TRADES[id] } });
+      const stamp = Date.now() + Math.random().toString(16).slice(2, 10).toUpperCase();
+      const id = 'TRD-' + stamp, taskId = 'CHK-' + stamp;
+      TRADES[id] = { ...t, id, status: 'PARV', eventStatus: 'New' };
+      TASKS[taskId] = { tradeId: id, submittedBy: caller };
+      json(res, 200, { code: 200, status: 'PENDING APPROVAL', msg: 'Submitted for checker approval. TaskId: ' + taskId,
+        data: { checkerContext: { taskId, submittedBy: caller }, trade: TRADES[id] } });
     });
-    return;
   }
+  // Mock only: the real approval request is not known yet. Another user than the submitter approves the task
+  const approve = req.method === 'POST' && req.url.match(/^\/api\/v1\/mock\/tasks\/([^/]+)\/approve$/);
+  if (approve) {
+    const task = TASKS[approve[1]];
+    if (!task) return json(res, 404, { message: 'Task not found' });
+    if (task.submittedBy === caller) return json(res, 403, { message: 'A task cannot be approved by the user who submitted it' });
+    delete TASKS[approve[1]];
+    TRADES[task.tradeId].status = 'LIVE';
+    return json(res, 200, { code: 200, status: 'APPROVED', data: { trade: TRADES[task.tradeId] } });
+  }
+  // The path and method are the real ones; the body and the response are this mock's own
+  if (req.method === 'POST' && req.url === '/api/v1/trades/trigger-event') {
+    return readBody((body) => {
+      const e = JSON.parse(body || '{}'), t = TRADES[e.tradeId];
+      if (!t) return json(res, 404, { message: 'Trade not found' });
+      if (t.status !== 'LIVE') return json(res, 409, { message: 'Only a live trade can be cancelled' });
+      if (!e.reason || !e.comments) return json(res, 400, { message: 'Reason and comments are required' });
+      Object.assign(t, { status: 'PARV', eventStatus: 'Cancelled', cancelReason: e.reason, cancelComments: e.comments });
+      json(res, 200, { code: 200, status: 'PENDING APPROVAL', data: { trade: t } });
+    });
+  }
+  if (req.method === 'GET' && req.url === '/api/trades') return json(res, 200, { data: { trades: Object.values(TRADES).reverse() } });
   if (req.method === 'GET' && req.url.startsWith('/api/trades/')) {
     const t = TRADES[req.url.split('/').pop()];
     return t ? json(res, 200, { data: { trade: t } }) : json(res, 404, { message: 'Trade not found' });

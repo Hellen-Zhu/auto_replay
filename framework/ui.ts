@@ -48,6 +48,25 @@ export type TargetIn = { [K in keyof Target]: Target[K] | (Target[K] extends str
 /** Read a value from the response a click triggers; url is matched against the end of the request path */
 export type Capture = { url: string; method?: string; field: string; saveAs: string };
 
+/** One part of a multipart request: a JSON document, or a file shipped with the cases in data/ */
+export type ApiPart = { json: unknown } | { file: string };
+
+/**
+ * A call to the system's API. path is relative to apiBaseUrl of the local config, never a full address.
+ * A text anywhere inside headers, body or a JSON part may be a reference: cfg('accounts.maker.email') or a parameter.
+ * save names the fields of the JSON response to keep as variables: { createdTradeId: 'data.trade.id' }.
+ */
+export type ApiCall = {
+  method: string;
+  path: string;
+  headers?: Record<string, Val>;
+  /** JSON body; leave it out for a multipart request */
+  body?: unknown;
+  multipart?: Record<string, ApiPart>;
+  save?: Record<string, string>;
+  timeout?: number;
+};
+
 type Step = {
   title?: string;
   substep?: string;
@@ -59,7 +78,17 @@ type Step = {
   button?: 'right';
   exact?: boolean;
   secret?: boolean;
+  // api steps only
+  method?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  multipart?: Record<string, ApiPart>;
+  save?: Record<string, string>;
+  timeout?: number;
 };
+
+/** The fields of an api step that hold JSON whose texts may contain placeholders */
+const API_JSON = ['headers', 'body', 'multipart'] as const;
 
 export class UI {
   readonly steps: Step[] = [];
@@ -174,6 +203,27 @@ export class UI {
   expectUrl(urlPath: string) {
     return this.run({ action: 'expectUrl', value: urlPath });
   }
+  /**
+   * Call the system's API without the page, e.g. to prepare the trade a case works on. Returns the saved variables
+   * (name -> value); like a value from read(), a later use of one is recorded as ${var:name}.
+   * The request itself is recorded, so the PO's replay sends it again: every replay really creates the data.
+   */
+  async api(call: ApiCall): Promise<Record<string, string>> {
+    if (/^https?:\/\//i.test(call.path)) {
+      throw new Error(`An API call takes a path, not a full address (${call.method} ${call.path.replace(/^(https?:\/\/)[^/]+/i, '$1...')}): the address is apiBaseUrl in config.local.json`);
+    }
+    const json = <T>(v: T): T => mapTexts(v, (s) => s, (ref) => this.toPlaceholder(ref));
+    return this.run({
+      action: 'api',
+      method: call.method.toUpperCase(),
+      value: call.path,
+      ...(call.headers ? { headers: json(call.headers) as Record<string, string> } : {}),
+      ...(call.body !== undefined ? { body: json(call.body) } : {}),
+      ...(call.multipart ? { multipart: json(call.multipart) } : {}),
+      ...(call.save ? { save: call.save } : {}),
+      ...(call.timeout !== undefined ? { timeout: call.timeout } : {}),
+    });
+  }
 
   // ---------- Internals ----------
   private toPlaceholder(v: Val): string {
@@ -212,21 +262,24 @@ export class UI {
       }).join('');
     };
     const target = step.target ? Object.fromEntries(Object.entries(step.target).map(([k, v]) => [k, typeof v === 'string' ? swap(v) : v])) : undefined;
-    return { ...step, value: swap(step.value), target: target as Target };
+    const out: Step = { ...step, value: swap(step.value), target: target as Target };
+    // The request of an api step too, e.g. the task ID an earlier call returned, inside a body
+    for (const k of API_JSON) if (step[k] !== undefined) (out as Record<string, unknown>)[k] = mapTexts(step[k], (s) => swap(s) as string);
+    return out;
   }
 
   /** Safety net: if someone hard-codes a password in test code, it is replaced with a config reference when recorded */
   private stripSecrets(step: Step): Step {
-    if (typeof step.value !== 'string') return step;
-    let value = step.value;
-    let hit = false;
-    for (const [p, secret] of secretEntries(this.config) as [string, string][]) {
-      if (value.includes(secret)) {
-        value = value.split(secret).join('${cfg:' + p + '}');
-        hit = true;
-      }
+    const secrets = secretEntries(this.config) as [string, string][];
+    const strip = (s: string) => secrets.reduce((text, [p, secret]) => text.split(secret).join('${cfg:' + p + '}'), s);
+    const out: Step = { ...step };
+    // The request of an api step: once it is a config reference it is shown by its name, so no mask is needed
+    for (const k of API_JSON) if (step[k] !== undefined) (out as Record<string, unknown>)[k] = mapTexts(step[k], strip);
+    if (typeof step.value === 'string' && strip(step.value) !== step.value) {
+      out.value = strip(step.value);
+      out.secret = true;
     }
-    return hit ? { ...step, value, secret: true } : step;
+    return out;
   }
 
   exportCase(file: string, meta: { name: string; description?: string; source: string }) {
@@ -235,8 +288,8 @@ export class UI {
     const caseDoc = {
       // A case is written in the lowest version that can express it, so that an older runner still runs what it can
       // and refuses the rest: 2 adds the params block; 3 adds hasText in a target and button on a click, which a
-      // version 2 runner would ignore without a word (any row, a normal click)
-      formatVersion: this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
+      // version 2 runner would ignore without a word (any row, a normal click); 4 adds the api action
+      formatVersion: this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,
@@ -259,9 +312,31 @@ function gitVersion(): string {
   }
 }
 
-/** Every text of the steps that may hold a placeholder: values and the text fields of targets */
+const isRef = (v: unknown): v is Ref => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  const keys = Object.keys(v);
+  return keys.length === 1 && (keys[0] === 'cfg' || keys[0] === 'param') && typeof (v as Record<string, unknown>)[keys[0]] === 'string';
+};
+
+/** Rewrite every text inside a JSON value. With ref, a reference (cfg(...), a parameter) found there becomes the text ref returns */
+function mapTexts<T>(value: T, text: (s: string) => string, ref?: (r: Ref) => string): T {
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') return text(v);
+    if (ref && isRef(v)) return ref(v);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(value) as T;
+}
+
+/** Every text of the steps that may hold a placeholder: values, the text fields of targets and the request of an api step */
 function stepTexts(steps: Step[]): string[] {
-  return steps.flatMap((s) => [s.value, ...Object.values(s.target ?? {})].filter((v) => typeof v === 'string') as string[]);
+  return steps.flatMap((s) => {
+    const texts = [s.value, ...Object.values(s.target ?? {})].filter((v) => typeof v === 'string') as string[];
+    for (const k of API_JSON) mapTexts(s[k], (t) => (texts.push(t), t));
+    return texts;
+  });
 }
 
 /** The case data the steps really use, in the order of first use; this becomes the params block of the case file */
@@ -274,6 +349,8 @@ function usedParams(steps: Step[], values: Record<string, string>): Record<strin
 /** List the local config entries a case needs; the runner uses this to prompt the PO for missing ones */
 function requiredConfig(steps: Step[], params: Record<string, string>): string[] {
   const set = new Set<string>();
+  // An api step is sent to the API's own address, which is local config like the pages' address
+  if (steps.some((s) => s.action === 'api')) set.add('apiBaseUrl');
   // Case data may point at local config too
   for (const t of [...stepTexts(steps), ...Object.values(params)]) for (const m of t.matchAll(/\$\{cfg:([^}]+)\}/g)) set.add(m[1]);
   return [...set];
