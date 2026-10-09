@@ -281,12 +281,16 @@ The two projects have the same layers, so the skill translates level by level:
 | Feature step | The case's step, with the same text |
 | FLOW snippet | Flow method; its lines become the substeps |
 | PAGE / COMPONENT snippet, built-in or Java step | Atomic operation of a page / component |
+| Java step that prepares data through the API (`... is provisioned via playwright api`) | One operation per request in an API object (`framework/api/`), composed by a method of `flows.tradeProvisioning` |
+| Request template in the test data yml (`REQ-TPL-...`) | The payload's interface in the API object; its values in `testdata/` |
 | Element key | `element('<same key>')`, after `npm run sync:elements` |
 | Stored variable | `testdata/`, or the value a flow returns (a captured trade ID) |
 
 - It syncs `elements/` first, reuses the flows and operations that exist, and ends with a report per case ID: ported and passed, ported but not run, or not ported and why.
-- It stops instead of guessing: a step that is neither a browser action nor an API call whose request is fully known (a database check, a file check), an element that is not defined or not found by testid, or a control this project cannot operate yet leaves the whole scenario unported, with what is needed. It never invents an element name, a testid, a data value or an API request.
-- It does not commit. Review the changes, run the cases against UAT (every run books real trades) and commit them yourself.
+- For a step that prepares data through the API it reads the Java code instead of the page: the step's method and its helpers, the call that sends each request (method, path, who sends it, the multipart parts), the request template the test data yml holds for it, and the response fields the code stores. Each request then becomes a `static` request and one operation of an API object, in the style of "QA: preparing data through the API"; the template's values go to `testdata/`. The report lists every request it read and every part it had to conclude rather than read.
+- It stops instead of guessing: a step that is neither a browser action nor an API call whose request is fully readable (a database check, a file check, a request built inside a library), an API call or a response check in a `When` / `Then`, a payload value the Java code computes at run time, an element that is not defined or not found by testid, or a control this project cannot operate yet leaves the whole scenario unported, with what is needed. It never invents an element name, a testid, a data value or any part of an API request.
+- It does not commit. Review the changes, run the cases against UAT (every run books real trades, through the API too) and commit them yourself.
+- Two complete traces are next to the skill: `example-trade-creation.md` (browser only) and `example-trade-cancellation.md` (a trade prepared through the API, then the browser).
 
 ## Packaging for the PO
 
