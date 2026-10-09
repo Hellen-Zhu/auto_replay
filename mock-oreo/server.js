@@ -20,7 +20,11 @@
 //   the checker's approve / reject of a task (path, JSON body, { code, status: 'SUCCESS', data: <the trade> } in the
 //   response) are like the real ones, and so is the status LIVE of an approved trade in the blotter. The body of
 //   trigger-event, the status REJECTED and the rule that the submitter cannot decide on the own task are this mock's
-//   own. So is the rule that a cancellation needs comments (the real dialog marks them optional): it is there so
+//   own. The two risk calculation requests (POST trades/<id>/calculate-risk before a cancellation, POST
+//   trades/calculate-risk-for-new before a new trade is booked) have the real paths; that the page sends them
+//   without a body, what it does with the answer and the answer itself are this mock's own. Started with
+//   MOCK_RISK_ENGINE=down the mock answers them with 503, like a risk engine that is not available: a case then
+//   passes only with riskEngine "mock" in the local config. So is the rule that a cancellation needs comments (the real dialog marks them optional): it is there so
 //   that a case whose comments did not reach the control fails.
 
 const http = require('http');
@@ -236,11 +240,13 @@ function toast(type, title, description) {
   setTimeout(() => li.remove(), 5000);
 }
 
-cancelEntry.addEventListener('click', () => {
+cancelEntry.addEventListener('click', async () => {
   menu.hidden = true;
   reason.reset(); comments.value = ''; err.textContent = '';
-  // simulate the risk calculation that runs before the confirmation dialog
-  setTimeout(() => { dialog.hidden = false; }, 400);
+  // the risk calculation runs before the confirmation dialog: without its answer the dialog does not open
+  const r = await api('/api/v1/trades/' + current.id + '/calculate-risk', { method: 'POST' });
+  if (!r.ok) { toast('error', 'Error', 'Risk calculation failed'); return; }
+  dialog.hidden = false;
 });
 $('trade-change-confirm-btn').addEventListener('click', async () => {
   const r = await api('/api/v1/trades/trigger-event', { method: 'POST',
@@ -297,13 +303,16 @@ function collect() {
     oldCounterparty: stepIn ? $('create-trade-old-counterparty-combobox').value : '',
   };
 }
-$('create-trade-book-btn').addEventListener('click', () => {
+$('create-trade-book-btn').addEventListener('click', async () => {
   const t = collect();
   const missing = ['counterparty', 'portfolio', 'productId', 'direction', 'fileName'].filter((k) => !t[k]);
   if (t.stepIn !== null) { if (!t.stepIn) missing.push('stepIn type'); if (!t.oldCounterparty) missing.push('oldCounterparty'); }
   err.textContent = missing.length ? 'Missing: ' + missing.join(', ') : '';
-  // simulate the risk calculation that runs before the confirmation dialog
-  if (!missing.length) setTimeout(() => { dialog.hidden = false; }, 400);
+  if (missing.length) return;
+  // the risk calculation runs before the confirmation dialog: without its answer the dialog does not open
+  const r = await fetch('/api/v1/trades/calculate-risk-for-new', { method: 'POST', headers: { 'X-User-Id': sessionStorage.getItem('userEmail') } });
+  if (!r.ok) { err.textContent = 'Risk calculation failed'; return; }
+  dialog.hidden = false;
 });
 $('trade-change-confirm-btn').addEventListener('click', async () => {
   // like the real system: multipart/form-data that carries the uploaded file itself
@@ -381,6 +390,12 @@ http.createServer((req, res) => {
       json(res, 200, { code: 200, status: 'PENDING APPROVAL', msg: 'Submitted for checker approval. TaskId: ' + taskId,
         data: { checkerContext: { taskId, submittedBy: caller }, trade: TRADES[id] } });
     });
+  }
+  // The risk calculation before a new trade is booked or an event is triggered: slow, and not always available
+  if (req.method === 'POST' && /^\/api\/v1\/trades\/(calculate-risk-for-new|[^/]+\/calculate-risk)$/.test(req.url)) {
+    return setTimeout(() => (process.env.MOCK_RISK_ENGINE === 'down'
+      ? json(res, 503, { code: 503, status: 'ERROR', msg: 'Risk engine is not available' })
+      : json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: { calculationTimestamp: new Date().toISOString(), pnl: -1, riskEngine: 'mock-oreo' } })), 400);
   }
   // The checker decides on a task: approve makes the trade live, reject does not. The request has a JSON body
   const decide = req.method === 'POST' && req.url.match(/^\/api\/v1\/checker\/tasks\/([^/]+)\/(approve|reject)$/);

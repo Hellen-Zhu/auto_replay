@@ -67,6 +67,10 @@ npm run replay                         # replay with the runner, exactly what th
 
 Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/trade-cancellation.spec.ts` exports to `cases/trade-cancellation/<case ID>.json`, the same name as its test data file. Nothing has to be set up for a new spec: its folder is created by the first export. The runner shows these folders to the PO instead of one long list (see "PO: how to use it").
 
+`riskEngine` decides what happens to the third-party risk calculation the system calls when a trade is booked or an event is triggered on one: `"real"` (default) waits for its answer, up to `timeouts.response` (60 s by default); `"mock"` answers it in the browser with a fixed success, so a case does not fail because the risk engine is slow or down. The exported case file is the same either way: the PO chooses the mode in their own settings, and a run with `"mock"` says so on the screen and in its report.
+
+> To see what `riskEngine` does on the mock: `MOCK_RISK_ENGINE=down npm run mock` (PowerShell: `$env:MOCK_RISK_ENGINE='down'; npm run mock`) makes the mock's risk calculation fail; the cases then fail with `"real"` and pass with `"mock"`.
+
 > To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173`, `apiBaseUrl` to `http://localhost:4173/api/v1` and the maker password to `maker1`. The values in `testdata/` are those of the real system; the mock offers them too. The mock's header comment says which of its testids are real and which are only its own guess.
 
 ### Trade creation cases
@@ -228,6 +232,7 @@ Key points:
 - In a page or component, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
 - Text fields of a target can be a parameter or a config reference too: `{ role: 'menuitem', name: p.direction }`.
 - A target can be narrowed by the text it contains: `{ ...blotter, inner: 'role=row', hasText: tradeId, nth: 0 }` is the first row of the blotter that shows that trade ID (`inner`, then `hasText`, then `nth`). `hasText` matches a part of the text, so the ID `T12` also finds the row of `T123`: search for the trade first.
+- `ui.clickAndAwait(target, request)` clicks and waits until the request the click triggers is answered (the risk calculation: `RiskCalculation.forNewTrade()` / `RiskCalculation.forTrade(tradeId)` in `framework/risk-engine.ts`); with `"riskEngine": "mock"` in the local config the request is answered by the test itself instead of the system.
 - `ui.rightClick(target)` clicks with the right mouse button, which opens a context menu such as the action menu of a blotter row.
 - Only **passing** cases are exported.
 
@@ -332,6 +337,7 @@ A case file is written in the lowest format version that can express it, and a r
    - In a very small window the runner shows a plain numbered list instead: type the number of a folder, then the number of the case (plain Enter = number 1, `B` goes back, any other text is a search). If the keyboard list does not look right on a computer, set the environment variable `OREO_PLAIN_MENU=1` before starting the bat to always get the numbered list.
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account (a password that no longer matches is then asked for again, and the current one can be typed again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
    If the case comes with **case data** (counterparty, portfolio...), it is listed there too. Type `D` to change a value for this run, e.g. to book against another counterparty; `CD` changes both settings and data. The case file itself is not modified, and the report shows the data the run used and marks what was changed.
+   A case that books a trade or triggers an event lists **riskEngine** there: `real` waits for the system's risk calculation, `mock` answers it without the risk engine (type `C` to change it). The report says when a run used `mock`.
    A case that prepares its data through the API also needs the **API address** (`apiBaseUrl`, with its path prefix such as `/api/v1`); it is shown, asked for and saved like the system address.
    The case starts as soon as this prompt is answered. (Not mentioned on the screen: typing `S` at this prompt runs the case **step by step**, stopping before each Given / When / Then block until Enter is pressed.)
 4. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail. **Ctrl+C** stops the run and closes the window.
@@ -380,5 +386,6 @@ Notes:
 - The company must allow running `node.exe` and `.bat` from a shared drive or an unzipped folder; test on one PO machine first.
 - The login page path defaults to `/`; if the real login page is elsewhere, change `LoginPage.path` in `framework/pages/login.page.ts`.
 - A replay really operates in UAT (real bookings, real approvals); make sure the environment can take repeated runs. A case with API steps creates a new trade on every replay.
+- The risk engine mode (`riskEngine`: `real` / `mock`) was verified on the mock only. With `mock` the risk calculation is not sent at all, so such a run does not prove the risk engine works; the report says so. Case files that wait for the calculation are format version 5 and need a runner package built from this version.
 - An API step has no screenshot: the report shows the call and the values it saved (e.g. the new trade ID), and the following steps show the result in the browser.
 - API calls are sent from Node, not from Edge, so they do not use the certificates Windows trusts. If the API address is `https` with a company certificate and the call fails with a certificate error, tell QA: this is not handled yet.

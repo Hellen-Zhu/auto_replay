@@ -1,5 +1,6 @@
 import type { TargetIn, Val } from '../ui';
 import { element, INNER_INPUT } from '../elements';
+import { RiskCalculation } from '../risk-engine';
 import { TradeChangeConfirmation } from '../components/trade-change-confirmation';
 import { BasePage } from './base.page';
 
@@ -47,8 +48,9 @@ export class TradesPage extends BasePage {
     await this.ui.expectVisible(this.cancelAction);
   }
 
-  async clickCancelAction() {
-    await this.ui.click(this.cancelAction);
+  /** The cancel entry starts the risk calculation of the trade; the click is over once it is answered */
+  async clickCancelAction(tradeId: string) {
+    await this.ui.clickAndAwait(this.cancelAction, RiskCalculation.forTrade(tradeId));
   }
 
   /** The trade's row shows this text (e.g. a status) in one of its columns */

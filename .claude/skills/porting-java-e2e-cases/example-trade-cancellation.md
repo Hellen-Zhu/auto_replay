@@ -186,7 +186,7 @@ When perform cancellation for the trade from trade portal
                                                         substep "I choose Cancel from the action menu"
       assert that 'trade_portal.row_action_cancel' ...    trades.expectCancelActionVisible()
   trigger cancellation for trade using configured risk engine mode ... [Java]
-                                                          trades.clickCancelAction()
+                                                          trades.clickCancelAction(tradeId)
   component trade change confirmation dialog is visible   trades.confirmDialog.expectVisible()
   component ... selects reason option 'DEALER_ERROR'    substep "I select the cancellation reason and type the comments"
       click 'trade_change_confirmation.reason_select'

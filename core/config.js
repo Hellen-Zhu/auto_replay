@@ -8,6 +8,9 @@ const DEFAULTS = {
   baseUrl: '',
   apiBaseUrl: '', // address of the API, which may differ from the pages' address; only cases with api steps need it
   accounts: {},
+  // The third-party risk calculation an event triggers: 'real' waits for its answer, 'mock' answers it in the browser
+  // with a fixed success, so a case does not depend on the risk engine being up
+  riskEngine: 'real',
   browser: {
     channel: 'msedge', // use the Edge already on the computer; "chrome" also works, or "" together with executablePath
     executablePath: '',
@@ -15,7 +18,8 @@ const DEFAULTS = {
     headless: false,
     slowMo: 300, // slow every step by 300ms so the PO can follow along
   },
-  timeouts: { step: 15000 },
+  // response: how long a click waits for the answer of a request it is known to trigger (a risk calculation is slow)
+  timeouts: { step: 15000, response: 60000 },
   evidence: { video: false }, // video needs Playwright's ffmpeg (usually not installable on the intranet); set to true in config.local.json when needed
 };
 

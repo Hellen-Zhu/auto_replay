@@ -57,7 +57,7 @@ A line that matches no entry and is not a recognizable built-in step, or matches
 
 ## Built-in Genie steps
 
-Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAndCapture`, `upload`, `press`, `read`, `expectVisible`, `expectText`, `expectUrl` for the page, plus `api` for a request to the system's API, and nothing else.
+Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAndCapture`, `clickAndAwait`, `upload`, `press`, `read`, `expectVisible`, `expectText`, `expectUrl` for the page, plus `api` for a request to the system's API, and nothing else.
 
 | Genie step | Here |
 |---|---|
@@ -78,11 +78,11 @@ A built-in step that is not in this table is ported only when its wording maps o
 | Java step | Here |
 |---|---|
 | `upload '<P>' dat file` | `newTrade.uploadDat(datFile(product))` |
-| `click save / book using configured risk engine mode for new trade creation` | `newTrade.clickSave()` / `newTrade.clickBook()`, no extra waits |
+| `click save / book using configured risk engine mode for new trade creation` | `newTrade.clickSave()` / `newTrade.clickBook()`. The mode is not ported as code: these operations click with `ui.clickAndAwait(<element>, RiskCalculation.forNewTrade())` (`framework/risk-engine.ts`), and `riskEngine` of the local config (`real` / `mock`) decides at run time whether the calculation is sent or mocked |
 | `confirm new trade creation and capture response as '<x>'` + `store e2e response field '<field>' from stored variable '<x>' as '<name>'` | `newTrade.confirmDialog.confirmAndCapture({ ...NewTradePage.createApi, saveAs: '<name>' })` |
 | `search for trade stored as '<name>' in blotter` | `trades.searchTrade(tradeId)` |
 | `open action menu item for new today blotter from stored variable '<name>'` | `trades.openActionMenu(tradeId)`: a right-click on the trade's row. Both together, as in `page trade portal searches and opens action menu for trade stored as '<name>'`: `flows.trades.openActionMenu(tradeId)` |
-| `trigger cancellation for trade using configured risk engine mode from trade portal for trade stored as '<name>'` | `trades.clickCancelAction()`, then `trades.confirmDialog.expectVisible()` |
+| `trigger cancellation for trade using configured risk engine mode from trade portal for trade stored as '<name>'` | `trades.clickCancelAction(tradeId)` (`ui.clickAndAwait` with `RiskCalculation.forTrade(tradeId)`), then `trades.confirmDialog.expectVisible()`. Another `... using configured risk engine mode ...` step: read the path of its calculation (`tradeRiskCalculationUrl(...)` or the like) and the test data key of its mocked answer from the Java method; a path that is not `/trades/<tradeId>/calculate-risk` or another answer becomes a new entry of `RiskCalculation`, and one that cannot be read completely stops the scenario |
 | `confirm cancel trade and wait for page ready` (clicks `trade_change_confirmation.confirm_btn` and waits for the answer of `POST /trades/trigger-event`) | `trades.confirmDialog.confirm()`: a plain click, nothing is read from the answer |
 | `assert toast notification with type '<type>' and message '<text>'` | `app.toast.expectMessage(Toast.message.<name>)`, the text as a `static` of `Toast`. The type is not checked: "to verify" |
 | `blotter row '<el>' index 0 column '<column>' is '<value>'` | `trades.expectRowShows(tradeId, <value>)`, the value as a `static` of `TradesPage`. The row contains the text, which is weaker than the Java check of one column (its implementation was not seen): "to verify" |

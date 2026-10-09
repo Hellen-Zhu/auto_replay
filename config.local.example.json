@@ -1,6 +1,7 @@
 {
   "baseUrl": "https://oreo-uat.example.internal:8088",
   "apiBaseUrl": "https://oreo-uat-api.example.internal/api/v1",
+  "riskEngine": "real",
   "accounts": {
     "maker": {
       "email": "maker@test.com",
@@ -19,7 +20,8 @@
     "slowMo": 300
   },
   "timeouts": {
-    "step": 15000
+    "step": 15000,
+    "response": 60000
   },
   "evidence": {
     "video": false

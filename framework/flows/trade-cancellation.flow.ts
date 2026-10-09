@@ -25,7 +25,7 @@ export class TradeCancellationFlow extends BaseFlow {
     await this.tradesFlow.openActionMenu(tradeId);
     await this.ui.And('I choose Cancel from the action menu', async () => {
       await trades.expectCancelActionVisible();
-      await trades.clickCancelAction();
+      await trades.clickCancelAction(tradeId);
       await trades.confirmDialog.expectVisible();
     });
     await this.ui.And('I select the cancellation reason and type the comments', async () => {

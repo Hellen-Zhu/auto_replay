@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { chromium } = require('@playwright/test');
-const { FORMAT_VERSION, executeStep, savedValues, describeStep, showPlaceholders, resolveDataFile, dataFilesOf } = require('../core/actions');
+const { FORMAT_VERSION, executeStep, savedValues, describeStep, showPlaceholders, resolveDataFile, dataFilesOf, isMocked } = require('../core/actions');
 const { loadConfig, launchOptions, secretEntries } = require('../core/config');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -612,6 +612,7 @@ function writeReport(dir, run) {
 <h1><span class="kw">Scenario:</span> ${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
 ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
 <div class="meta">${summary} · Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''} · Case source: ${esc(run.source)} · Version: ${esc(run.codeVersion)}</div>
+${run.mocked && run.mocked.length ? `<p class="desc changed">Note: ${esc(run.mocked.join(', '))} was set to "mock" for this run: its requests were answered by the runner, not by the system.</p>` : ''}
 ${caseData}${runValues}<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
 <p class="meta">Full replay: <a href="${esc(run.traceUrl)}">Open trace viewer</a><br>
@@ -913,6 +914,12 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
     traceUrl: traceUrl(config, path.basename(dir)),
     ...(caseData.length ? { caseData } : {}),
   };
+  // A run whose requests were answered by a mock (riskEngine: "mock") must say so, on the screen and in the report
+  const mocked = [...new Set(doc.steps.filter((s) => isMocked(s, config)).map((s) => s.request.setting))];
+  if (mocked.length) {
+    run.mocked = mocked;
+    say(`  NOTE: ${mocked.join(', ')} is "mock": its requests are answered by this runner, not by the system.`);
+  }
   const t0 = Date.now();
 
   const viewport = { width: 1280, height: 720 };
@@ -975,7 +982,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
     let failed = false;
     for (let i = 0; i < doc.steps.length; i++) {
       const step = doc.steps[i];
-      const desc = describeStep(step, ctx.vars, ctx.params);
+      const desc = describeStep(step, ctx.vars, ctx.params, config);
       const rec = { title: step.title, desc, status: 'skipped' };
       if (step.substep) rec.substep = step.substep;
       run.steps.push(rec);

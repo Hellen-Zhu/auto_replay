@@ -1,5 +1,6 @@
 import type { Val } from '../ui';
 import { element } from '../elements';
+import { RiskCalculation } from '../risk-engine';
 import { BasePage } from './base.page';
 import { Combobox } from '../components/combobox';
 import { ConfirmDialog } from '../components/confirm-dialog';
@@ -89,11 +90,12 @@ export class NewTradePage extends BasePage {
     await this.ui.click(this.stepinPartialRadio);
   }
 
+  // Save and Book start the risk calculation of the new trade; the click is over once it is answered
   async clickBook() {
-    await this.ui.click(this.bookBtn);
+    await this.ui.clickAndAwait(this.bookBtn, RiskCalculation.forNewTrade());
   }
 
   async clickSave() {
-    await this.ui.click(this.saveBtn);
+    await this.ui.clickAndAwait(this.saveBtn, RiskCalculation.forNewTrade());
   }
 }

@@ -7,8 +7,8 @@ const path = require('path');
 const { expect } = require('@playwright/test');
 
 // Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name};
-// 3 = adds hasText in a target and button on a click; 4 = adds the api action
-const FORMAT_VERSION = 4;
+// 3 = adds hasText in a target and button on a click; 4 = adds the api action; 5 = adds request on a click
+const FORMAT_VERSION = 5;
 
 /**
  * Turn a target description from the JSON into a Playwright Locator.
@@ -133,6 +133,72 @@ function resolveDataFile(rootDir, rel) {
   return file;
 }
 
+/** Does a request address end with this path? A query in the path must be on the request too, with the same values */
+function urlMatcher(pathAndQuery) {
+  const [wantPath, wantQuery = ''] = String(pathAndQuery).split('?');
+  const wantParams = [...new URLSearchParams(wantQuery)];
+  return (url) => url.pathname.replace(/\/+$/, '').endsWith(wantPath.replace(/\/+$/, ''))
+    && wantParams.every(([k, v]) => url.searchParams.get(k) === v);
+}
+
+/**
+ * Is the request of this click answered by the runner instead of the system? Only when the step names a local
+ * setting (request.setting, e.g. riskEngine) and that setting is 'mock'. Any other value than 'real' is refused.
+ */
+function isMocked(step, config) {
+  const req = step && step.request;
+  if (!req || !req.setting || !req.mock) return false;
+  const mode = String(getPath(config, req.setting) ?? 'real').trim().toLowerCase() || 'real';
+  if (mode !== 'mock' && mode !== 'real') throw new Error(`${req.setting} in config.local.json must be "real" or "mock", not "${mode}"`);
+  return mode === 'mock';
+}
+
+/**
+ * Click and wait for the answer of a request the click triggers, e.g. the risk calculation that runs before a
+ * confirmation dialog opens:
+ *   request: { url: '/trades/${var:createdTradeId}/calculate-risk', method: 'POST', setting: 'riskEngine',
+ *              mock: { status: 200, body: { ... } } }
+ * url is matched like the one of capture. The request is sent by the page and answered by the system, unless the
+ * local setting named by setting is 'mock': then it never leaves the browser and is answered with mock.
+ * Either way the step is over only once the answer is there; any answer other than 2xx fails it.
+ */
+async function clickAndAwait(page, loc, step, ctx, timeout) {
+  const req = step.request;
+  const method = String(req.method || 'GET').toUpperCase();
+  const urlPath = await resolveValue(String(req.url), ctx);
+  const what = `${method} ...${urlPath}`;
+  const isMatch = urlMatcher(urlPath);
+  const wait = step.timeout ?? ctx.config?.timeouts?.response ?? 60000;
+  const mocked = isMocked(step, ctx.config);
+  const answered = page.waitForResponse((r) => r.request().method() === method && isMatch(new URL(r.url())), { timeout: wait });
+  answered.catch(() => {}); // reported below; without this a failed click would leave an unhandled rejection
+  const route = async (r) => {
+    const request = r.request();
+    if (request.method() !== method) return r.fallback();
+    const origin = await request.headerValue('origin');
+    await r.fulfill({
+      status: req.mock.status || 200,
+      contentType: 'application/json',
+      // the API is on another origin than the pages: the browser only hands the answer to the page with these
+      headers: origin ? { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true' } : {},
+      body: JSON.stringify(await resolveDeep(req.mock.body ?? {}, ctx)),
+    });
+  };
+  if (mocked) await page.route(isMatch, route);
+  let res;
+  try {
+    await loc.click({ timeout, button: step.button });
+    try { res = await answered; }
+    catch { throw new Error(`No ${what} was answered within ${wait} ms after the click${mocked ? '' : ` (timeouts.response in config.local.json; "${req.setting || 'the request'}": "mock" answers it without the system)`}`); }
+  } finally {
+    if (mocked) await page.unroute(isMatch, route).catch(() => {});
+  }
+  if (!res.ok()) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${what} returned HTTP ${res.status()}${text ? ': ' + text.slice(0, 300) : ''}${req.setting && req.mock && !mocked ? ` (set "${req.setting}": "mock" in config.local.json to run without it)` : ''}`);
+  }
+}
+
 /**
  * Click and read a value out of the response the click triggers, e.g. the ID of the trade that was just created:
  *   capture: { url: '/trades', method: 'POST', field: 'data.trade.id', saveAs: 'createdTradeId' }
@@ -142,10 +208,8 @@ function resolveDataFile(rootDir, rel) {
 async function clickAndCapture(page, loc, capture, ctx, timeout, button) {
   const method = capture.method ? String(capture.method).toUpperCase() : '';
   const what = `${method || 'request'} ...${capture.url}`;
-  const [wantPath, wantQuery = ''] = String(capture.url).split('?');
-  const wantParams = [...new URLSearchParams(wantQuery)];
-  const isMatch = (url) => url.pathname.replace(/\/+$/, '').endsWith(wantPath.replace(/\/+$/, ''))
-    && wantParams.every(([k, v]) => url.searchParams.get(k) === v);
+  const wantPath = String(capture.url).split('?')[0];
+  const isMatch = urlMatcher(capture.url);
   // The response is paused in the browser (CDP Fetch domain, response stage), read, then released to the page:
   // - page.route + route.fetch() would re-send the request without the file of a multipart upload (the browser
   //   does not expose it), so the server receives a trade with an empty file;
@@ -299,6 +363,8 @@ async function executeStep(page, step, ctx) {
       return;
     case 'click':
       // button: 'right' opens a context menu, e.g. the action menu of a blotter row; without it, a normal click
+      if (step.request && step.capture) throw new Error('A click cannot have both request and capture');
+      if (step.request) return clickAndAwait(page, resolveTarget(page, step.target), step, ctx, timeout);
       if (step.capture) return clickAndCapture(page, resolveTarget(page, step.target), step.capture, ctx, timeout, step.button);
       await resolveTarget(page, step.target).click({ timeout, button: step.button });
       return;
@@ -363,9 +429,9 @@ function savedValues(step, result) {
 
 /**
  * One-line readable description of a step, used in logs and reports; pass the variables read so far and
- * the case data (params) to show their values
+ * the case data (params) to show their values, and the local config to say that a request is answered by a mock
  */
-function describeStep(step, vars, params) {
+function describeStep(step, vars, params, config) {
   const t = describeTarget(step.target, vars, params);
   const v = step.secret ? '******' : typeof step.value === 'string' ? showPlaceholders(step.value, vars, params) : step.value;
   switch (step.action) {
@@ -373,6 +439,10 @@ function describeStep(step, vars, params) {
     case 'fill': return `Type ${v} into ${t}`;
     case 'click': {
       const click = step.button === 'right' ? 'Right-click' : 'Click';
+      if (step.request) {
+        return `${click} ${t} and wait for the answer of ${String(step.request.method || 'GET').toUpperCase()} ${showPlaceholders(step.request.url, vars, params)}`
+          + (config && isMocked(step, config) ? ` (MOCKED: ${step.request.setting} is "mock")` : '');
+      }
       return step.capture ? `${click} ${t} and save ${step.capture.field} from the response as ${step.capture.saveAs}` : `${click} ${t}`;
     }
     case 'upload': return `Upload file ${v} to ${t}`;
@@ -398,5 +468,5 @@ function describeStep(step, vars, params) {
 }
 
 module.exports = {
-  FORMAT_VERSION, resolveDataFile, dataFilesOf, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath,
+  FORMAT_VERSION, resolveDataFile, dataFilesOf, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath, isMocked,
 };

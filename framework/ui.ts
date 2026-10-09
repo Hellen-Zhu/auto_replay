@@ -49,6 +49,13 @@ export type TargetIn = { [K in keyof Target]: Target[K] | (Target[K] extends str
 /** Read a value from the response a click triggers; url is matched against the end of the request path */
 export type Capture = { url: string; method?: string; field: string; saveAs: string };
 
+/**
+ * A request a click is known to trigger and whose answer the step waits for, e.g. a risk calculation. url is matched
+ * against the end of the request path. With setting (the name of a local config entry, e.g. 'riskEngine') and mock,
+ * the request is answered by mock instead of the system when that entry is 'mock'.
+ */
+export type AwaitedRequest = { url: string; method?: string; setting?: string; mock?: { status?: number; body: unknown } };
+
 /** One part of a multipart request: a JSON document, or a file shipped with the cases in data/ */
 export type ApiPart = { json: unknown } | { file: string };
 
@@ -77,6 +84,7 @@ type Step = {
   value?: string;
   saveAs?: string;
   capture?: Capture;
+  request?: AwaitedRequest;
   button?: 'right';
   exact?: boolean;
   secret?: boolean;
@@ -89,8 +97,8 @@ type Step = {
   timeout?: number;
 };
 
-/** The fields of an api step that hold JSON whose texts may contain placeholders */
-const API_JSON = ['headers', 'body', 'multipart'] as const;
+/** The fields that hold JSON whose texts may contain placeholders: the request of an api step, the request a click waits for */
+const API_JSON = ['headers', 'body', 'multipart', 'request'] as const;
 
 export class UI {
   readonly steps: Step[] = [];
@@ -173,6 +181,13 @@ export class UI {
   }
   click(target: TargetIn) {
     return this.run({ action: 'click', target: this.toTarget(target) });
+  }
+  /**
+   * Click and wait for the answer of a request the click triggers (e.g. the risk calculation before a confirmation
+   * dialog). A trade ID in its url that an earlier step produced is recorded as ${var:name}.
+   */
+  clickAndAwait(target: TargetIn, request: AwaitedRequest) {
+    return this.run({ action: 'click', target: this.toTarget(target), request });
   }
   /** Click with the right mouse button, which opens a context menu such as the action menu of a blotter row */
   rightClick(target: TargetIn) {
@@ -298,8 +313,9 @@ export class UI {
     const caseDoc = {
       // A case is written in the lowest version that can express it, so that an older runner still runs what it can
       // and refuses the rest: 2 adds the params block; 3 adds hasText in a target and button on a click, which a
-      // version 2 runner would ignore without a word (any row, a normal click); 4 adds the api action
-      formatVersion: this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
+      // version 2 runner would ignore without a word (any row, a normal click); 4 adds the api action; 5 adds the
+      // request a click waits for (an older runner would click and never mock it)
+      formatVersion: this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,
@@ -363,5 +379,7 @@ function requiredConfig(steps: Step[], params: Record<string, string>): string[]
   if (steps.some((s) => s.action === 'api')) set.add('apiBaseUrl');
   // Case data may point at local config too
   for (const t of [...stepTexts(steps), ...Object.values(params)]) for (const m of t.matchAll(/\$\{cfg:([^}]+)\}/g)) set.add(m[1]);
+  // A request that can be mocked is switched by a local setting, which the runner then shows and lets the PO change
+  for (const s of steps) if (s.request?.setting) set.add(s.request.setting);
   return [...set];
 }
