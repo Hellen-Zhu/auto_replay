@@ -386,7 +386,7 @@ Notes:
 - The PO's computer needs Edge (default) or Chrome (set `browser.channel` to `"chrome"`).
 - The keyboard-operated case list and running several cases at the same time were verified on macOS against the mock only. Still to check on a PO computer: how the list is drawn in the Windows console (fallback: `OREO_PLAIN_MENU=1`), and whether the real system accepts one account logged in from several browsers at once.
 - The company must allow running `node.exe` and `.bat` from a shared drive or an unzipped folder; test on one PO machine first.
-- The login page path defaults to `/`; if the real login page is elsewhere, change `LoginPage.path` in `framework/pages/login.page.ts`.
+- The login page path is `/login` (`LoginPage.path` in `framework/pages/login.page.ts`). The root `/` is not used: for a user who is signed in it opens the trade portal.
 - A replay really operates in UAT (real bookings, real approvals); make sure the environment can take repeated runs. A case with API steps creates a new trade on every replay.
 - The risk engine mode (`riskEngine`: `real` / `mock`) was verified on the mock only. With `mock` the risk calculation is not sent at all, so such a run does not prove the risk engine works; the report says so. Case files that wait for the calculation are format version 5 and need a runner package built from this version.
 - An API step has no screenshot: the report shows the call and the values it saved (e.g. the new trade ID), and the following steps show the result in the browser.

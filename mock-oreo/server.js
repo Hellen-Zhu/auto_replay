@@ -143,6 +143,9 @@ customElements.define('sc-text-input', ScTextInput);
 customElements.define('sc-button', ScButton);
 </script>`;
 
+// The root is not the login page: it sends a signed-in user to the trade portal, as the real system does
+const rootPage = `<!doctype html><script>location.replace(sessionStorage.getItem('user') ? '/trades' : '/login');</script>`;
+
 const loginPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>OREO</title>${components}
 <style>body{font-family:system-ui;background:#999;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 .dialog{background:#fff;border-radius:8px;width:420px;overflow:hidden}.head{background:#1e4fa0;color:#fff;text-align:center;padding:32px}
@@ -208,7 +211,7 @@ h3{margin:24px 24px 0}.search{margin:16px 24px 0}.row{display:flex;align-items:c
 <ol id="toaster"></ol>
 <script>
 const u = sessionStorage.getItem('user'), email = sessionStorage.getItem('userEmail');
-if (!u) location.href = '/';
+if (!u) location.href = '/login';
 // simulate async loading of user info
 setTimeout(() => { document.getElementById('uname').textContent = u; }, 300);
 const $ = (id) => document.querySelector('[data-testid=' + id + ']');
@@ -298,7 +301,7 @@ const pageHead = `<!doctype html><html lang="en"><head><meta charset="utf-8"><ti
 #err{color:#b91c1c;font-size:13px;margin:8px 0}.overlay{position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center}
 .overlay[hidden]{display:none}.box{background:#fff;padding:24px;border-radius:8px;width:360px}.card{border:1px solid #ddd;border-radius:8px;padding:16px;font-size:14px}</style></head>
 <body><header data-testid="layout-topnav-container"><b>OREO 0.2.17</b></header>
-<script>if (!sessionStorage.getItem('user')) location.href = '/';</script>`;
+<script>if (!sessionStorage.getItem('user')) location.href = '/login';</script>`;
 
 const COUNTERPARTIES = '10 AM NY|10 AM JAK|MOCK BANK A|MOCK BANK B|MOCK CORP C';
 const newTradePage = `${pageHead}
@@ -468,7 +471,7 @@ http.createServer((req, res) => {
     return t ? json(res, 200, { data: { trade: t } }) : json(res, 404, { message: 'Trade not found' });
   }
   const url = req.url.split('?')[0];
-  const html = url === '/trades/new' ? newTradePage : url.startsWith('/trades/') ? tradeDetailPage : url.startsWith('/trades') ? tradesPage : loginPage;
+  const html = url === '/' ? rootPage : url === '/trades/new' ? newTradePage : url.startsWith('/trades/') ? tradeDetailPage : url.startsWith('/trades') ? tradesPage : loginPage;
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
   res.end(html);
 }).listen(PORT, () => console.log(`Mock OREO started: http://localhost:${PORT}  (account maker@test.com / maker1)`));

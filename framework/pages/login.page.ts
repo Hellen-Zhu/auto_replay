@@ -2,8 +2,8 @@ import type { Target, Val } from '../ui';
 import { BasePage } from './base.page';
 
 export class LoginPage extends BasePage {
-  /** Path relative to baseUrl. Change it here if the real system's login page is not at the root */
-  static readonly path = '/';
+  /** Path relative to baseUrl. Not the root: for a user who is signed in the root opens the trade portal, not the login page */
+  static readonly path = '/login';
 
   protected readonly dialog: Target = { testId: 'login-dialog' };
   protected readonly email: Target = { testId: 'login-email-input', inner: 'input' };
