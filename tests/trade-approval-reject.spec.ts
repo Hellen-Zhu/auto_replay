@@ -7,7 +7,7 @@ import { prepare } from './support';
 // so the case needs apiBaseUrl in the local config.
 // One product only (user decision, minimal coverage): the checker's pages are the same for every product. What
 // differs is the kind of trade, so there is one case per kind. Scenario UI-001 (a normal trade is approved) is the
-// journey through the pages in trade-creation.spec.ts (TC-TRADE-CREATION-FX_TRF-UI-005) and is not repeated here.
+// journey through the pages in trade-creation.spec.ts (TC-TRADE-CREATION-UI-005) and is not repeated here.
 // Not as in the feature: there the checker decides in UI-002 and UI-003 "from the trade detail page" and the result
 // is checked "in trade details"; those snippets are not known, so here the decision is made from the trade portal
 // and the result is checked in the blotter, and the step lines say so. UI-004 was not seen: its ID and title are

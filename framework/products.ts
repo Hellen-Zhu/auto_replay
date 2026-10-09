@@ -4,7 +4,8 @@
 
 /**
  * What a product can be tested for; one capability per scenario that not every product supports.
- * A variation in data only (e.g. direction Sell) is not a capability: it is a single test with its testdata row.
+ * A variation in data only (e.g. direction Sell) is not a capability and not a case: it is run by changing the
+ * case data of an existing case.
  */
 export type Capability =
   | 'create' // book a normal trade

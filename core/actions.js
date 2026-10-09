@@ -9,7 +9,7 @@ const { expect } = require('@playwright/test');
 // Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name};
 // 3 = adds hasText in a target and button on a click; 4 = adds the api action; 5 = adds request on a click;
 // 6 = adds case data without a value (an empty text in params), which is asked for before the run
-const FORMAT_VERSION = 6;
+const FORMAT_VERSION = 7;
 
 /**
  * Turn a target description from the JSON into a Playwright Locator.
@@ -275,10 +275,18 @@ async function resolveDeep(value, ctx) {
 }
 
 /** The files of the data folder a step needs: what an upload step uploads and the file parts of an api step */
-function dataFilesOf(step) {
-  if (step.action === 'upload') return [step.value];
-  if (step.action === 'api') return Object.values(step.multipart || {}).filter((p) => p && p.file).map((p) => p.file);
-  return [];
+function dataFilesOf(step, params) {
+  const files = step.action === 'upload' ? [step.value]
+    : step.action === 'api' ? Object.values(step.multipart || {}).filter((p) => p && p.file).map((p) => p.file) : [];
+  return params ? files.map((f) => fillParams(f, params)) : files;
+}
+
+/**
+ * Text with its case data filled in: a step line such as "creates a new '${param:product}' trade", or the name of
+ * a data file (data/${param:product}.dat). Case data without a value stays as it is written.
+ */
+function fillParams(text, params) {
+  return String(text).replace(/\$\{param:([^}]+)\}/g, (m, name) => (params && params[name] !== undefined && String(params[name]) !== '' ? String(params[name]) : m));
 }
 
 /**
@@ -302,7 +310,7 @@ async function callApi(page, step, apiPath, ctx, timeout) {
     options.multipart = {};
     for (const [name, part] of Object.entries(step.multipart)) {
       if (part && part.file) {
-        const file = resolveDataFile(ctx.rootDir, part.file);
+        const file = resolveDataFile(ctx.rootDir, await resolveValue(part.file, ctx));
         options.multipart[name] = { name: path.basename(file), mimeType: 'application/octet-stream', buffer: fs.readFileSync(file) };
       } else if (part && part.json !== undefined) {
         // Sent the way a browser sends a JSON Blob in a form: its own content type and the file name "blob"
@@ -470,5 +478,5 @@ function describeStep(step, vars, params, config) {
 }
 
 module.exports = {
-  FORMAT_VERSION, resolveDataFile, dataFilesOf, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath, isMocked,
+  FORMAT_VERSION, resolveDataFile, dataFilesOf, fillParams, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath, isMocked,
 };

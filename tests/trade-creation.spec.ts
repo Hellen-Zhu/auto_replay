@@ -45,26 +45,15 @@ test.describe('Trade creation', () => {
     });
   }
 
-  // A data variation of one product, so a single test outside the loops; the direction comes from this case's
-  // row in testdata/trade-creation.json
-  test('[TC-TRADE-CREATION-FX_TRF-UI-004] Maker creates a new FX_TRF trade with direction Sell', async ({ When, And, Then, flows, testData }) => {
-    const product = 'FX_TRF';
-    prepare(product, 'trade with direction Sell');
-    const data = testData<TradeCreationData>();
-
-    await When('maker is logged in to the trade portal', () => flows.auth.login('maker'));
-    const tradeId = await And(`creates a new '${product}' trade with direction Sell`, () => flows.tradeCreation.createTrade(product, data));
-    await Then('trade is created with pending approval status and info', () => flows.tradeCreation.expectPendingApproval(tradeId));
-  });
-
-  // The one journey that goes through the pages from end to end: maker books, checker approves. One product is
-  // enough, the checker's part does not depend on it; the other decisions are in trade-approval-reject.spec.ts,
-  // on a trade created through the API. It is scenario UI-001 of the E2E project's approval feature with the
-  // Given done in the browser; the case ID is this repo's.
-  test('[TC-TRADE-CREATION-FX_TRF-UI-005] FX_TRF Trade is Live after Maker submits and Checker approves', async ({ When, And, Then, flows, testData }) => {
-    const product = 'FX_TRF';
-    prepareCase(product, `Maker books a new ${product} trade from its dat file, checker approves it from the trade portal and the trade is live`);
-    const data = testData<TradeCreationData>();
+  // The one journey that goes through the pages from end to end: maker books, checker approves. The checker's part
+  // does not depend on the product, so this is one case and the product is its case data (the row in
+  // testdata/trade-creation.json): the PO runs it for another product by changing "product" before the run. The
+  // other decisions are in trade-approval-reject.spec.ts, on a trade created through the API. It is scenario UI-001
+  // of the E2E project's approval feature with the Given done in the browser; the case ID is this repo's.
+  test('[TC-TRADE-CREATION-UI-005] Trade is Live after Maker submits and Checker approves', async ({ When, And, Then, flows, testData }) => {
+    const { product: productOfRow, ...data } = testData<TradeCreationData & { product: string }>();
+    prepareCase(productOfRow, 'Maker books a new trade of the product in the case data from its dat file, checker approves it from the trade portal and the trade is live');
+    const product = flows.tradeCreation.productAsCaseData(productOfRow);
 
     await When('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     const tradeId = await And(`creates a new '${product}' trade`, () => flows.tradeCreation.createTrade(product, data));

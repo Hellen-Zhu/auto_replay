@@ -106,6 +106,7 @@ export class UI {
   /** Case data handed out by params() so far: name -> value */
   private readonly paramValues: Record<string, string> = {};
   /** Case data the PO has to enter for a run (input()): name -> the value of this run */
+  private readonly literals: Record<string, string> = {}; // case data whose value is found in the steps: name -> value
   private readonly inputs: Record<string, string> = {};
   private pendingTitle?: string;
   private pendingSubstep?: string;
@@ -180,9 +181,20 @@ export class UI {
    * gets the name with an empty value, and the runner asks the PO for the value before every run.
    */
   input(name: string, value: string): string {
+    this.param(name, value);
+    this.inputs[name] = value;
+    return value;
+  }
+
+  /**
+   * Case data that decides what the case works on, e.g. the product: the value is used as plain text by the flows
+   * (in a file name, as a typed value, in a step line), and wherever a later step contains it, it is recorded as
+   * ${param:name}. The case file keeps the value, so the PO runs the case as it is or changes it for a run.
+   */
+  param(name: string, value: string): string {
     this.useParam(name, value);
     if (value.length < 4) throw new Error(`The value of "${name}" is too short to be told apart from other text (at least 4 characters)`);
-    this.inputs[name] = value;
+    this.literals[name] = value;
     return value;
   }
 
@@ -272,7 +284,9 @@ export class UI {
     // Turn dynamic values into variables: if trade ID TRD-123 was read earlier, a later TRD-123 is rewritten to ${var:tradeId}
     const recorded: Step = this.variabilize(this.stripSecrets(step));
     // The title and the substep are attached only to the first action of their group
-    const group = { ...(this.pendingTitle ? { title: this.pendingTitle } : {}), ...(this.pendingSubstep ? { substep: this.pendingSubstep } : {}) };
+    // A step line that names such case data ("creates a new 'FX_TRF' trade") follows it too
+    const line = (s: string) => this.swap(s, this.literalEntries());
+    const group = { ...(this.pendingTitle ? { title: line(this.pendingTitle) } : {}), ...(this.pendingSubstep ? { substep: line(this.pendingSubstep) } : {}) };
     this.pendingTitle = undefined;
     this.pendingSubstep = undefined;
     const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, params: this.paramValues, rootDir: this.rootDir });
@@ -288,22 +302,28 @@ export class UI {
     return result;
   }
 
+  private literalEntries(): string[][] {
+    return Object.entries(this.literals).map(([name, v]) => [v, '${param:' + name + '}']);
+  }
+
+  private swap<S extends string | undefined>(s: S, entries: string[][]): S {
+    if (typeof s !== 'string' || !entries.length) return s;
+    // Only the literal text is checked: a placeholder that is already there (odd parts of the split) is left alone
+    return s.split(/(\$\{(?:var|cfg|param):[^}]+\})/).map((part, i) => {
+      if (i % 2) return part;
+      for (const [v, placeholder] of entries) part = part.split(v).join(placeholder);
+      return part;
+    }).join('') as S;
+  }
+
   private variabilize(step: Step): Step {
-    // A value the PO enters for a run (input()) is case data: it is rewritten in the same way, to ${param:name}
+    // Case data given by its value (param(), input()) is rewritten in the same way, to ${param:name}
     const entries = [
       ...Object.entries(this.vars).filter(([, v]) => v && v.length >= 4).map(([name, v]) => [v, '${var:' + name + '}']),
-      ...Object.entries(this.inputs).map(([name, v]) => [v, '${param:' + name + '}']),
+      ...this.literalEntries(),
     ];
     if (!entries.length) return step;
-    const swap = (s?: string) => {
-      if (typeof s !== 'string') return s;
-      // Only the literal text is checked: a placeholder that is already there (odd parts of the split) is left alone
-      return s.split(/(\$\{(?:var|cfg|param):[^}]+\})/).map((part, i) => {
-        if (i % 2) return part;
-        for (const [v, placeholder] of entries) part = part.split(v).join(placeholder);
-        return part;
-      }).join('');
-    };
+    const swap = (s?: string) => this.swap(s, entries);
     const target = step.target ? Object.fromEntries(Object.entries(step.target).map(([k, v]) => [k, typeof v === 'string' ? swap(v) : v])) : undefined;
     const out: Step = { ...step, value: swap(step.value), target: target as Target };
     // The request of an api step too, e.g. the task ID an earlier call returned, inside a body
@@ -336,8 +356,9 @@ export class UI {
       // and refuses the rest: 2 adds the params block; 3 adds hasText in a target and button on a click, which a
       // version 2 runner would ignore without a word (any row, a normal click); 4 adds the api action; 5 adds the
       // request a click waits for (an older runner would click and never mock it); 6 adds case data without a value,
-      // which the runner asks for (an older runner would run with the empty text, e.g. find any trade's row)
-      formatVersion: asked.length ? 6 : this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
+      // which the runner asks for (an older runner would run with the empty text, e.g. find any trade's row); 7 adds
+      // case data in the name of a data file and in a step line (an older runner would look for a file of that name)
+      formatVersion: this.steps.some(namesCaseData) ? 7 : asked.length ? 6 : this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,
@@ -385,6 +406,12 @@ function stepTexts(steps: Step[]): string[] {
     for (const k of API_JSON) mapTexts(s[k], (t) => (texts.push(t), t));
     return texts;
   });
+}
+
+/** Does a step name case data where a runner before version 7 took the text as it is: its data file, its step line? */
+function namesCaseData(s: Step): boolean {
+  const texts = (core.dataFilesOf(s) as string[]).concat(s.title ?? '', s.substep ?? '');
+  return texts.some((t) => t.includes('${param:'));
 }
 
 /** The case data the steps really use, in the order of first use; this becomes the params block of the case file */

@@ -30,6 +30,15 @@ const OPTIONAL_FIELDS = DATA_FIELDS.filter((name) => !fieldDef(name).required &&
  * with expectPendingApproval(tradeId).
  */
 export class TradeCreationFlow extends BaseFlow {
+  /**
+   * The product as case data, for a case that is the same for every product: the PO can run it for another product
+   * by changing "product" before the run (that product's dat file has to be in data/). Returns the product for the
+   * flows that follow; they record it as ${param:product} wherever they use it.
+   */
+  productAsCaseData(product: string): string {
+    return this.caseData('product', product);
+  }
+
   /** Maker creates a normal trade for a product */
   async createTrade(product: string, data: TradeCreationData): Promise<string> {
     await this.openNewTradeForm();

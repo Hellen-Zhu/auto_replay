@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { chromium } = require('@playwright/test');
-const { FORMAT_VERSION, executeStep, savedValues, describeStep, showPlaceholders, resolveDataFile, dataFilesOf, isMocked } = require('../core/actions');
+const { FORMAT_VERSION, executeStep, savedValues, describeStep, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, isMocked } = require('../core/actions');
 const { loadConfig, launchOptions, secretEntries } = require('../core/config');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -745,13 +745,14 @@ const caseDataOf = (doc, params) => Object.keys(params).map((name) => {
 const askedParamsOf = (doc) => Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '');
 
 // Fails when this runner cannot run the case, before anything is asked or opened
-function checkCase({ file, doc }) {
+function checkCase({ file, doc }, params) {
   if (!doc || !Array.isArray(doc.steps)) throw new Error(`${path.basename(file)} is not a case file (it has no steps)`);
   if (Number(doc.formatVersion) > FORMAT_VERSION) {
     throw new Error(`${path.basename(file)} is case format version ${doc.formatVersion}; this runner supports up to version ${FORMAT_VERSION}. Ask QA for the current UAT-Runner package.`);
   }
-  // A file the case uploads or sends to the API that did not come with the package
-  for (const s of doc.steps) for (const f of dataFilesOf(s)) resolveDataFile(ROOT, f);
+  // A file the case uploads or sends to the API that did not come with the package. Its name may hold case data
+  // (data/${param:product}.dat), so the check is repeated with the data of the run once the PO has changed it
+  for (const s of doc.steps) for (const f of dataFilesOf(s, params || paramsOf(doc))) resolveDataFile(ROOT, f);
 }
 
 // The local settings the cases need. For several cases: each setting once, the API address first as in a case file
@@ -995,13 +996,16 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
     for (let i = 0; i < doc.steps.length; i++) {
       const step = doc.steps[i];
       const desc = describeStep(step, ctx.vars, ctx.params, config);
-      const rec = { title: step.title, desc, status: 'skipped' };
-      if (step.substep) rec.substep = step.substep;
+      // a step line may name case data (the product): it is shown with the value of this run
+      const title = step.title && fillParams(step.title, ctx.params);
+      const substep = step.substep && fillParams(step.substep, ctx.params);
+      const rec = { title, desc, status: 'skipped' };
+      if (substep) rec.substep = substep;
       run.steps.push(rec);
       if (failed) continue;
 
-      if (step.title) say(`  ■ ${step.title}`);
-      if (step.substep) say(`    - ${step.substep}`);
+      if (title) say(`  ■ ${title}`);
+      if (substep) say(`    - ${substep}`);
       if (!quiet) process.stdout.write(`    [${i + 1}/${doc.steps.length}] ${desc} ... `);
       try {
         const r = await executeStep(page, step, ctx);
@@ -1074,6 +1078,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
 async function runCase(chosen, config) {
   checkCase(chosen);
   const { params, askConfig, stepByStep } = await askSettings([chosen], config);
+  checkCase(chosen, params);
   return executeCase(chosen, config, { params, stepByStep, askConfig });
 }
 

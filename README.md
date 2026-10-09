@@ -75,14 +75,16 @@ Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/tr
 
 ### Trade creation cases
 
-`tests/trade-creation.spec.ts` has four tests (normal trade, StepIn full, StepIn partial, normal trade with direction Sell), each run for its own list of products, since not every product supports StepIn, mirroring `trade_creation.feature` of the E2E project. Before running them:
+`tests/trade-creation.spec.ts` has three tests (normal trade, StepIn full, StepIn partial), each run for its own list of products, since not every product supports StepIn, mirroring `trade_creation.feature` of the E2E project. Before running them:
 
 1. Copy the product `.dat` files into `data/` (`FX_PSCRIPT.dat`, `FX_TRF.dat`, `FX_PSCRIPT_FSKO.dat`); a case whose product has no file is skipped.
 2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
 To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`) and put its `.dat` file in `data/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
 
-`[TC-TRADE-CREATION-FX_TRF-UI-005]` is the one journey that goes through the pages from end to end: the maker books a normal trade, the checker logs in to the trade portal and approves it, the trade is `LIVE` / `New`. It needs the `checker` account with its password in `config.local.json`.
+A variation in data only (direction Sell, another counterparty) is not a case of its own: the PO runs an existing case and changes its case data with `D`.
+
+`[TC-TRADE-CREATION-UI-005]` is the one journey that goes through the pages from end to end: the maker books a normal trade, the checker logs in to the trade portal and approves it, the trade is `LIVE` / `New`. It needs the `checker` account with its password in `config.local.json`. It is one case for every product: **the product is case data** (`"product": "FX_TRF"` in its testdata row), so the PO runs it for another product by changing `product` with `D` before the run; that product's `data/<PRODUCT>.dat` has to be in the package, or the runner says which file is missing. In the flow this is `flows.tradeCreation.productAsCaseData(product)`: from then on every use of the product (the typed Product ID, the name of the dat file, the step lines) is recorded as `${param:product}`. Such a case file is format version 7 and needs a runner package built from this version.
 
 ### Coverage: where a case is repeated per product
 
@@ -139,14 +141,14 @@ Case data lives in `testdata/`, not in `config.local.json`:
 {
   "defaults": { "oldCounterpartyName": "10 AM JAK" },
   "cases": [
-    { "id": "TC-TRADE-CREATION-FX_TRF-UI-004", "direction": "Sell" }
+    { "id": "TC-TRADE-CREATION-UI-005", "product": "FX_TRF" }
   ]
 }
 ```
 
 (The real files are plain JSON, without comments.)
 
-- A case gets `common.json`, then `defaults` of its spec's file, then its own row: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once. **A case that needs nothing different has no row at all** (only the Sell case has one); `cases`, `defaults` and even the file are optional.
+- A case gets `common.json`, then `defaults` of its spec's file, then its own row: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once. **A case that needs nothing different has no row at all** (only `-UI-005` has one, for its product); `cases`, `defaults` and even the file are optional.
 - `id` is the full case ID. **The data is matched at run time**: a test title starts with its case ID in `[ ]` (the spec may build it, e.g. `[TC-TRADE-CREATION-${product}-UI-001]`), and the `testData` fixture looks that ID up in `testdata/<spec file name>.json` (`tests/trade-creation.spec.ts` → `testdata/trade-creation.json`). Take care with the spelling of an `id`: a row that matches no case is simply not used. The ID is also the exported file name (`cases/<spec file name>/<id>.json`).
 - In the test: `const data = testData<TradeCreationData>()`, then hand it to the flow.
 - In the flow, `const p = this.params(data)` turns the data into parameters. `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value is written into the `params` block of the case file, so the PO sees it before the run and can change it for one run. Only the parameters a case really uses are written.
@@ -349,7 +351,10 @@ A case file is written in the lowest format version that can express it, and a r
 | 1 | Steps only | Every runner |
 | 2 | Case data (`params`) | A runner built since case data was added |
 | 3 | A right-click, or a target narrowed with `hasText` (any case that works on a blotter row) | A runner built since those were added |
-| 4 | An API call (any case that prepares its trade through the API) | A runner built from this version or later: send the PO a new package |
+| 4 | An API call (any case that prepares its trade through the API) | A runner built since the API call was added |
+| 5 | A click that waits for a request, which can be mocked (the risk calculation) | A runner built since `riskEngine` was added |
+| 6 | Case data that is entered for every run (the ID of an existing trade) | A runner built since those cases were added |
+| 7 | Case data in the name of a data file or in a step line (the product as case data) | A runner built from this version or later: send the PO a new package |
 
 ## PO: how to use it
 
