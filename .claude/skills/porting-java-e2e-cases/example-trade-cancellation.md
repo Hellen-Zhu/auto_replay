@@ -4,6 +4,8 @@ The Java side of a case that is already ported, whose first step prepares its tr
 
 The Java side below is condensed from what was seen of the E2E project. Snippet entries are written as their regex and body lines without the keywords (which play no part in matching); section headers are given only where they were seen; `(cut)` marks what was not visible; the accounts in the Java source are replaced by `<maker account>` and `<checker account>`.
 
+The trace covers the first five steps of the scenario, up to the pending cancellation. The feature goes on with the checker (`When checker is logged in to the trade portal`, `And approves / rejects the pending trade from trade portal`, `Then the trade is approved / rejected successfully`, `And the trade is closed as Cancelled` / `the trade is Live and marked as New`); those steps are plain browser steps, ported in `framework/flows/trade-approval.flow.ts` and `framework/components/checker-action.ts`.
+
 ## Java side
 
 `features/ui/trading/trade_cancellation.feature`:

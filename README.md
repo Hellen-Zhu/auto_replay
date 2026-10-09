@@ -33,7 +33,7 @@ Two kinds of data are kept apart:
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
 | `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/<spec name>/` automatically after a test passes |
-| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`) |
+| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`) |
 | `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`; `support.ts` holds what the specs share |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
@@ -82,13 +82,15 @@ Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/tr
 
 To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`) and put its `.dat` file in `data/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
 
+`[TC-TRADE-CREATION-<product>-UI-005]` and `-UI-006` continue a normal creation with the checker: the checker logs in to the trade portal and approves the new trade (it becomes `LIVE`) or rejects it (it goes back to a draft). They need the `checker` account with its password in `config.local.json`.
+
 ### Trade cancellation cases
 
-`tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: one test per product with the `cancel` capability, `[TC-TRADE-CANCELLATION-<product>-UI-001]`. Its `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
+`tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: two tests per product with the `cancel` capability. In both the maker cancels a live trade; then the checker logs in and, in `[TC-TRADE-CANCELLATION-<product>-UI-001]`, approves the cancellation (the trade ends as `DEAD` / `Cancelled`) or, in `-UI-002`, rejects it (the trade is `LIVE` / `New` again). Their `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
 
-1. Set `apiBaseUrl` in `config.local.json`, with its prefix (`.../api/v1`), and make sure the `checker` account has its e-mail there (its password is not needed: the API takes no login).
+1. Set `apiBaseUrl` in `config.local.json`, with its prefix (`.../api/v1`), and make sure the `checker` account has its e-mail there and its password (the checker also logs in to the trade portal).
 2. Copy the product `.dat` files into `data/`, as for trade creation.
-3. Run `npm run sync:elements -- <E2E project>`: the trade portal and confirmation dialog elements this case uses come from the E2E project's element files.
+3. Run `npm run sync:elements -- <E2E project>`: the trade portal, confirmation dialog and checker action elements these cases use come from the E2E project's element files.
 
 Its data is in `testdata/trade-cancellation.json` (the trade that is created, the cancellation reason and comments). Parts of this case were written from what is known of the E2E project and still have to be checked on the real system; they are listed in `CLAUDE.md`, section 10.
 

@@ -206,7 +206,7 @@ Skip the whole scenario (a case that silently lacks a step claims a coverage it 
 - a request that is not completely readable, a payload value computed at run time, an API call or a response assertion in a `When` or a `Then`;
 - an element key that is not in `elements/` after the sync, an element whose `findBy` is not `testId`, a locator with a placeholder. Supporting another `findBy` is the user's decision, not a hand-written CSS / XPath;
 - a control this project cannot operate yet (date picker, Yes / No toggle, grid cell editing): its real DOM is needed;
-- a second user who acts in the browser in the same scenario, unless the Java side does it purely with UI steps (log out, log in) on defined elements; a new browser session per user cannot be expressed in a case file;
+- a second user who acts in the browser in the same scenario, unless the Java side does it with `<role> is logged in to the trade portal` (`flows.auth.login('<role>')` again, as the cancellation cases do for the checker: list it under "to verify", the real system may need a logout first) or purely with UI steps on defined elements; a new browser session per user cannot be expressed in a case file;
 - a new tab or window, a download, a fixed wait.
 
 Never, whatever the reason:

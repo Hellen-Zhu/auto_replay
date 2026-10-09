@@ -11,15 +11,22 @@
 //   Whether the real component renders a <textarea> or an <input> there is not known (the mock renders a <textarea>);
 //   the tag of the reason select (sc-select here) is not known either, only that a click opens it and that its
 //   entries have the role menuitem;
-// - testids made up here because the real ones are not known yet (search box, all-trades blotter): they are marked
+// - testids made up here because the real ones are not known yet (search box, all-trades blotter, the checker's
+//   Approve / Reject menu entries, their dialog and its confirm button): they are marked
 //   "mock testid" below. Point the element names at them with a scratch elements folder (OREO_ELEMENTS_DIR) when
 //   running a case against the mock;
-// - the toast only copies the two attributes the E2E project reads (data-title, data-description);
+// - the toast only copies the two attributes the E2E project reads (data-title, data-description); the titles
+//   "Trade approved successfully" / "Trade rejected successfully" and the cancellation's message are the real texts;
+// - the checker's decision in the browser: the Approve / Reject entries are in the row's action menu and open a
+//   dialog with a confirm button, as the E2E project's steps use them; how that dialog looks is this mock's own.
+//   What a decision does to a trade: an approved cancellation gives DEAD / Cancelled and a rejected one LIVE / New,
+//   as in the E2E project; an approved new trade is LIVE (real); a rejected new trade is shown as DRAFT, which is
+//   only what the user described, not a text seen on the real system;
 // - API, served under /api/v1 (so apiBaseUrl for the mock is http://localhost:4173/api/v1): create (path, X-User-Id
 //   header, multipart parts "trade" + "datFile", data.trade.id and data.checkerContext.taskId in the response) and
 //   the checker's approve / reject of a task (path, JSON body, { code, status: 'SUCCESS', data: <the trade> } in the
 //   response) are like the real ones, and so is the status LIVE of an approved trade in the blotter. The body of
-//   trigger-event, the status REJECTED and the rule that the submitter cannot decide on the own task are this mock's
+//   trigger-event and the rule that the submitter cannot decide on the own task are this mock's
 //   own. The two risk calculation requests (POST trades/<id>/calculate-risk before a cancellation, POST
 //   trades/calculate-risk-for-new before a new trade is booked) have the real paths; that the page sends them
 //   without a body, what it does with the answer and the answer itself are this mock's own. Started with
@@ -184,7 +191,13 @@ h3{margin:24px 24px 0}.search{margin:16px 24px 0}.row{display:flex;align-items:c
 <div id="rowmenu" role="menu" hidden>
   <div role="menuitem">View Details</div>
   <div role="menuitem" data-testid="trade-row-action-cancellation">Cancellation</div>
+  <!-- mock testids -->
+  <div role="menuitem" data-testid="checker-action-approve-btn">Approve</div>
+  <div role="menuitem" data-testid="checker-action-reject-btn">Reject</div>
 </div>
+<!-- mock testids -->
+<sc-modal data-testid="checker-action-dialog" hidden><div slot="header"><h2 id="decision-title"></h2></div>
+  <div><sc-button data-testid="checker-action-confirm-btn">Confirm</sc-button></div></sc-modal>
 <sc-modal data-testid="trade-change-confirmation-dialog" hidden><div slot="header"><h2>Confirm Trade Changes</h2>
   <p>Review the changes and risk impact before saving</p></div>
   <div><h2>Updated Risk Calculation</h2>
@@ -206,7 +219,9 @@ const search = $('trade-portal-search-input'), tbody = $('trade-portal-all-trade
 const menu = document.getElementById('rowmenu'), cancelEntry = $('trade-row-action-cancellation');
 const dialog = $('trade-change-confirmation-dialog'), err = document.getElementById('err');
 const reason = $('trade-change-reason-select'), comments = $('trade-change-comments-textarea');
-let trades = [], current = null;
+const approveEntry = $('checker-action-approve-btn'), rejectEntry = $('checker-action-reject-btn');
+const checkerDialog = $('checker-action-dialog');
+let trades = [], current = null, decision = '';
 
 function render() {
   const q = search.value.trim().toLowerCase();
@@ -218,6 +233,7 @@ function render() {
       e.preventDefault();
       current = t;
       cancelEntry.hidden = t.status !== 'LIVE'; // only a live trade can be cancelled
+      approveEntry.hidden = rejectEntry.hidden = !t.taskId; // only a trade with an open approval task can be decided on
       menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
       menu.hidden = false;
     });
@@ -247,6 +263,23 @@ cancelEntry.addEventListener('click', async () => {
   const r = await api('/api/v1/trades/' + current.id + '/calculate-risk', { method: 'POST' });
   if (!r.ok) { toast('error', 'Error', 'Risk calculation failed'); return; }
   dialog.hidden = false;
+});
+for (const [entry, what] of [[approveEntry, 'approve'], [rejectEntry, 'reject']]) {
+  entry.addEventListener('click', () => {
+    menu.hidden = true;
+    decision = what;
+    document.getElementById('decision-title').textContent = (what === 'approve' ? 'Approve' : 'Reject') + ' trade ' + current.id;
+    checkerDialog.hidden = false;
+  });
+}
+$('checker-action-confirm-btn').addEventListener('click', async () => {
+  const r = await fetch('/api/v1/checker/tasks/' + current.taskId + '/' + decision,
+    { method: 'POST', headers: { 'X-User-Id': email, 'content-type': 'application/json' }, body: '{}' });
+  const body = await r.json();
+  checkerDialog.hidden = true;
+  if (!r.ok) { toast('error', 'Error', body.message); return; }
+  toast('success', decision === 'approve' ? 'Trade approved successfully' : 'Trade rejected successfully', '');
+  load();
 });
 $('trade-change-confirm-btn').addEventListener('click', async () => {
   const r = await api('/api/v1/trades/trigger-event', { method: 'POST',
@@ -345,7 +378,7 @@ setTimeout(async () => {
 </script></main></body></html>`;
 
 const TRADES = {}; // trades booked in this mock session, kept in memory only
-const TASKS = {}; // approval tasks that are still open: task ID -> { tradeId, submittedBy }
+const TASKS = {}; // approval tasks that are still open: task ID -> { tradeId, submittedBy, kind: 'create' | 'cancel' }
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
 
 http.createServer((req, res) => {
@@ -385,8 +418,8 @@ http.createServer((req, res) => {
       if (t.stepIn !== null && (!t.stepIn || !t.oldCounterparty)) return json(res, 400, { message: 'StepIn info is incomplete' });
       const stamp = Date.now() + Math.random().toString(16).slice(2, 10).toUpperCase();
       const id = 'TRD-' + stamp, taskId = 'CHK-' + stamp;
-      TRADES[id] = { ...t, id, status: 'PARV', eventStatus: 'New' };
-      TASKS[taskId] = { tradeId: id, submittedBy: caller };
+      TRADES[id] = { ...t, id, status: 'PARV', eventStatus: 'New', taskId };
+      TASKS[taskId] = { tradeId: id, submittedBy: caller, kind: 'create' };
       json(res, 200, { code: 200, status: 'PENDING APPROVAL', msg: 'Submitted for checker approval. TaskId: ' + taskId,
         data: { checkerContext: { taskId, submittedBy: caller }, trade: TRADES[id] } });
     });
@@ -397,7 +430,7 @@ http.createServer((req, res) => {
       ? json(res, 503, { code: 503, status: 'ERROR', msg: 'Risk engine is not available' })
       : json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: { calculationTimestamp: new Date().toISOString(), pnl: -1, riskEngine: 'mock-oreo' } })), 400);
   }
-  // The checker decides on a task: approve makes the trade live, reject does not. The request has a JSON body
+  // The checker decides on a task, i.e. on a new trade or on a cancellation. The request has a JSON body
   const decide = req.method === 'POST' && req.url.match(/^\/api\/v1\/checker\/tasks\/([^/]+)\/(approve|reject)$/);
   if (decide) {
     return readBody((body) => {
@@ -407,7 +440,10 @@ http.createServer((req, res) => {
       if (task.submittedBy === caller) return json(res, 403, { message: 'A task cannot be decided by the user who submitted it' });
       delete TASKS[decide[1]];
       const t = TRADES[task.tradeId];
-      t.status = decide[2] === 'approve' ? 'LIVE' : 'REJECTED';
+      delete t.taskId;
+      const approved = decide[2] === 'approve';
+      if (task.kind === 'cancel') Object.assign(t, approved ? { status: 'DEAD' } : { status: 'LIVE', eventStatus: 'New' });
+      else t.status = approved ? 'LIVE' : 'DRAFT';
       json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: { id: t.id, basic: { counterpartyName: t.counterparty, portfolioId: t.portfolio, productId: t.productId, direction: t.direction }, trace: [] } });
     });
   }
@@ -418,7 +454,9 @@ http.createServer((req, res) => {
       if (!t) return json(res, 404, { message: 'Trade not found' });
       if (t.status !== 'LIVE') return json(res, 409, { message: 'Only a live trade can be cancelled' });
       if (!e.reason || !e.comments) return json(res, 400, { message: 'Reason and comments are required' });
-      Object.assign(t, { status: 'PARV', eventStatus: 'Cancelled', cancelReason: e.reason, cancelComments: e.comments });
+      const taskId = 'CHK-' + Date.now() + Math.random().toString(16).slice(2, 10).toUpperCase();
+      TASKS[taskId] = { tradeId: t.id, submittedBy: caller, kind: 'cancel' };
+      Object.assign(t, { status: 'PARV', eventStatus: 'Cancelled', cancelReason: e.reason, cancelComments: e.comments, taskId });
       json(res, 200, { code: 200, status: 'PENDING APPROVAL', data: { trade: t } });
     });
   }

@@ -44,14 +44,11 @@ export class TradeCancellationFlow extends BaseFlow {
 
   /** In the blotter the trade is pending approval with the event status Cancelled */
   async expectPendingCheckerApproval(tradeId: string, keyword: Keyword = 'Then') {
-    const { trades } = this.app;
-    await this.ui[keyword]('I open the trade portal and search for the trade', async () => {
-      await trades.open();
-      await trades.searchTrade(tradeId);
-    });
-    await this.ui.And('its row shows it is pending approval for a cancellation', async () => {
-      await trades.expectRowShows(tradeId, TradesPage.status.pendingApproval);
-      await trades.expectRowShows(tradeId, TradesPage.eventStatus.cancelled);
-    });
+    await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.pendingApproval, TradesPage.eventStatus.cancelled, keyword);
+  }
+
+  /** After the checker approved the cancellation: in the blotter the trade is dead with the event status Cancelled */
+  async expectClosedAsCancelled(tradeId: string, keyword: Keyword = 'Then') {
+    await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.dead, TradesPage.eventStatus.cancelled, keyword);
   }
 }

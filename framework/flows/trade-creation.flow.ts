@@ -1,7 +1,8 @@
-import { NewTradePage, TradeDetailPage, type NewTradeField, type NewTradeFieldDef } from '../pages';
+import { NewTradePage, TradeDetailPage, TradesPage, type NewTradeField, type NewTradeFieldDef } from '../pages';
 import { datFile } from '../products';
 import type { Val } from '../ui';
 import { BaseFlow, type Keyword } from './base.flow';
+import { TradesFlow } from './trades.flow';
 
 type Fields = typeof NewTradePage.fields;
 /** The fields that take their value from case data */
@@ -30,6 +31,8 @@ const OPTIONAL_FIELDS = DATA_FIELDS.filter((name) => !fieldDef(name).required &&
  * with expectPendingApproval(tradeId).
  */
 export class TradeCreationFlow extends BaseFlow {
+  private readonly tradesFlow = new TradesFlow(this.app);
+
   /** Maker creates a normal trade for a product */
   async createTrade(product: string, data: TradeCreationData): Promise<string> {
     await this.openNewTradeForm();
@@ -116,6 +119,16 @@ export class TradeCreationFlow extends BaseFlow {
       await tradeDetail.expectTradeId(tradeId); // recorded as ${var:createdTradeId}
       await tradeDetail.expectStatus(TradeDetailPage.status.pendingApproval);
     });
+  }
+
+  /** After the checker approved the new trade: it is live in the blotter */
+  async expectLive(tradeId: string, keyword: Keyword = 'Then') {
+    await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.live, undefined, keyword);
+  }
+
+  /** After the checker rejected the new trade: it is a draft again in the blotter */
+  async expectDraft(tradeId: string, keyword: Keyword = 'Then') {
+    await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.draft, undefined, keyword);
   }
 }
 
