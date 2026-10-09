@@ -5,7 +5,7 @@ QA runs a case locally with Playwright → once it passes, a **case file** (JSON
 ```
 QA: npx playwright test  ──export──►  cases/trade-creation/TC-TRADE-CREATION-FX_TRF-UI-001.json
                                           │ put on the shared drive
-PO: double-click run-case.bat → pick a folder and a case, or search → Edge opens and runs → evidence/xxx/report.html
+PO: double-click run-case.bat → pick a case in the tree of folders, or tick several → Edge opens and runs → evidence/xxx/report.html
 ```
 
 A case file contains **no server address and no password**, only relative paths and config references (`${cfg:accounts.maker.password}`). Those values live in each computer's own `config.local.json`.
@@ -39,7 +39,7 @@ Two kinds of data are kept apart:
 | `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
 | `runner/runner.js` | PO-side runner |
-| `portable/run-case.bat` | The launcher the PO double-clicks |
+| `portable/run-case.bat` | The launcher the PO double-clicks; a case file, several of them or a folder of cases can be dragged onto it |
 | `portable/record-session.bat` | Records a manual session (no case): the PO works by hand with the trace on, e.g. to report a bug |
 | `portable/view-trace.bat` | Opens the list of earlier runs with their report and trace viewer links |
 | `scripts/build-portable.js` | Builds the portable runner |
@@ -310,20 +310,45 @@ A case file is written in the lowest format version that can express it, and a r
 ## PO: how to use it
 
 1. Unzip `UAT-Runner.zip` (nothing needs to be installed).
-2. Double-click **run-case.bat** and choose the case; or drag a case `.json` onto the bat file.
-   - The cases are grouped in folders, one per kind of event (trade creation, trade cancellation...). Type the number of a folder to open it, then the number of the case. Plain Enter takes number 1; `B` goes back.
-   - Or **type text instead of a number to search**, at any of these prompts: a product (`trf`), part of a case ID (`cancellation-fx_trf`) or several words (`cancel pscript`: every word must match). Inside a folder the search covers that folder, at the first list it covers everything.
-   - A list of more than 40 cases is cut; type text to narrow it.
+2. Double-click **run-case.bat** and choose the case with the keyboard; or drag a case `.json` onto the bat file.
+   - The list shows only the folders at first, one per kind of event (trade creation, trade cancellation...), each with the number of cases in it:
+
+     ```
+     Choose a case to run   (14 cases)
+
+     > + [ ] trade-cancellation/   (3 cases)
+       + [ ] trade-creation/   (11 cases)
+     ```
+
+   - **Up / Down** move the highlighted row (also PageUp / PageDown, Home / End). **Right** or Enter opens a folder and shows its cases below it; **Left** closes it. **Enter on a case runs it.**
+   - **Type text to search**: a product (`trf`), part of a case ID (`cancellation-fx_trf`). Only the matching cases stay, in their folders. Backspace deletes a character, Esc clears the search.
+   - The description of the highlighted case is shown below the list. A list longer than the window scrolls.
+   - Case files that lie directly in `cases/` (not in a folder) are in a row `(not in a folder)` after the folders.
+   - **Ctrl+C** closes the window.
+   - In a very small window the runner shows a plain numbered list instead: type the number of a folder, then the number of the case (plain Enter = number 1, `B` goes back, any other text is a search). If the keyboard list does not look right on a computer, set the environment variable `OREO_PLAIN_MENU=1` before starting the bat to always get the numbered list.
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account (a password that no longer matches is then asked for again, and the current one can be typed again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
    If the case comes with **case data** (counterparty, portfolio...), it is listed there too. Type `D` to change a value for this run, e.g. to book against another counterparty; `CD` changes both settings and data. The case file itself is not modified, and the report shows the data the run used and marks what was changed.
    A case that prepares its data through the API also needs the **API address** (`apiBaseUrl`, with its path prefix such as `/api/v1`); it is shown, asked for and saved like the system address.
 4. Press Enter to run, or type `S` to run **step by step**: the run then stops after each Given / When / Then block until you press Enter.
-5. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail.
+5. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail. **Ctrl+C** stops the run and closes the window.
 6. When it finishes, the report opens automatically. It reads as the scenario: one row per Given / When / Then step with its result and a screenshot (pauses and their length are shown too); click "N actions" under a step to see the individual actions behind it. Values the run produced, such as the ID of the trade it created, are listed above the steps ("Values from this run") and under the step that produced them.
 7. The console and the bottom of the report give two links: **Report** (the report as a URL) and **Full replay** (Playwright's trace viewer for this run: every action with before / after snapshots, console and network). They are `http://127.0.0.1:9400/...` addresses served by the runner itself, so they work only on this computer and only while the runner window stays open. The links of every case run in that window keep working until it is closed.
-8. **The window stays open for the next case**: press Enter to go back to the case list, which comes back where you were, or type `Q` to close. The address, the account and the password you typed in are kept while the window is open, so they are not asked for again (a change made with `C` stays for the next cases too; a password is kept in memory only and never saved). A case that cannot be run, e.g. because its file needs a newer runner, shows its error and the window goes on.
+8. **The window stays open for the next case**: press Enter to go back to the case list, which comes back as you left it (open folders, search), or type `Q` to close. The address, the account and the password you typed in are kept while the window is open, so they are not asked for again (a change made with `C` stays for the next cases too; a password is kept in memory only and never saved). A case that cannot be run, e.g. because its file needs a newer runner, shows its error and the window goes on.
 9. To open an earlier run later, double-click **view-trace.bat**: it opens a page listing every run with its Report and Full replay links.
 10. If something goes wrong, send the matching folder under `evidence/` to QA; they can drop it into their own `evidence/` folder and open it the same way.
+
+### Running several cases
+
+- **Tick the cases with Space**, then press Enter: Space on a case ticks that case (`[x]`), Space on a folder ticks every case in it (`[-]` = only some of them are ticked). Ticks can be combined with the search: search for `trf`, tick, search for something else, tick. Esc (without a search) unticks everything.
+- Or **drag a folder** of cases, or several case files, onto run-case.bat (with the plain numbered list this is the way to run several cases).
+- The settings (address, account, password) are asked for **once** for all the cases. Case data cannot be changed here: each case runs with the values of its own case file; to change a value, run that case on its own.
+- Then choose how to run them:
+  - **Enter: one after another**, each exactly as when it is run alone (every step on the screen, `P` pauses);
+  - **a number, e.g. `4`: that many at the same time** (at most 8), each in an Edge window of its own. The console then shows one line when a case starts and one when it ends. `P` and step by step are not available; Ctrl+C stops everything;
+  - **`S`: one after another, step by step.**
+- A case that cannot be run (its file needs a newer runner, a data file is missing) is left out and listed; the others run.
+- Every case gets its own evidence folder and report as usual. At the end a **summary** opens (`evidence/batch_<time>/report.html`): one row per case with its result, duration, the values it produced (e.g. the trade ID) and the links to its report and full replay. Ctrl+C during the run still writes the summary of what was done so far.
+- Running at the same time logs the same account in from several browsers at once. Start with 2 and check that the system accepts it before using more.
 
 ## PO: recording a bug by hand
 
@@ -348,6 +373,7 @@ Notes:
 - The report and trace viewer links are local (`127.0.0.1`), not shareable URLs; to show a run to someone else, send them the evidence folder. If port 9400 is taken, set `"evidence": { "viewPort": 9500 }` in `config.local.json`.
 - To open Full replay in Playwright's official viewer instead of the bundled one, set `"evidence": { "traceViewer": "official" }` in `config.local.json`; the link then points to `https://trace.playwright.dev/?trace=...`. That site does not store traces: it runs in the browser and reads `trace.zip` from this computer, so the link still works only here and while the runner window is open, and it needs internet access to `trace.playwright.dev`.
 - The PO's computer needs Edge (default) or Chrome (set `browser.channel` to `"chrome"`).
+- The keyboard-operated case list and running several cases at the same time were verified on macOS against the mock only. Still to check on a PO computer: how the list is drawn in the Windows console (fallback: `OREO_PLAIN_MENU=1`), and whether the real system accepts one account logged in from several browsers at once.
 - The company must allow running `node.exe` and `.bat` from a shared drive or an unzipped folder; test on one PO machine first.
 - The login page path defaults to `/`; if the real login page is elsewhere, change `LoginPage.path` in `framework/pages/login.page.ts`.
 - A replay really operates in UAT (real bookings, real approvals); make sure the environment can take repeated runs. A case with API steps creates a new trade on every replay.
