@@ -1,5 +1,5 @@
 import type { TargetIn, UI, Val } from '../ui';
-import { element } from '../elements';
+import { element, INNER_INPUT } from '../elements';
 import { ConfirmDialog } from './confirm-dialog';
 
 /**
@@ -8,7 +8,8 @@ import { ConfirmDialog } from './confirm-dialog';
  */
 export class TradeChangeConfirmation extends ConfirmDialog {
   protected readonly reasonSelect = element('trade_change_confirmation.reason_select');
-  protected readonly commentsTextarea = element('trade_change_confirmation.comments_textarea');
+  // The comments field is a web component (sc-text-input), not a plain textarea: the real control is in its shadow root
+  protected readonly commentsTextarea = element('trade_change_confirmation.comments_textarea', { inner: INNER_INPUT });
 
   constructor(ui: UI) {
     super(ui, element('trade_change_confirmation.dialog'), element('trade_change_confirmation.confirm_btn'));

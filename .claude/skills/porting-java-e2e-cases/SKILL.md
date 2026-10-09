@@ -60,8 +60,9 @@ Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAnd
 |---|---|
 | `click '<el>'` | `ui.click(element('<el>'))` |
 | `type inner value '<var>' from stored variable into '<el>'` + `click option from stored variable '<var>'` | A combobox: `new Combobox(ui, element('<el>', { inner: 'input' })).select(value)`. On the New Trade form: one line in `NewTradePage.fields` (kind `combobox`), operated by `setField` |
-| `type inner value ... into '<el>'` alone | `ui.fill(element('<el>', { inner: 'input' }), value)`; on the New Trade form a `fields` line of kind `text` |
-| `click '<el>'` + `click option '<text>'` | `ui.click(element('<el>'))`, then the entry `{ role: 'menuitem', name: '<text>', exact: true }`. That role is confirmed for comboboxes only: list it under "to verify" |
+| `type value '<text>' into '<el>'`, or `type inner value '<var>' from stored variable into '<el>'` alone | `ui.fill(element('<el>', { inner: INNER_INPUT }), value)`: both Java steps fill `input[part='input'], textarea[part='input']` inside the element, which is the web component host also when its key ends in `_textarea`. On the New Trade form a `fields` line of kind `text` |
+| `type '<var>' from stored variable into '<el>'` | The Java step fills the element itself: `ui.fill(element('<el>'), value)` |
+| `click '<el>'` + `click option '<text>'` | `ui.click(element('<el>'))`, then the entry `{ role: 'menuitem', name: '<text>', exact: true }`. That role is confirmed for comboboxes and for the reason select of the trade change confirmation dialog; for another dropdown list it under "to verify" |
 | `assert that '<el>' is eventually visible` | `ui.expectVisible(element('<el>'))`. An `sc-modal` host is 0 x 0: assert its slotted header, as `ConfirmDialog` does |
 | `assert that '<el>' eventually contains from stored variable '<var>'` | `ui.expectText(element('<el>'), value)` |
 | `assert that '<el>' eventually contains '<text>'` | `ui.expectText(element('<el>'), '<text>')`; a fixed UI text such as a status badge is a `static` of the page (`TradeDetailPage.status`) |

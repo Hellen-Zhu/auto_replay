@@ -10,6 +10,13 @@ import type { Target } from './ui';
 
 const DIR = process.env.OREO_ELEMENTS_DIR || path.resolve(__dirname, '..', 'elements');
 
+/**
+ * The real control of a text web component (sc-text-input): an <input> or a <textarea> in its shadow root. The element
+ * files locate the host, and a fill on the host fails ("Element is not an <input>, <textarea> ..."), so a text field
+ * is looked up with { inner: INNER_INPUT }. It is the locator the E2E project's "type value ... into ..." step fills.
+ */
+export const INNER_INPUT = "input[part='input'], textarea[part='input']";
+
 /** How a findBy of the element files becomes a Target. The E2E project uses testId; another kind is one more line */
 const FIND_BY: Record<string, (value: string) => Target> = {
   testId: (value) => ({ testId: value }),

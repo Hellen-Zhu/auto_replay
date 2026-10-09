@@ -1,5 +1,5 @@
 import type { TargetIn, Val } from '../ui';
-import { element } from '../elements';
+import { element, INNER_INPUT } from '../elements';
 import { TradeChangeConfirmation } from '../components/trade-change-confirmation';
 import { BasePage } from './base.page';
 
@@ -10,8 +10,8 @@ export class TradesPage extends BasePage {
   static readonly status = { pendingApproval: 'PARV' };
   static readonly eventStatus = { cancelled: 'Cancelled' };
 
-  // The search box is a web component: the real control in its shadow root is an input or a textarea
-  protected readonly searchInput = element('trade_portal.search_input', { inner: "input[part='input'], textarea[part='input']" });
+  // The search box is a web component: the real control is in its shadow root
+  protected readonly searchInput = element('trade_portal.search_input', { inner: INNER_INPUT });
   protected readonly allTradesBlotter = element('trade_portal.all_trade_blotter');
   // An entry of a row's action menu
   protected readonly cancelAction = element('trade_portal.row_action_cancel');

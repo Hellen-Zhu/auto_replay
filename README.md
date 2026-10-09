@@ -122,7 +122,7 @@ Locators are not written again in this project: they are the element files of th
 ]
 ```
 
-A page object or component refers to an element by that name: `element('new_trade.book_btn')`. The element files only know the control itself, so what is specific to how this project operates it is added at the place of use, e.g. the real `<input>` inside a web component: `element('new_trade.portfolio_select', { inner: 'input' })`.
+A page object or component refers to an element by that name: `element('new_trade.book_btn')`. The element files only know the control itself, so what is specific to how this project operates it is added at the place of use, e.g. the real `<input>` inside a web component: `element('new_trade.portfolio_select', { inner: 'input' })`. For a text field use `{ inner: INNER_INPUT }` (exported by `framework/elements.ts`): it matches the `<input>` or `<textarea>` inside the component, exactly as the E2E project's `type value '...' into '...'` step does. This holds for every text field, also one whose element name ends in `_textarea`: the element is the web component, and filling it directly fails with `Element is not an <input>, <textarea>, <select> or [contenteditable]`.
 
 To refresh `elements/` after the E2E project changed:
 
@@ -155,7 +155,7 @@ The framework follows the Page Object Model, in three layers. Each layer only ca
 // framework/pages/trades.page.ts
 export class TradesPage extends BasePage {
   static readonly path = '/trades';
-  protected readonly searchInput = element('trade_portal.search_input', { inner: "input[part='input'], textarea[part='input']" });
+  protected readonly searchInput = element('trade_portal.search_input', { inner: INNER_INPUT });
   protected readonly allTradesBlotter = element('trade_portal.all_trade_blotter');
 
   // The first row of the blotter that shows this trade ID: the rows are only told apart by their text
@@ -221,7 +221,7 @@ Key points:
 - A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
 - Case data does not go into `config.local.json`: put it in `testdata/` and use it through `this.params(data)` in the flow.
-- OREO inputs are web components and the real `<input>` sits in the shadow DOM, so input targets need `inner: 'input'`; buttons can be clicked on the host element directly.
+- OREO inputs are web components and the real `<input>` (or `<textarea>`) sits in the shadow DOM, so input targets need `inner: 'input'` or `inner: INNER_INPUT`; buttons can be clicked on the host element directly.
 - In a page or component, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
 - Text fields of a target can be a parameter or a config reference too: `{ role: 'menuitem', name: p.direction }`.
 - A target can be narrowed by the text it contains: `{ ...blotter, inner: 'role=row', hasText: tradeId, nth: 0 }` is the first row of the blotter that shows that trade ID (`inner`, then `hasText`, then `nth`). `hasText` matches a part of the text, so the ID `T12` also finds the row of `T123`: search for the trade first.

@@ -5,16 +5,23 @@
 //
 // What is real and what is only this mock's guess:
 // - real testids: login-*, layout-*, create-trade-*, trade-file-upload, trade-detail-*, trade-change-confirmation-dialog,
-//   trade-change-confirm-btn, trade-row-action-cancellation;
-// - testids made up here because the real ones are not known yet (search box, all-trades blotter, reason select,
-//   comments textarea): they are marked "mock testid" below. Point the element names at them with a scratch elements
-//   folder (OREO_ELEMENTS_DIR) when running a case against the mock;
+//   trade-change-confirm-btn, trade-row-action-cancellation, trade-change-reason-select, trade-change-comments-textarea;
+// - the comments field of the confirmation dialog is, as on the real system, an sc-text-input host with
+//   data-slot="textarea": a fill on the host fails, the control to fill is the [part="input"] in its shadow root.
+//   Whether the real component renders a <textarea> or an <input> there is not known (the mock renders a <textarea>);
+//   the tag of the reason select (sc-select here) is not known either, only that a click opens it and that its
+//   entries have the role menuitem;
+// - testids made up here because the real ones are not known yet (search box, all-trades blotter): they are marked
+//   "mock testid" below. Point the element names at them with a scratch elements folder (OREO_ELEMENTS_DIR) when
+//   running a case against the mock;
 // - the toast only copies the two attributes the E2E project reads (data-title, data-description);
 // - API, served under /api/v1 (so apiBaseUrl for the mock is http://localhost:4173/api/v1): create (path, X-User-Id
 //   header, multipart parts "trade" + "datFile", data.trade.id and data.checkerContext.taskId in the response) and
 //   the checker's approve / reject of a task (path, JSON body, { code, status: 'SUCCESS', data: <the trade> } in the
-//   response) are like the real ones. The body of trigger-event, the statuses LIVE and REJECTED and the rule that the
-//   submitter cannot decide on the own task are this mock's own.
+//   response) are like the real ones, and so is the status LIVE of an approved trade in the blotter. The body of
+//   trigger-event, the status REJECTED and the rule that the submitter cannot decide on the own task are this mock's
+//   own. So is the rule that a cancellation needs comments (the real dialog marks them optional): it is there so
+//   that a case whose comments did not reach the control fails.
 
 const http = require('http');
 const PORT = Number(process.env.PORT || 4173);
@@ -25,11 +32,17 @@ const components = `
 class ScTextInput extends HTMLElement {
   connectedCallback() {
     const r = this.attachShadow({ mode: 'open' });
-    r.innerHTML = '<div part="base" class="sc-form-group"><div part="input-group"><input part="input" class="sc-form-control line" type="' +
-      (this.getAttribute('type') || 'text') + '" placeholder="' + (this.getAttribute('placeholder') || '') + '"></div></div>' +
-      '<style>input{width:260px;padding:6px;border:none;border-bottom:1px solid #ccc;font-size:14px}</style>';
+    // data-slot="textarea" marks the multi-line variant (the comments field of the trade change confirmation dialog)
+    const control = this.getAttribute('data-slot') === 'textarea'
+      ? '<textarea part="input" class="sc-form-control" rows="3"></textarea>'
+      : '<input part="input" class="sc-form-control line" type="' + (this.getAttribute('type') || 'text') +
+        '" placeholder="' + (this.getAttribute('placeholder') || '') + '">';
+    r.innerHTML = '<div part="base" class="sc-form-group"><div part="input-group">' + control + '</div></div>' +
+      '<style>input{width:260px;padding:6px;border:none;border-bottom:1px solid #ccc;font-size:14px}' +
+      'textarea{width:260px;padding:6px;border:1px solid #ccc;font:inherit;font-size:13px}</style>';
   }
-  get value() { return this.shadowRoot.querySelector('input').value; }
+  get value() { return this.shadowRoot.querySelector('[part=input]').value; }
+  set value(text) { this.shadowRoot.querySelector('[part=input]').value = text; }
 }
 class ScButton extends HTMLElement {
   connectedCallback() {
@@ -171,9 +184,8 @@ h3{margin:24px 24px 0}.search{margin:16px 24px 0}.row{display:flex;align-items:c
 <sc-modal data-testid="trade-change-confirmation-dialog" hidden><div slot="header"><h2>Confirm Trade Changes</h2>
   <p>Review the changes and risk impact before saving</p></div>
   <div><h2>Updated Risk Calculation</h2>
-    <!-- mock testids -->
-    <div class="row"><label>Reason</label><sc-select data-testid="trade-change-reason-select" options="DEALER_ERROR|CLIENT_REQUEST|MOCK_OTHER"></sc-select></div>
-    <div class="row"><label>Comments</label><textarea data-testid="trade-change-comments-textarea" rows="3" cols="28"></textarea></div>
+    <div class="row"><label>Update Reason *</label><sc-select data-testid="trade-change-reason-select" options="DEALER_ERROR|CLIENT_REQUEST|MOCK_OTHER"></sc-select></div>
+    <div class="row"><label>Additional Comments (Optional)</label><sc-text-input data-slot="textarea" id="update-comments" data-ui="form-control" data-testid="trade-change-comments-textarea"></sc-text-input></div>
     <div id="err"></div>
     <sc-button data-testid="trade-change-confirm-btn">Confirm &amp; Save</sc-button></div></sc-modal>
 <ol id="toaster"></ol>
