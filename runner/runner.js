@@ -93,6 +93,14 @@ function listCases(dir = CASES_DIR) {
     });
 }
 
+// A case file directly in cases/ whose ID a folder holds too is the copy an export left there before the cases had
+// folders (an export never deletes a file). The one in the folder is the current one, so the other is not listed;
+// dragged onto run-case.bat by itself it still runs.
+function withoutOldCopies(cases) {
+  const inFolders = new Set(cases.filter((c) => c.dir).map((c) => c.id));
+  return cases.filter((c) => c.dir || !inFolders.has(c.id));
+}
+
 // A list longer than this is cut: with hundreds of cases the PO narrows it by typing text instead of scrolling
 const LIST_MAX = 40;
 const inFolder = (c, dir) => !dir || c.dir === dir || c.dir.startsWith(`${dir}/`);
@@ -493,7 +501,7 @@ function printSelected(list) {
 
 /** The cases the PO wants to run: null when there are none to choose from, QUIT when the PO closes the list */
 async function chooseCases() {
-  const cases = listCases().filter((c) => !c.error);
+  const cases = withoutOldCopies(listCases().filter((c) => !c.error));
   if (!cases.length) {
     console.log(`\nThere are no cases in the cases folder. Put the .json case files provided by QA into:\n  ${CASES_DIR}\n`);
     return null;
@@ -513,7 +521,7 @@ function casesFromArgs(args) {
   for (const arg of args) {
     const file = path.resolve(arg);
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
-      for (const c of listCases(file)) {
+      for (const c of withoutOldCopies(listCases(file))) {
         if (c.error) console.log(`Skipped ${path.basename(c.file)}: it is not a case file (${c.error.split('\n')[0]})`);
         else list.push(c);
       }

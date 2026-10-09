@@ -296,7 +296,7 @@ npm run build:portable -- --with-config   # include your baseUrl and accounts (p
 npm run build:portable -- --no-zip        # produce the folder only, no zip
 ```
 
-This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported case files need to be sent to the PO, who drops them into the same folder under their `cases` folder, e.g. `cases/trade-cancellation/` (plus any new file under `data/` that a case uploads). The runner finds a case file anywhere under `cases/`, at any depth, so a file dropped directly into `cases` runs as well; it is just listed outside the folders. `testdata/` is not part of the package: a case file carries the data it uses.
+This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported case files need to be sent to the PO, who drops them into the same folder under their `cases` folder, e.g. `cases/trade-cancellation/` (plus any new file under `data/` that a case uploads). The runner finds a case file anywhere under `cases/`, at any depth, so a file dropped directly into `cases` runs as well; it is just listed outside the folders (unless a folder holds a case with the same file name, which is then the one that is listed). `testdata/` is not part of the package: a case file carries the data it uses.
 
 A case file is written in the lowest format version that can express it, and a runner refuses a file newer than itself with a message asking for the current package:
 
@@ -323,7 +323,7 @@ A case file is written in the lowest format version that can express it, and a r
    - **Up / Down** move the highlighted row (also PageUp / PageDown, Home / End). **Right** or Enter opens a folder and shows its cases below it; **Left** closes it. **Enter on a case runs it.**
    - **Type text to search**: a product (`trf`), part of a case ID (`cancellation-fx_trf`). Only the matching cases stay, in their folders. Backspace deletes a character, Esc clears the search.
    - The description of the highlighted case is shown below the list. A list longer than the window scrolls.
-   - Case files that lie directly in `cases/` (not in a folder) are in a row `(not in a folder)` after the folders.
+   - Case files that lie directly in `cases/` (not in a folder) are in a row `(not in a folder)` after the folders. A file there with the same name as a case in a folder is not listed: it is the copy from before the cases had folders, and the one in the folder is the current one. Delete such files (`Remove-Item cases\*.json` removes only the files directly in `cases`).
    - **Ctrl+C** closes the window.
    - In a very small window the runner shows a plain numbered list instead: type the number of a folder, then the number of the case (plain Enter = number 1, `B` goes back, any other text is a search). If the keyboard list does not look right on a computer, set the environment variable `OREO_PLAIN_MENU=1` before starting the bat to always get the numbered list.
 3. The runner shows the system address and account it is about to use. Press Enter to continue, or type `C` to switch to another environment or account (a password that no longer matches is then asked for again, and the current one can be typed again). Anything missing, such as the password, is prompted for. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
