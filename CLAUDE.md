@@ -240,7 +240,7 @@ npx tsc -p .                      # type check
    - if the trade change confirmation requires a reason or comments for this event, the flow needs them (the snippet fills neither);
    - confirmed by the user: every input of the system is the web component (testid on the host, the control inside it is `INNER_INPUT`), so the amount and the currency are filled as `typeField` does, and the options of the direction dropdown are `menuitem` entries;
    - the final status is checked as text in the trade's row, not per column (the snippet checks the columns `status` and `eventStatus`), and whether a `DEAD` trade stays in the all-trades blotter was not seen;
-   - the provisioning data of the `Given` is that of the cancellation (the API template).
+   - confirmed by the user: the `Given` of every lifecycle event creates its trade like the cancellation does, with the same API data (the API template) and the same steps.
    Other lifecycle events (partial termination, novation remaining, step out, portfolio reassignment) each get a spec, a flow that fills the dialog between `flows.lifecycleEvent.openAction` and `submit`, and a testdata file.
 13. Optional enhancements: a case index page; copying ffmpeg from the local cache into the package (if video is needed later). For the case files, once there are hundreds: not rewriting a case file whose steps did not change (today `exportedAt` and `codeVersion` change on every export, so a full run shows every file as modified in Git); a check for case files whose test was renamed or removed (an export never deletes a file); packaging only some folders.
 
