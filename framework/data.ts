@@ -18,11 +18,13 @@ function readJson(file: string, label: string): unknown {
 }
 
 /**
- * The data of one case: testdata/common.json (values shared by every file), then "defaults" of
- * testdata/<name>.json, then the row of its "cases" whose "id" is the case ID; a later one wins.
- *   { "defaults": { ...shared by every case of this spec... }, "cases": [ { "id": "TC-XXX-001", ... }, ... ] }
- * Everything is optional: a case needs a row only for values that differ from the shared ones, and a spec whose
- * cases all use the common values needs no file.
+ * The data of one case: testdata/common.json (values shared by every file), then the shared blocks the file
+ * lists under "use", then "defaults" of testdata/<name>.json, then the row of its "cases" whose "id" is the case
+ * ID; a later one wins.
+ *   { "use": ["given-trade"], "defaults": { ...shared by every case of this spec... }, "cases": [ { "id": "TC-XXX-001", ... }, ... ] }
+ * A shared block is testdata/shared/<block>.json, a flat object like common.json: values that several specs need
+ * but not all of them, e.g. the trade a lifecycle event starts from. Everything is optional: a case needs a row
+ * only for values that differ from the shared ones, and a spec whose cases all use the common values needs no file.
  */
 export function findCase<T extends object>(name: string, id: string): T & { id: string } {
   const commonFile = path.join(DIR, 'common.json');
@@ -33,8 +35,18 @@ export function findCase<T extends object>(name: string, id: string): T & { id: 
   const file = path.join(DIR, `${name}.json`);
   const doc = fs.existsSync(file) ? readJson(file, label) : {};
   if (!isObject(doc)) throw new Error(`${label} must be an object with "defaults" and / or "cases"`);
-  const { defaults = {}, cases = [] } = doc;
+  const { use = [], defaults = {}, cases = [] } = doc;
+  if (!Array.isArray(use) || use.some((b) => typeof b !== 'string' || !/^[\w-]+$/.test(b))) throw new Error(`${label}: "use" must be a list of shared block names`);
   if (!isObject(defaults)) throw new Error(`${label}: "defaults" must be an object`);
+  const shared: Row = {};
+  for (const block of use as string[]) {
+    const blockLabel = `testdata/shared/${block}.json`;
+    const blockFile = path.join(DIR, 'shared', `${block}.json`);
+    if (!fs.existsSync(blockFile)) throw new Error(`${label}: "use" names "${block}", but ${blockLabel} does not exist`);
+    const values = readJson(blockFile, blockLabel);
+    if (!isObject(values)) throw new Error(`${blockLabel} must be an object`);
+    Object.assign(shared, values);
+  }
   if (!Array.isArray(cases)) throw new Error(`${label}: "cases" must be a list`);
 
   const seen = new Set<string>();
@@ -46,7 +58,7 @@ export function findCase<T extends object>(name: string, id: string): T & { id: 
     seen.add(row.id);
     if (row.id === id) own = row;
   });
-  return { ...common, ...defaults, ...own, id } as T & { id: string };
+  return { ...common, ...shared, ...defaults, ...own, id } as T & { id: string };
 }
 
 /** The case ID of a test: the [xxx] at the start of its title */

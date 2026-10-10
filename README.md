@@ -31,14 +31,14 @@ Two kinds of data are kept apart:
 | `framework/elements.ts` | `element('<name>')`: looks a locator up in `elements/` by the name the E2E project gives it |
 | `framework/app.ts` | `App`: one instance of every page and shared component, each created on first use |
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
-| `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
+| `framework/data.ts` | Reads `testdata/<name>.json` with the shared blocks it uses and finds the row of a case ID (behind the `testData` fixture) |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/<spec name>/` automatically after a test passes |
 | `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`, `tradeAllocation`, `lifecycleEvent`, `tradeEarlyTermination`, `tradeAmendment`, `tradePartialNovationRemaining`, ...) |
 | `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`, `trade-allocation.spec.ts`, `trade-early-termination.spec.ts`, `trade-partial-termination.spec.ts`, `trade-novation-remaining.spec.ts`, `trade-step-out-full.spec.ts`, `trade-step-out-partial.spec.ts`, `trade-portfolio-reassignment.spec.ts`, `trade-amendment.spec.ts`, `trade-partial-novation-remaining.spec.ts`; `support.ts` holds what the specs share |
-| `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
+| `testdata/` | Case data: `common.json` (values shared by all cases), `shared/` (blocks of values shared by several specs) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
-| `runner/runner.js` | PO-side runner |
+| `runner/runner.js`, `runner/lib/` | PO-side runner: `runner.js` is the entry, its parts (case list and tree, settings, execution, batch, report, view server, recording) are the modules in `runner/lib/` |
 | `portable/run-case.bat` | The launcher the PO double-clicks; a case file, several of them or a folder of cases can be dragged onto it |
 | `portable/record-session.bat` | Records a manual session (no case): the PO works by hand with the trace on, e.g. to report a bug |
 | `portable/view-trace.bat` | Opens the list of earlier runs with their report and trace viewer links |
@@ -179,6 +179,7 @@ Case data lives in `testdata/`, not in `config.local.json`:
 
 (The real files are plain JSON, without comments.)
 
+- Values that several specs share, but not all of them, are a block in `testdata/shared/`: a spec's file lists it (`"use": ["given-trade"]`) and gets its values between `common.json` and its own `defaults`. `shared/given-trade.json` holds the API data of the trade every lifecycle event starts from, so it is written once instead of in each event's file.
 - A case gets `common.json`, then `defaults` of its spec's file, then its own row: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once. **A case that needs nothing different has no row at all** (only `-UI-005` has one, for its product); `cases`, `defaults` and even the file are optional.
 - `id` is the full case ID. **The data is matched at run time**: a test title starts with its case ID in `[ ]` (the spec may build it, e.g. `[TC-TRADE-CREATION-${product}-UI-001]`), and the `testData` fixture looks that ID up in `testdata/<spec file name>.json` (`tests/trade-creation.spec.ts` → `testdata/trade-creation.json`). Take care with the spelling of an `id`: a row that matches no case is simply not used. The ID is also the exported file name (`cases/<spec file name>/<id>.json`).
 - In the test: `const data = testData<TradeCreationData>()`, then hand it to the flow.

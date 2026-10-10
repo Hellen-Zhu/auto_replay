@@ -1,8 +1,7 @@
 {
+  "use": ["given-trade"],
   "defaults": {
-    "counterpartyFmId": "300036958",
-    "premiumAmount": 10000,
-    "premiumCurrency": "USD"
+    "portfolioId": "CM_OIL_CRU_OPT"
   },
   "cases": [
     {

@@ -1,9 +1,6 @@
 {
+  "use": ["given-trade"],
   "defaults": {
-    "portfolioId": "ABS_EQF",
-    "counterpartyFmId": "300036958",
-    "premiumAmount": 10000,
-    "premiumCurrency": "USD",
     "newPortfolio": "CM_PRC_UK",
     "expectedPortfolio": "CM_PRC_UK"
   }

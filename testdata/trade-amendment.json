@@ -1,9 +1,6 @@
 {
+  "use": ["given-trade"],
   "defaults": {
-    "portfolioId": "ABS_EQF",
-    "counterpartyFmId": "300036958",
-    "premiumAmount": 10000,
-    "premiumCurrency": "USD",
     "amendmentReason": "NON_ECON_CHANGE",
     "newCounterpartyName": "10 AM JAK",
     "newPortfolio": "PAE_CTPSHK_PB",
