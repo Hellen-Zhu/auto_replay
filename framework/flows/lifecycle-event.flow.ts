@@ -22,8 +22,8 @@ export class LifecycleEventFlow extends BaseFlow {
 
   /**
    * Confirm the event's dialog, which starts the risk calculation (mocked or real by the setting riskEngine), then
-   * confirm the trade change. The E2E project's last step, "confirm lifecycle event trade change and wait for page
-   * ready", is a Java step whose code was not seen: here it is a click that waits for the trigger-event answer.
+   * confirm the trade change, which waits for the trigger-event answer. Both are as in TradeLifecycleEventSteps of
+   * the E2E project: the same buttons, requests and, for a mocked calculation, the same answer.
    */
   async submit(tradeId: string) {
     const { trades, dynamicAction } = this.app;
