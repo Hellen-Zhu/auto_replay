@@ -3,6 +3,8 @@
 
 import type { UI } from './ui';
 import { TradesApi } from './api';
+import { AllocationDialog } from './components/allocation-dialog';
+import { DynamicAction } from './components/dynamic-action';
 import { Toast } from './components/toast';
 import { TopBar } from './components/top-bar';
 import { LoginPage, TradesPage, NewTradePage, TradeDetailPage } from './pages';
@@ -13,6 +15,8 @@ export class App {
   private readonly created: {
     topBar?: TopBar;
     toast?: Toast;
+    allocationDialog?: AllocationDialog;
+    dynamicAction?: DynamicAction;
     login?: LoginPage;
     trades?: TradesPage;
     newTrade?: NewTradePage;
@@ -24,6 +28,9 @@ export class App {
 
   get topBar() { return (this.created.topBar ??= new TopBar(this.ui)); }
   get toast() { return (this.created.toast ??= new Toast(this.ui)); }
+  /** The dialogs a lifecycle event on a trade opens, from the trade portal or the trade detail page */
+  get allocationDialog() { return (this.created.allocationDialog ??= new AllocationDialog(this.ui)); }
+  get dynamicAction() { return (this.created.dynamicAction ??= new DynamicAction(this.ui)); }
   get login() { return (this.created.login ??= new LoginPage(this.ui)); }
   get trades() { return (this.created.trades ??= new TradesPage(this.ui)); }
   get newTrade() { return (this.created.newTrade ??= new NewTradePage(this.ui)); }

@@ -243,6 +243,21 @@ export class UI {
   expectText(target: TargetIn, value: Val, opts: { exact?: boolean } = {}) {
     return this.run({ action: 'expectText', target: this.toTarget(target), value: this.toPlaceholder(value), exact: opts.exact });
   }
+  /** Not shown: hidden, or not on the page at all (a dialog that closed, a menu entry the user is not offered) */
+  expectHidden(target: TargetIn) {
+    return this.run({ action: 'expectHidden', target: this.toTarget(target) });
+  }
+  /** For a web component, point at the real control inside it: { inner: 'button' } */
+  expectEnabled(target: TargetIn) {
+    return this.run({ action: 'expectEnabled', target: this.toTarget(target) });
+  }
+  expectDisabled(target: TargetIn) {
+    return this.run({ action: 'expectDisabled', target: this.toTarget(target) });
+  }
+  /** What an input holds (its value is not text of the page, so expectText does not see it); the target is the real control */
+  expectValue(target: TargetIn, value: Val) {
+    return this.run({ action: 'expectValue', target: this.toTarget(target), value: this.toPlaceholder(value) });
+  }
   expectUrl(urlPath: string) {
     return this.run({ action: 'expectUrl', value: urlPath });
   }
@@ -357,8 +372,9 @@ export class UI {
       // version 2 runner would ignore without a word (any row, a normal click); 4 adds the api action; 5 adds the
       // request a click waits for (an older runner would click and never mock it); 6 adds case data without a value,
       // which the runner asks for (an older runner would run with the empty text, e.g. find any trade's row); 7 adds
-      // case data in the name of a data file and in a step line (an older runner would look for a file of that name)
-      formatVersion: this.steps.some(namesCaseData) ? 7 : asked.length ? 6 : this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
+      // case data in the name of a data file and in a step line (an older runner would look for a file of that name);
+      // 8 adds the checks expectHidden / expectEnabled / expectDisabled / expectValue
+      formatVersion: this.steps.some((s) => core.V8_ACTIONS.includes(s.action)) ? 8 : this.steps.some(namesCaseData) ? 7 : asked.length ? 6 : this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,

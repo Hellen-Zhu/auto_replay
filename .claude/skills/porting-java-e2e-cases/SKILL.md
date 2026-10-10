@@ -57,7 +57,7 @@ A line that matches no entry and is not a recognizable built-in step, or matches
 
 ## Built-in Genie steps
 
-Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAndCapture`, `clickAndAwait`, `upload`, `press`, `read`, `expectVisible`, `expectText`, `expectUrl` for the page, plus `api` for a request to the system's API, and nothing else.
+Seen so far. The `UI` class has `goto`, `fill`, `click`, `rightClick`, `clickAndCapture`, `clickAndAwait`, `upload`, `press`, `read`, `expectVisible`, `expectHidden`, `expectEnabled`, `expectDisabled`, `expectValue`, `expectText`, `expectUrl` for the page, plus `api` for a request to the system's API, and nothing else.
 
 | Genie step | Here |
 |---|---|

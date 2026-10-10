@@ -18,6 +18,11 @@ export class ConfirmDialog extends BaseComponent {
     await this.ui.expectVisible(this.header);
   }
 
+  /** The dialog is closed */
+  async expectHidden() {
+    await this.ui.expectHidden(this.header);
+  }
+
   async confirm() {
     await this.ui.click(this.confirmBtn);
   }

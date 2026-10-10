@@ -8,8 +8,13 @@ const { expect } = require('@playwright/test');
 
 // Case file versions this code can run: 1 = steps only; 2 = adds the params block and ${param:name};
 // 3 = adds hasText in a target and button on a click; 4 = adds the api action; 5 = adds request on a click;
-// 6 = adds case data without a value (an empty text in params), which is asked for before the run
-const FORMAT_VERSION = 7;
+// 6 = adds case data without a value (an empty text in params), which is asked for before the run;
+// 7 = adds case data in the name of a data file and in a step line;
+// 8 = adds the checks expectHidden, expectEnabled, expectDisabled and expectValue
+const FORMAT_VERSION = 8;
+
+/** The checks that came with version 8: a case that uses one cannot be run by an older runner */
+const V8_ACTIONS = ['expectHidden', 'expectEnabled', 'expectDisabled', 'expectValue'];
 
 /**
  * Turn a target description from the JSON into a Playwright Locator.
@@ -407,6 +412,20 @@ async function executeStep(page, step, ctx) {
     case 'expectVisible':
       await expect(resolveTarget(page, step.target)).toBeVisible({ timeout });
       return;
+    case 'expectHidden':
+      // Not on the page counts as hidden too: a dialog that was closed, a menu entry the user is not offered
+      await expect(resolveTarget(page, step.target)).toBeHidden({ timeout });
+      return;
+    case 'expectEnabled':
+      await expect(resolveTarget(page, step.target)).toBeEnabled({ timeout });
+      return;
+    case 'expectDisabled':
+      await expect(resolveTarget(page, step.target)).toBeDisabled({ timeout });
+      return;
+    case 'expectValue':
+      // What an input, a textarea or a select holds: its text is not part of the page's text, so expectText cannot see it
+      await expect(resolveTarget(page, step.target)).toHaveValue(value, { timeout });
+      return;
     case 'expectText':
       if (step.exact) await expect(resolveTarget(page, step.target)).toHaveText(value, { timeout });
       else await expect(resolveTarget(page, step.target)).toContainText(value, { timeout });
@@ -460,6 +479,10 @@ function describeStep(step, vars, params, config) {
     case 'select': return `Select ${v} in ${t}`;
     case 'read': return `Read ${t} and save as ${step.saveAs}`;
     case 'expectVisible': return `Verify ${t} is visible`;
+    case 'expectHidden': return `Verify ${t} is not shown`;
+    case 'expectEnabled': return `Verify ${t} is enabled`;
+    case 'expectDisabled': return `Verify ${t} is disabled`;
+    case 'expectValue': return `Verify ${t} holds the value ${v}`;
     case 'expectText': return `Verify ${t} ${step.exact ? 'equals' : 'contains'} ${v}`;
     case 'expectUrl': return `Verify current page is ${v}`;
     case 'wait': return `Wait ${v} ms`;
@@ -478,5 +501,5 @@ function describeStep(step, vars, params, config) {
 }
 
 module.exports = {
-  FORMAT_VERSION, resolveDataFile, dataFilesOf, fillParams, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath, isMocked,
+  FORMAT_VERSION, V8_ACTIONS, resolveDataFile, dataFilesOf, fillParams, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath, isMocked,
 };
