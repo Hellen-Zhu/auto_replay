@@ -66,6 +66,14 @@ export class DynamicAction extends ConfirmDialog {
     await this.ui.clickAndAwait(this.confirmBtn, RiskCalculation.forTrade(tradeId));
   }
 
+  /**
+   * The same for a partial novation, whose form starts another risk calculation (the E2E project's "confirm
+   * dynamic action form using configured partial risk engine mode")
+   */
+  async confirmAndAwaitPartialNovationRisk(tradeId: string) {
+    await this.ui.clickAndAwait(this.confirmBtn, RiskCalculation.forPartialNovation(tradeId));
+  }
+
   /** The line that shows how the result of the event is calculated */
   async expectEquationContains(text: Val) {
     await this.ui.expectText(element('dynamic_action.equation_line'), text);

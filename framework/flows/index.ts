@@ -16,6 +16,8 @@ import { TradeNovationRemainingFlow } from './trade-novation-remaining.flow';
 import { TradeStepOutFlow } from './trade-step-out.flow';
 import { TradePortfolioReassignmentFlow } from './trade-portfolio-reassignment.flow';
 import { TradeDetailFlow } from './trade-detail.flow';
+import { TradeAmendmentFlow } from './trade-amendment.flow';
+import { TradePartialNovationRemainingFlow } from './trade-partial-novation-remaining.flow';
 
 export class Flows {
   readonly auth: AuthFlow;
@@ -32,6 +34,8 @@ export class Flows {
   readonly tradeStepOut: TradeStepOutFlow;
   readonly tradePortfolioReassignment: TradePortfolioReassignmentFlow;
   readonly tradeDetail: TradeDetailFlow;
+  readonly tradeAmendment: TradeAmendmentFlow;
+  readonly tradePartialNovationRemaining: TradePartialNovationRemainingFlow;
 
   constructor(app: App) {
     this.auth = new AuthFlow(app);
@@ -48,6 +52,8 @@ export class Flows {
     this.tradeStepOut = new TradeStepOutFlow(app);
     this.tradePortfolioReassignment = new TradePortfolioReassignmentFlow(app);
     this.tradeDetail = new TradeDetailFlow(app);
+    this.tradeAmendment = new TradeAmendmentFlow(app);
+    this.tradePartialNovationRemaining = new TradePartialNovationRemainingFlow(app);
   }
 }
 
@@ -62,4 +68,6 @@ export { type TradePartialTerminationData } from './trade-partial-termination.fl
 export { type TradeNovationRemainingData, type NovationInputProfile } from './trade-novation-remaining.flow';
 export { type TradeStepOutData, type TradeStepOutPartialData } from './trade-step-out.flow';
 export { type TradePortfolioReassignmentData } from './trade-portfolio-reassignment.flow';
-export { AuthFlow, TradesFlow, TradeCreationFlow, TradeProvisioningFlow, TradeCancellationFlow, TradeApprovalFlow, TradeAllocationFlow, LifecycleEventFlow, TradeEarlyTerminationFlow, TradePartialTerminationFlow, TradeNovationRemainingFlow, TradeStepOutFlow, TradePortfolioReassignmentFlow, TradeDetailFlow };
+export { type TradeAmendmentData } from './trade-amendment.flow';
+export { type TradePartialNovationRemainingData, type PartialNovationStart } from './trade-partial-novation-remaining.flow';
+export { AuthFlow, TradesFlow, TradeCreationFlow, TradeProvisioningFlow, TradeCancellationFlow, TradeApprovalFlow, TradeAllocationFlow, LifecycleEventFlow, TradeEarlyTerminationFlow, TradePartialTerminationFlow, TradeNovationRemainingFlow, TradeStepOutFlow, TradePortfolioReassignmentFlow, TradeDetailFlow, TradeAmendmentFlow, TradePartialNovationRemainingFlow };

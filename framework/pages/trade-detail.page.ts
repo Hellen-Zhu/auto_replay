@@ -1,7 +1,9 @@
-import type { TargetIn, Val } from '../ui';
+import type { AwaitedRequest, TargetIn, Val } from '../ui';
 import { element, INNER_INPUT } from '../elements';
 import { Combobox } from '../components/combobox';
 import { ConfirmDialog } from '../components/confirm-dialog';
+import { TradeChangeConfirmation } from '../components/trade-change-confirmation';
+import { RiskCalculation } from '../risk-engine';
 import { BasePage } from './base.page';
 
 export type TradeDetailSection = keyof typeof TradeDetailPage.sections;
@@ -9,6 +11,7 @@ export type TradeDetailButton = keyof typeof TradeDetailPage.buttons;
 export type TradeDetailValue = keyof typeof TradeDetailPage.values;
 export type TradeDetailCombobox = keyof typeof TradeDetailPage.comboboxes;
 export type ScheduleFixing = keyof typeof TradeDetailPage.scheduleFixings;
+export type CheckerDecision = keyof typeof TradeDetailPage.checkerDecisions;
 
 /**
  * Trade detail page (the E2E project's trade_detail_page.snippet). Apart from the header card, an element is
@@ -20,6 +23,16 @@ export class TradeDetailPage extends BasePage {
 
   /** Status badges shown on the header card (confirmed on the real system) */
   static readonly status = { pendingApproval: 'PARV' };
+
+  /**
+   * The request the checker's confirmation sends. The E2E project waits for any POST under /checker/tasks/; a
+   * request is matched here by the end of its path, which is the decision (the task ID in between is not known to
+   * the page object).
+   */
+  static readonly checkerDecisions = {
+    approve: { url: '/approve', method: 'POST' },
+    reject: { url: '/reject', method: 'POST' },
+  } as const satisfies Record<string, AwaitedRequest>;
 
   /** The regions of the page: expectSectionVisible(name), expectSectionContains(name, text) */
   static readonly sections = {
@@ -76,6 +89,11 @@ export class TradeDetailPage extends BasePage {
     return new ConfirmDialog(this.ui, element('trade_detail.confirm_checker_dialog'), element('trade_detail.checker_confirm_btn'));
   }
 
+  /** The dialog that Amend opens, with the result of the risk calculation, a reason and comments */
+  get changeConfirmation(): TradeChangeConfirmation {
+    return new TradeChangeConfirmation(this.ui);
+  }
+
   /** The dialog that Cancel opens. Its confirm button is not in the E2E project's snippets, so it has none here */
   protected get cancelDialogHeader(): TargetIn {
     return element('trade_detail.cancel_dialog', { inner: '[slot="header"]' });
@@ -110,6 +128,19 @@ export class TradeDetailPage extends BasePage {
 
   async clickButton(name: TradeDetailButton) {
     await this.ui.click(element(TradeDetailPage.buttons[name].element));
+  }
+
+  /**
+   * Amend sends the changes made on the page to the risk calculation of the trade (mocked or real by the setting
+   * riskEngine); the click is over once it is answered and the trade change confirmation opens
+   */
+  async clickAmend(tradeId: string) {
+    await this.ui.clickAndAwait(element('trade_detail.amend_btn'), RiskCalculation.forTrade(tradeId));
+  }
+
+  /** Confirm the checker's dialog and wait until the system has answered the decision */
+  async confirmCheckerDecision(decision: CheckerDecision) {
+    await this.ui.clickAndAwait(element('trade_detail.checker_confirm_btn'), TradeDetailPage.checkerDecisions[decision]);
   }
 
   /** What a field holds; the E2E project reads the inner input of the control in the same way */

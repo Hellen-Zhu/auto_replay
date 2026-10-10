@@ -1,0 +1,12 @@
+{
+  "defaults": {
+    "portfolioId": "ABS_EQF",
+    "counterpartyFmId": "300036958",
+    "premiumAmount": 10000,
+    "premiumCurrency": "USD",
+    "remainingNotional": "1,000.00",
+    "newCounterpartyName": "1330 ATH",
+    "equationLine": "Notional: 70,000.00 - 1,000.00 = 69,000.00",
+    "newNotional": "69,000.00"
+  }
+}

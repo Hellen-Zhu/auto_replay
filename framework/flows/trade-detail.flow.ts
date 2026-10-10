@@ -25,7 +25,7 @@ export class TradeDetailFlow extends BaseFlow {
     const { tradeDetail } = this.app;
     await this.open(tradeId);
     await this.ui.And('I click Approve', () => tradeDetail.clickButton('approve'));
-    await this.ui.And('I confirm the approval', () => tradeDetail.checkerDialog.confirm());
+    await this.ui.And('I confirm the approval', () => tradeDetail.confirmCheckerDecision('approve'));
   }
 
   /** Checker rejects the pending trade from its trade detail page */
@@ -33,7 +33,7 @@ export class TradeDetailFlow extends BaseFlow {
     const { tradeDetail } = this.app;
     await this.open(tradeId);
     await this.ui.And('I click Reject', () => tradeDetail.clickButton('reject'));
-    await this.ui.And('I confirm the rejection', () => tradeDetail.checkerDialog.confirm());
+    await this.ui.And('I confirm the rejection', () => tradeDetail.confirmCheckerDecision('reject'));
   }
 
   /** Every part of the trade details is shown */

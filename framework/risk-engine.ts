@@ -25,4 +25,10 @@ export const RiskCalculation = {
   forNewTrade: (): AwaitedRequest => calculation('/trades/calculate-risk-for-new'),
   /** Before an event on an existing trade (cancellation: tradeRiskCalculationUrl(tradeId) of the E2E project) */
   forTrade: (tradeId: string): AwaitedRequest => calculation(`/trades/${tradeId}/calculate-risk`),
+  /**
+   * Before a partial novation of an existing trade (tradePartialRiskCalculationUrl(tradeId) of the E2E project).
+   * The E2E project mocks it with its own test data, UI-SETUP-RISK-CALC-PARTIAL-SUCCESS, whose body was not seen
+   * completely: the mocked answer here is the one of the other calculations, which the page may not accept.
+   */
+  forPartialNovation: (tradeId: string): AwaitedRequest => calculation(`/trades/${tradeId}/calculate-partial-novation-risk`),
 };
