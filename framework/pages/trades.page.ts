@@ -18,7 +18,7 @@ export class TradesPage extends BasePage {
    * rejected new trade goes back to) was stated by the user.
    */
   static readonly status = { pendingApproval: 'PARV', live: 'LIVE', dead: 'DEAD', draft: 'DRFT' };
-  static readonly eventStatus = { cancelled: 'Cancelled', new: 'New' };
+  static readonly eventStatus = { cancelled: 'Cancelled', new: 'New', terminated: 'Terminated' };
 
   // The tables below follow the E2E project's trade_portal_page.snippet. Their elements are looked up when an
   // operation uses them, not when the page is created: a case needs only the elements it really works on.

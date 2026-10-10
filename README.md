@@ -33,8 +33,8 @@ Two kinds of data are kept apart:
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
 | `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/<spec name>/` automatically after a test passes |
-| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`, `tradeAllocation`) |
-| `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`, `trade-allocation.spec.ts`; `support.ts` holds what the specs share |
+| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`, `tradeAllocation`, `lifecycleEvent`, `tradeEarlyTermination`) |
+| `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`, `trade-allocation.spec.ts`, `trade-early-termination.spec.ts`; `support.ts` holds what the specs share |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
@@ -110,6 +110,13 @@ Its data is in `testdata/trade-cancellation.json` (the trade that is created, th
 `tests/trade-allocation.spec.ts` mirrors `trade_allocation.feature`: the maker allocates a live trade to subtrades from the trade portal (action menu, Allocation), the message `Trade <ID> has been allocated into <n> sub-trade(s).` is shown and the trade details (`/trade/<ID>`) show `DEAD`. Three tests: `[TC-TRADE-ALLOCATION-<product>-UI-001]` (two subtrades, 50/50, for `FX_TRF` only, see "Coverage"), `[TC-TRADE-ALLOCATION-UI-002]` (four subtrades, 30/30/30/10) and `[TC-TRADE-ALLOCATION-UI-003]` (`FX_PSCRIPT`, three subtrades, 34/34/32). The live trade of the `Given` is created through the API, so they need what the cancellation cases need (`apiBaseUrl`, both accounts, the `.dat` files, the element sync).
 
 How a trade is split is data: the row of the case in `testdata/trade-allocation.json` lists its subtrades in the order of the dialog's rows, each with an optional `counterpartyName` and `percentage`; a value that is left out keeps what the dialog proposes (the 50/50 case sets no percentage). The values and the comments are those of the E2E project's allocation test data. In the case file each value is case data named after its row (`subTrade1Percentage`), so the PO can try another split. **These cases have not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
+
+
+### Trade early termination case
+
+`tests/trade-early-termination.spec.ts` mirrors `trade_early_termination.feature`: the maker opens Early Termination from the action menu of a live trade, selects the direction, types the amount and the currency, confirms the event (which starts the risk calculation, see `riskEngine`) and confirms the trade change; the message `EarlyTermination completed successfully` is shown and the blotter shows the trade as `DEAD` / `Terminated`. One test, `[TC-TRADE-EARLY-TERMINATION-<product>-UI-001]`, for `FX_TRF` only (see "Coverage"). The live trade of the `Given` is created through the API. Direction, amount and currency are case data (`testdata/trade-early-termination.json`), so the PO can change them for a run.
+
+Opening an event from the action menu and submitting it are shared by all lifecycle events (`flows.lifecycleEvent.openAction` / `submit`); a new event adds a flow that fills the dialog in between, a spec and a testdata file. **This case has not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
 
 ### Cases on an existing trade
 

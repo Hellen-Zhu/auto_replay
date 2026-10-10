@@ -10,6 +10,7 @@ export class Toast extends BaseComponent {
   /** The messages the cases check */
   static readonly message = {
     cancellationCompleted: 'Cancellation completed successfully',
+    earlyTerminationCompleted: 'EarlyTermination completed successfully',
     /**
      * The fixed part of "Trade <ID> has been allocated into <n> sub-trade(s).", the E2E project's toastMessage of
      * its allocation test data, where the trade ID is a wildcard

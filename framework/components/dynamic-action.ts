@@ -2,6 +2,7 @@ import type { TargetIn, UI, Val } from '../ui';
 import { element, INNER_INPUT } from '../elements';
 import { Combobox } from './combobox';
 import { ConfirmDialog } from './confirm-dialog';
+import { RiskCalculation } from '../risk-engine';
 
 /**
  * The dialog of a lifecycle event on a trade (the E2E project's dynamic_action_component.snippet): early and
@@ -55,6 +56,14 @@ export class DynamicAction extends ConfirmDialog {
 
   async chooseOption(value: Val) {
     await this.ui.click(this.option(value));
+  }
+
+  /**
+   * Confirm the event's form and wait for the risk calculation it triggers (the E2E project's "confirm dynamic
+   * action form using configured risk engine mode"); the trade change confirmation opens with its result
+   */
+  async confirmAndAwaitRisk(tradeId: string) {
+    await this.ui.clickAndAwait(this.confirmBtn, RiskCalculation.forTrade(tradeId));
   }
 
   /** The line that shows how the result of the event is calculated */
