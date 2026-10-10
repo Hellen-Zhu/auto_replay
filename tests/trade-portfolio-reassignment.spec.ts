@@ -8,8 +8,8 @@ import { prepare } from './support';
 // The feature runs the scenario for three products; here it runs for one (user decision, minimal coverage: the
 // pages of the event are the same for every product).
 // The end of the feature's title was not visible when it was copied: it is completed here with the event's name.
-// Not ported: the feature's second scenario (-UI-002, the td_bf value of a customized formula), whose check is a
-// Java step that was not seen.
+// Not ported: the feature's second scenario (-UI-002, the td_bf value of a customized formula). User decision: it
+// is not needed here.
 
 type Data = TradeProvisioningData & TradePortfolioReassignmentData;
 

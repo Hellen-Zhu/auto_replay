@@ -10,9 +10,11 @@ import { prepare } from './support';
 // them (the feature's have) and the PO runs a case for another product by changing "product" before the run. Scenario UI-001 (a normal trade is approved) is the
 // journey through the pages in trade-creation.spec.ts (TC-TRADE-CREATION-UI-005) and is not repeated here.
 // Not as in the feature: there the checker decides in UI-002 and UI-003 "from the trade detail page" and the result
-// is checked "in trade details"; those snippets are not known, so here the decision is made from the trade portal
-// and the result is checked in the blotter, and the step lines say so. UI-004 was not seen: its ID and title are
-// taken to continue UI-003.
+// is checked "in trade details"; here the decision is made from the trade portal and the result is checked in the
+// blotter, and the step lines say so. The feature's way is written as flows.tradeDetail (approve, reject,
+// expectDraft, expectLive, from trade_detail.snippet) but not used: the mock's trade detail page has no checker
+// buttons and no status badge, so these cases would no longer run there. UI-004 was not seen: its ID and title
+// are taken to continue UI-003.
 
 type Data = TradeProvisioningData & StepInProvisioningData & { product: string };
 

@@ -15,6 +15,7 @@ import { TradePartialTerminationFlow } from './trade-partial-termination.flow';
 import { TradeNovationRemainingFlow } from './trade-novation-remaining.flow';
 import { TradeStepOutFlow } from './trade-step-out.flow';
 import { TradePortfolioReassignmentFlow } from './trade-portfolio-reassignment.flow';
+import { TradeDetailFlow } from './trade-detail.flow';
 
 export class Flows {
   readonly auth: AuthFlow;
@@ -30,6 +31,7 @@ export class Flows {
   readonly tradeNovationRemaining: TradeNovationRemainingFlow;
   readonly tradeStepOut: TradeStepOutFlow;
   readonly tradePortfolioReassignment: TradePortfolioReassignmentFlow;
+  readonly tradeDetail: TradeDetailFlow;
 
   constructor(app: App) {
     this.auth = new AuthFlow(app);
@@ -45,6 +47,7 @@ export class Flows {
     this.tradeNovationRemaining = new TradeNovationRemainingFlow(app);
     this.tradeStepOut = new TradeStepOutFlow(app);
     this.tradePortfolioReassignment = new TradePortfolioReassignmentFlow(app);
+    this.tradeDetail = new TradeDetailFlow(app);
   }
 }
 
@@ -59,4 +62,4 @@ export { type TradePartialTerminationData } from './trade-partial-termination.fl
 export { type TradeNovationRemainingData, type NovationInputProfile } from './trade-novation-remaining.flow';
 export { type TradeStepOutData, type TradeStepOutPartialData } from './trade-step-out.flow';
 export { type TradePortfolioReassignmentData } from './trade-portfolio-reassignment.flow';
-export { AuthFlow, TradesFlow, TradeCreationFlow, TradeProvisioningFlow, TradeCancellationFlow, TradeApprovalFlow, TradeAllocationFlow, LifecycleEventFlow, TradeEarlyTerminationFlow, TradePartialTerminationFlow, TradeNovationRemainingFlow, TradeStepOutFlow, TradePortfolioReassignmentFlow };
+export { AuthFlow, TradesFlow, TradeCreationFlow, TradeProvisioningFlow, TradeCancellationFlow, TradeApprovalFlow, TradeAllocationFlow, LifecycleEventFlow, TradeEarlyTerminationFlow, TradePartialTerminationFlow, TradeNovationRemainingFlow, TradeStepOutFlow, TradePortfolioReassignmentFlow, TradeDetailFlow };
