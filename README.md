@@ -34,7 +34,7 @@ Two kinds of data are kept apart:
 | `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/<spec name>/` automatically after a test passes |
 | `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`, `tradeAllocation`, `lifecycleEvent`, `tradeEarlyTermination`) |
-| `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`, `trade-allocation.spec.ts`, `trade-early-termination.spec.ts`; `support.ts` holds what the specs share |
+| `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`, `trade-allocation.spec.ts`, `trade-early-termination.spec.ts`, `trade-partial-termination.spec.ts`, `trade-novation-remaining.spec.ts`, `trade-step-out-full.spec.ts`, `trade-step-out-partial.spec.ts`, `trade-portfolio-reassignment.spec.ts`; `support.ts` holds what the specs share |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
@@ -117,6 +117,20 @@ How a trade is split is data: the row of the case in `testdata/trade-allocation.
 `tests/trade-early-termination.spec.ts` mirrors `trade_early_termination.feature`: the maker opens Early Termination from the action menu of a live trade, selects the direction, types the amount and the currency, confirms the event (which starts the risk calculation, see `riskEngine`) and confirms the trade change; the message `EarlyTermination completed successfully` is shown and the blotter shows the trade as `DEAD` / `Terminated`. One test, `[TC-TRADE-EARLY-TERMINATION-<product>-UI-001]`, for `FX_TRF` only (see "Coverage"). The live trade of the `Given` is created through the API. Direction, amount and currency are case data (`testdata/trade-early-termination.json`), so the PO can change them for a run.
 
 Opening an event from the action menu and submitting it are shared by all lifecycle events (`flows.lifecycleEvent.openAction` / `submit`); a new event adds a flow that fills the dialog in between, a spec and a testdata file. **This case has not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
+
+### Other lifecycle event cases
+
+Five more events follow the pattern of the early termination, each with one test for `FX_TRF`, its own flow and its data in `testdata/<spec name>.json` (the values of the E2E project's test data, all case data the PO can change):
+
+| Spec | Case | What the maker enters | Expected |
+|---|---|---|---|
+| `tests/trade-partial-termination.spec.ts` | `[TC-TRADE-PARTIAL-TERMINATION-<product>-UI-001]` | new notional, unwind fee amount | message `Trade <ID> updated with new notional ...`; trade details show the new notional, status `LIVE` |
+| `tests/trade-novation-remaining.spec.ts` | `[TC-TRADE-NOVATION-REMAINING-<product>-UI-001]` | target amount, new counterparty | message title `Novation completed. Original trade <ID> terminated.`; blotter `DEAD` / `Novated` |
+| `tests/trade-step-out-full.spec.ts` | `[TC-TRADE-STEP-OUT-FULL-<product>-UI-001]` | direction, amount, currency, counterparty | message `StepOutFull completed successfully`; blotter `DEAD` / `Novated` |
+| `tests/trade-step-out-partial.spec.ts` | `[TC-TRADE-STEP-OUT-PARTIAL-<product>-UI-001]` | the same plus the new notional | message `StepOutPartial completed successfully`; blotter `LIVE` / `Novated` |
+| `tests/trade-portfolio-reassignment.spec.ts` | `[TC-TRADE-PORTFOLIO-REASSIGNMENT-<product>-UI-001]` | new portfolio | message `PortfolioReassignment completed successfully`; blotter `LIVE` / `Amended`; trade details show the new portfolio |
+
+**These cases have not been run yet.** The event statuses `Novated` and `Amended`, and what else still has to be checked on the real system, are listed in `CLAUDE.md`, section 10.
 
 ### Cases on an existing trade
 

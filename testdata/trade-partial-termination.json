@@ -1,0 +1,11 @@
+{
+  "defaults": {
+    "portfolioId": "ABS_EQF",
+    "counterpartyFmId": "300036958",
+    "premiumAmount": 10000,
+    "premiumCurrency": "USD",
+    "partialTerminationNewNotional": "5000",
+    "partialTerminationUnwindFeeAmount": "100",
+    "expectedNotional": "5,000.00"
+  }
+}

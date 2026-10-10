@@ -11,6 +11,11 @@ export class Toast extends BaseComponent {
   static readonly message = {
     cancellationCompleted: 'Cancellation completed successfully',
     earlyTerminationCompleted: 'EarlyTermination completed successfully',
+    stepOutFullCompleted: 'StepOutFull completed successfully',
+    stepOutPartialCompleted: 'StepOutPartial completed successfully',
+    portfolioReassignmentCompleted: 'PortfolioReassignment completed successfully',
+    /** The fixed part of "Trade <ID> updated with new notional <amount>", which the E2E project matches with wildcards */
+    partialTerminationCompleted: 'updated with new notional',
     /**
      * The fixed part of "Trade <ID> has been allocated into <n> sub-trade(s).", the E2E project's toastMessage of
      * its allocation test data, where the trade ID is a wildcard
@@ -21,6 +26,8 @@ export class Toast extends BaseComponent {
   static readonly title = {
     tradeApproved: 'Trade approved successfully',
     tradeRejected: 'Trade rejected successfully',
+    /** The fixed start of "Novation completed. Original trade <ID> terminated.", where the trade ID is a wildcard */
+    novationCompleted: 'Novation completed. Original trade',
   };
 
   /** The toast that shows this message; several toasts can be on screen at once */

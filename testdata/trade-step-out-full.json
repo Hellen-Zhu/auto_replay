@@ -1,0 +1,12 @@
+{
+  "defaults": {
+    "portfolioId": "ABS_EQF",
+    "counterpartyFmId": "300036958",
+    "premiumAmount": 10000,
+    "premiumCurrency": "USD",
+    "stepOutDirection": "Pay",
+    "stepOutAmount": "5,000",
+    "stepOutCurrency": "USD",
+    "stepOutCounterpartyName": "10 AM NY"
+  }
+}

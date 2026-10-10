@@ -15,10 +15,11 @@ export class TradesPage extends BasePage {
   static readonly path = '/trades';
   /**
    * What the blotter shows in a trade's row. PARV, LIVE and DEAD are the E2E project's; DRFT (a draft, what a
-   * rejected new trade goes back to) was stated by the user.
+   * rejected new trade goes back to) was stated by the user. The event statuses Novated and Amended are the words
+   * of the E2E project's feature steps ("closed as Novated", "marked as Amended"); their snippets were not seen.
    */
   static readonly status = { pendingApproval: 'PARV', live: 'LIVE', dead: 'DEAD', draft: 'DRFT' };
-  static readonly eventStatus = { cancelled: 'Cancelled', new: 'New', terminated: 'Terminated' };
+  static readonly eventStatus = { cancelled: 'Cancelled', new: 'New', terminated: 'Terminated', novated: 'Novated', amended: 'Amended' };
 
   // The tables below follow the E2E project's trade_portal_page.snippet. Their elements are looked up when an
   // operation uses them, not when the page is created: a case needs only the elements it really works on.
