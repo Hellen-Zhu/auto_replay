@@ -75,18 +75,17 @@ export class TradeAllocationFlow extends BaseFlow {
     });
   }
 
-  /** The success toast of the allocation is shown */
-  async expectCompleted(keyword: Keyword = 'Then') {
-    await this.ui[keyword]('I see the message that the allocation is completed', () =>
-      this.app.toast.expectMessage(Toast.message.allocationCompleted),
+  /** The success toast of the allocation is shown: it names the number of subtrades the trade was split into */
+  async expectCompleted(ways: number, keyword: Keyword = 'Then') {
+    await this.ui[keyword](`I see the message that the trade has been allocated into ${ways} subtrades`, () =>
+      this.app.toast.expectMessage(Toast.message.allocatedInto(ways)),
     );
   }
 
   /** The allocated trade is replaced by its subtrades: its trade details show the status DEAD */
   async expectAllocatedToDead(tradeId: string, keyword: Keyword = 'Then') {
-    await this.tradesFlow.openTradeDetails(tradeId, keyword);
-    await this.ui.And(`its status badge shows ${TradesPage.status.dead}`, () =>
-      this.app.tradeDetail.expectStatusBadge(TradesPage.status.dead),
-    );
+    const { tradeDetail } = this.app;
+    await this.ui[keyword]('I open the trade details of the trade', () => tradeDetail.open(tradeId));
+    await this.ui.And(`its status badge shows ${TradesPage.status.dead}`, () => tradeDetail.expectStatusBadge(TradesPage.status.dead));
   }
 }

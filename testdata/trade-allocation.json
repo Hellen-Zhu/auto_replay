@@ -1,23 +1,33 @@
 {
   "defaults": {
-    "portfolioId": "ABS_EQF",
     "counterpartyFmId": "300036958",
     "premiumAmount": 10000,
-    "premiumCurrency": "USD",
-    "allocationComments": "allocation for test"
+    "premiumCurrency": "USD"
   },
   "cases": [
     {
       "id": "TC-TRADE-ALLOCATION-FX_TRF-UI-001",
-      "subTrades": [{ "percentage": "50" }, { "percentage": "50" }]
+      "subTrades": [{ "counterpartyName": "10 AM JAK" }, { "counterpartyName": "10 AM JAK" }],
+      "allocationComments": "Allocation of 2 sub-trades for FX_TRF trade with 50% each"
     },
     {
       "id": "TC-TRADE-ALLOCATION-UI-002",
-      "subTrades": [{ "percentage": "30" }, { "percentage": "30" }, { "percentage": "30" }, { "percentage": "10" }]
+      "subTrades": [
+        { "counterpartyName": "10 AM JAK", "percentage": "30" },
+        { "counterpartyName": "10 AM JAK", "percentage": "30" },
+        { "counterpartyName": "11 AM GMT", "percentage": "30" },
+        { "counterpartyName": "11 AM GMT", "percentage": "10" }
+      ],
+      "allocationComments": "Allocation of 4 sub-trades for FX_TRF trade with 30%/30%/30%/10%"
     },
     {
       "id": "TC-TRADE-ALLOCATION-UI-003",
-      "subTrades": [{ "percentage": "34" }, { "percentage": "34" }, { "percentage": "32" }]
+      "subTrades": [
+        { "counterpartyName": "10 AM JAK", "percentage": "34" },
+        { "counterpartyName": "10 AM JAK", "percentage": "34" },
+        { "counterpartyName": "10 AM JAK", "percentage": "32" }
+      ],
+      "allocationComments": "Allocation of 3 sub-trades for FX_PSCRIPT trade with 34%/34%/32%"
     }
   ]
 }

@@ -6,7 +6,8 @@ import { prepare } from './support';
 // through the API (flows.tradeProvisioning), so the cases need apiBaseUrl in the local config.
 // The feature runs -UI-001 for three products; here it runs for one (user decision, minimal coverage: the pages of
 // an allocation are the same for every product). -UI-003 is about one product, FX_CO there, FX_PSCRIPT here.
-// How the trade is split (the subtrades and their percentages) is the data of each case.
+// How the trade is split (the counterparty and the percentage of each subtrade) and the comments are the data of
+// each case, taken from the E2E project's allocation test data.
 
 type Data = TradeProvisioningData & TradeAllocationData;
 
@@ -20,7 +21,7 @@ test.describe('Trade allocation', () => {
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When("perform equal '2' way allocation for the trade", () => flows.tradeAllocation.allocate(tradeId, 2, data));
-    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted());
+    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted(2));
     await And('the trade is allocated to Dead in the trade details', () => flows.tradeAllocation.expectAllocatedToDead(tradeId));
   });
 
@@ -31,7 +32,7 @@ test.describe('Trade allocation', () => {
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When("perform unequal '4' way allocation for the trade", () => flows.tradeAllocation.allocate(tradeId, 4, data));
-    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted());
+    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted(4));
     await And('the trade is allocated to Dead in the trade details', () => flows.tradeAllocation.expectAllocatedToDead(tradeId));
   });
 
@@ -43,7 +44,7 @@ test.describe('Trade allocation', () => {
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When("perform unequal '3' way allocation for the trade", () => flows.tradeAllocation.allocate(tradeId, 3, data));
-    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted());
+    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted(3));
     await And('the trade is allocated to Dead in the trade details', () => flows.tradeAllocation.expectAllocatedToDead(tradeId));
   });
 });

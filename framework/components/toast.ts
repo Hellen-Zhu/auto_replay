@@ -10,8 +10,11 @@ export class Toast extends BaseComponent {
   /** The messages the cases check */
   static readonly message = {
     cancellationCompleted: 'Cancellation completed successfully',
-    // Inferred from the cancellation's: the E2E project keeps it in its test data (toastMessage), which was not seen
-    allocationCompleted: 'Allocation completed successfully',
+    /**
+     * The fixed part of "Trade <ID> has been allocated into <n> sub-trade(s).", the E2E project's toastMessage of
+     * its allocation test data, where the trade ID is a wildcard
+     */
+    allocatedInto: (subTrades: number) => `has been allocated into ${subTrades} sub-trade(s).`,
   };
   /** The titles the cases check */
   static readonly title = {

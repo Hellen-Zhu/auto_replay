@@ -15,6 +15,9 @@ export type ScheduleFixing = keyof typeof TradeDetailPage.scheduleFixings;
  * looked up when an operation uses it, not when the page is created.
  */
 export class TradeDetailPage extends BasePage {
+  /** The page of a trade is this path followed by its ID (TradeDetailSteps of the E2E project) */
+  static readonly path = '/trade';
+
   /** Status badges shown on the header card (confirmed on the real system) */
   static readonly status = { pendingApproval: 'PARV' };
 
@@ -76,6 +79,11 @@ export class TradeDetailPage extends BasePage {
   /** The dialog that Cancel opens. Its confirm button is not in the E2E project's snippets, so it has none here */
   protected get cancelDialogHeader(): TargetIn {
     return element('trade_detail.cancel_dialog', { inner: '[slot="header"]' });
+  }
+
+  /** Opens the page of that trade by its address. Pass the ID a booking returned: it is recorded as a variable */
+  async open(tradeId: string) {
+    await this.ui.goto(`${TradeDetailPage.path}/${tradeId}`);
   }
 
   /** Pass the ID returned by the booking; it is recorded as a variable, so a replay checks its own new trade */
