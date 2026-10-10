@@ -33,8 +33,8 @@ Two kinds of data are kept apart:
 | `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
 | `framework/data.ts` | Reads `testdata/<name>.json` and finds the row of a case ID (behind the `testData` fixture) |
 | `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/<spec name>/` automatically after a test passes |
-| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`) |
-| `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`; `support.ts` holds what the specs share |
+| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`, `tradeAllocation`) |
+| `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`, `trade-allocation.spec.ts`; `support.ts` holds what the specs share |
 | `testdata/` | Case data: `common.json` (values shared by all cases) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
 | `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
 | `data/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
@@ -104,6 +104,12 @@ A case is repeated for every product only where the product changes what is test
 3. Run `npm run sync:elements -- <E2E project>`: the trade portal, confirmation dialog and checker action elements these cases use come from the E2E project's element files.
 
 Its data is in `testdata/trade-cancellation.json` (the trade that is created, the cancellation reason and comments). Parts of this case were written from what is known of the E2E project and still have to be checked on the real system; they are listed in `CLAUDE.md`, section 10.
+
+### Trade allocation cases
+
+`tests/trade-allocation.spec.ts` mirrors `trade_allocation.feature`: the maker allocates a live trade to subtrades from the trade portal (action menu, Allocation), the success message is shown and the trade details show `DEAD`. Three tests: `[TC-TRADE-ALLOCATION-<product>-UI-001]` (two subtrades, 50/50, for `FX_TRF` only, see "Coverage"), `[TC-TRADE-ALLOCATION-UI-002]` (four subtrades, 30/30/30/10) and `[TC-TRADE-ALLOCATION-UI-003]` (`FX_PSCRIPT`, three subtrades, 34/34/32). The live trade of the `Given` is created through the API, so they need what the cancellation cases need (`apiBaseUrl`, both accounts, the `.dat` files, the element sync).
+
+How a trade is split is data: the row of the case in `testdata/trade-allocation.json` lists its subtrades in the order of the dialog's rows, each with an optional `counterpartyName` and `percentage`; a value that is left out keeps what the dialog proposes. In the case file each value is case data named after its row (`subTrade1Percentage`), so the PO can try another split. **These cases have not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
 
 ### Cases on an existing trade
 

@@ -1,0 +1,23 @@
+{
+  "defaults": {
+    "portfolioId": "ABS_EQF",
+    "counterpartyFmId": "300036958",
+    "premiumAmount": 10000,
+    "premiumCurrency": "USD",
+    "allocationComments": "allocation for test"
+  },
+  "cases": [
+    {
+      "id": "TC-TRADE-ALLOCATION-FX_TRF-UI-001",
+      "subTrades": [{ "percentage": "50" }, { "percentage": "50" }]
+    },
+    {
+      "id": "TC-TRADE-ALLOCATION-UI-002",
+      "subTrades": [{ "percentage": "30" }, { "percentage": "30" }, { "percentage": "30" }, { "percentage": "10" }]
+    },
+    {
+      "id": "TC-TRADE-ALLOCATION-UI-003",
+      "subTrades": [{ "percentage": "34" }, { "percentage": "34" }, { "percentage": "32" }]
+    }
+  ]
+}

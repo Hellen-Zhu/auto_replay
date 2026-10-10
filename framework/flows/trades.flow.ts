@@ -27,6 +27,20 @@ export class TradesFlow extends BaseFlow {
     });
   }
 
+  /** The trade detail page of a trade, reached from its row in the blotter (View Details of the action menu) */
+  async openTradeDetails(tradeId: string, keyword: Keyword = 'When') {
+    const { trades } = this.app;
+    await this.ui[keyword]('I open the trade portal and search for the trade', async () => {
+      await trades.open();
+      await trades.searchTrade(tradeId);
+    });
+    await this.ui.And('I open its details from the action menu', async () => {
+      await trades.openActionMenu(tradeId);
+      await trades.expectRowActionVisible('viewDetails');
+      await trades.clickRowAction('viewDetails');
+    });
+  }
+
   /** In the blotter of the trade portal the trade's row shows this status and, when one is given, this event status */
   async expectStatusInBlotter(tradeId: string, status: string, eventStatus?: string, keyword: Keyword = 'Then') {
     const { trades } = this.app;

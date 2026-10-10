@@ -1,4 +1,4 @@
-import type { TargetIn, UI, Val } from '../ui';
+import type { AwaitedRequest, TargetIn, UI, Val } from '../ui';
 import { element, INNER_INPUT } from '../elements';
 import { ConfirmDialog } from './confirm-dialog';
 
@@ -7,6 +7,9 @@ import { ConfirmDialog } from './confirm-dialog';
  * for a reason and comments.
  */
 export class TradeChangeConfirmation extends ConfirmDialog {
+  /** The request that confirming an event on a trade sends; it always reaches the system, nothing is mocked */
+  static readonly triggerEvent: AwaitedRequest = { url: '/trades/trigger-event', method: 'POST' };
+
   protected readonly reasonSelect = element('trade_change_confirmation.reason_select');
   // The comments field is a web component (sc-text-input), not a plain textarea: the real control is in its shadow root
   protected readonly commentsTextarea = element('trade_change_confirmation.comments_textarea', { inner: INNER_INPUT });
@@ -28,5 +31,10 @@ export class TradeChangeConfirmation extends ConfirmDialog {
 
   async typeComments(text: Val) {
     await this.ui.fill(this.commentsTextarea, text);
+  }
+
+  /** Confirm and wait until the system has answered the event (an answer other than 2xx fails the step) */
+  async confirmAndAwait() {
+    await this.ui.clickAndAwait(this.confirmBtn, TradeChangeConfirmation.triggerEvent);
   }
 }

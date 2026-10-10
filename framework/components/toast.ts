@@ -10,6 +10,8 @@ export class Toast extends BaseComponent {
   /** The messages the cases check */
   static readonly message = {
     cancellationCompleted: 'Cancellation completed successfully',
+    // Inferred from the cancellation's: the E2E project keeps it in its test data (toastMessage), which was not seen
+    allocationCompleted: 'Allocation completed successfully',
   };
   /** The titles the cases check */
   static readonly title = {
