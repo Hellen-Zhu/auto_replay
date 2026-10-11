@@ -3,6 +3,7 @@
 //
 //   npm run export:existing-trade                      (product FX_TRF)
 //   npm run export:existing-trade -- --product=FX_DCD --headed
+//   npm run export:existing-trade -- --events          (also the cases on an existing trade of the other events)
 //
 // Those cases work on a trade that already exists and are skipped without OREO_TRADE_ID. This script gets the
 // trades by running the trade creation case of the product, which leaves its trade pending approval, and then
@@ -15,6 +16,10 @@
 // 001 and 003 run twice; the second run only prepares the trade and exports the same case file again.
 // Every run books three real trades in the system the local config points at. It stops at the first case that
 // does not pass; nothing is rolled back.
+// With --events it goes on with the case on an existing trade that each other lifecycle event has in its own spec
+// (TC-TRADE-<EVENT>-EXISTING-UI-...): one more trade per case, made Live by 001, then the event. That books ten
+// more real trades. The values those cases check come from testdata/ and are those of data/<PRODUCT>/<PRODUCT>.dat
+// of FX_TRF (the notionals of the partial novation, for one).
 // Any other argument is passed on to Playwright (--headed, --trace ...).
 
 const { spawn } = require('child_process');
@@ -29,13 +34,29 @@ const CREATION_SPEC = 'tests/trade-creation.spec.ts';
 const args = process.argv.slice(2);
 const productArg = args.find((a) => a.startsWith('--product='));
 const product = productArg ? productArg.slice('--product='.length) : 'FX_TRF';
-const passOn = args.filter((a) => a !== productArg);
+const withEvents = args.includes('--events');
+const passOn = args.filter((a) => a !== productArg && a !== '--events');
 
 const existing = (n) => `TC-EXISTING-TRADE-UI-00${n}`;
+const own = (...numbers) => numbers.map((n) => ({ spec: SPEC, caseId: existing(n) }));
+// An event's case on an existing trade is in the event's spec: the trade is made Live first
+const event = (name, n = 1) => [...own(1), { spec: `tests/trade-${name}.spec.ts`, caseId: `TC-TRADE-${name.toUpperCase()}-EXISTING-UI-00${n}` }];
 const PLAN = [
-  { trade: 1, cases: [1, 3, 4] },
-  { trade: 2, cases: [2] },
-  { trade: 3, cases: [1, 3, 5] },
+  own(1, 3, 4),
+  own(2),
+  own(1, 3, 5),
+  ...(withEvents ? [
+    event('allocation'),
+    event('early-termination'),
+    event('partial-termination'),
+    event('novation-remaining'),
+    event('step-out-full'),
+    event('step-out-partial'),
+    event('portfolio-reassignment'),
+    event('amendment', 2),
+    event('amendment', 3),
+    event('partial-novation-remaining'),
+  ] : []),
 ];
 
 /** Runs one case by its ID; resolves with what Playwright printed */
@@ -75,19 +96,19 @@ async function main() {
 
   const trades = [];
   try {
-    for (const { trade, cases } of PLAN) {
-      console.log(`\n=== Trade ${trade} of ${PLAN.length}: creating a ${product} trade that is pending approval ===`);
+    for (const [i, cases] of PLAN.entries()) {
+      console.log(`\n=== Trade ${i + 1} of ${PLAN.length}: creating a ${product} trade that is pending approval ===`);
       const tradeId = await createPendingTrade();
       trades.push(tradeId);
-      for (const n of cases) {
-        console.log(`\n=== Trade ${trade} (${tradeId}): ${existing(n)} ===`);
-        await runCase(SPEC, existing(n), { OREO_TRADE_ID: tradeId });
+      for (const { spec, caseId } of cases) {
+        console.log(`\n=== Trade ${i + 1} (${tradeId}): ${caseId} ===`);
+        await runCase(spec, caseId, { OREO_TRADE_ID: tradeId });
       }
     }
   } finally {
     if (trades.length) console.log(`\nTrades created by this run: ${trades.join(', ')}`);
   }
-  console.log('The five case files are in cases/existing-trade/');
+  console.log(`The five case files are in cases/existing-trade/${withEvents ? ', those of the events in the folder of each event' : ''}`);
 }
 
 main().catch((e) => {

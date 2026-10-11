@@ -78,14 +78,22 @@ Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/tr
 
 `tests/trade-creation.spec.ts` has three tests (normal trade, StepIn full, StepIn partial), each run for its own list of products, since not every product supports StepIn, mirroring `trade_creation.feature` of the E2E project. Before running them:
 
-1. Copy the product `.dat` files into `data/` (`FX_PSCRIPT.dat`, `FX_TRF.dat`, `FX_PSCRIPT_FSKO.dat`); a case whose product has no file is skipped.
+1. Copy the product `.dat` files into `data/`, one folder per product: `data/FX_TRF/FX_TRF.dat`, `data/FX_PSCRIPT/FX_PSCRIPT.dat`, ...; a case whose product has no file is skipped. Other dat files of the same product (variants of its structure) go into the same folder under their own names.
 2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
 
-To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`) and put its `.dat` file in `data/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
+To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`) and put its `.dat` file in `data/<PRODUCT>/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
 
 A variation in data only (direction Sell, another counterparty) is not a case of its own: the PO runs an existing case and changes its case data with `D`.
 
-`[TC-TRADE-CREATION-UI-005]` is the one journey that goes through the pages from end to end: the maker books a normal trade, the checker logs in to the trade portal and approves it, the trade is `LIVE` / `New`. It needs the `checker` account with its password in `config.local.json`. It is one case for every product: **the product is case data** (`"product": "FX_TRF"` in its testdata row), so the PO runs it for another product by changing `product` with `D` before the run; the runner lists the products that have a `data/<PRODUCT>.dat` in the package, numbered, and takes a number or a name (a name without a dat file is asked for again). In the flow this is `flows.tradeCreation.productAsCaseData(product)`: from then on every use of the product (the typed Product ID, the name of the dat file, the step lines) is recorded as `${param:product}`. Such a case file is format version 7 and needs a runner package built from this version.
+`[TC-TRADE-CREATION-UI-005]` is the one journey that goes through the pages from end to end: the maker books a normal trade, the checker logs in to the trade portal and approves it, the trade is `LIVE` / `New`. It needs the `checker` account with its password in `config.local.json`. It is one case for every product: **the product is case data** (`"product": "FX_TRF"` in its testdata row), so the PO runs it for another product by changing `product` with `D` before the run; the runner lists the products that have a `data/<PRODUCT>/<PRODUCT>.dat` in the package, numbered, and takes a number or a name (a name without a dat file is asked for again). In the flow this is `flows.tradeCreation.productAsCaseData(product)`: from then on every use of the product (the typed Product ID, the name of the dat file, the step lines) is recorded as `${param:product}`. Such a case file is format version 7 and needs a runner package built from this version.
+
+#### Choosing the product and its dat file
+
+A product has more than one dat file: each is a variant of the product's structure. A variant is data, not a case of its own. Every case that is not repeated per product takes `product` and `datFile` (a file name in `data/<product>/`) from its case data: `[TC-TRADE-CREATION-UI-006]` creates a trade from them and checks it is pending approval; the lifecycle event cases create their `Given` trade from them through the API (`testdata/shared/given-trade.json`). In the runner, `D` asks for the product first (the folders of `data/` in the package) and then for the dat file (the files in that product's folder); after a change of product a folder with a single file is taken without asking. What a case checks that depends on the file (a notional, for one) is case data too and has to be changed with it.
+
+#### An event on a trade that already exists
+
+Each lifecycle event also has a case that works on an existing live trade whose ID is entered for the run: `TC-TRADE-<EVENT>-EXISTING-UI-001` in the event's spec (`TC-TRADE-AMENDMENT-EXISTING-UI-002` / `-003` for the amendment; the cancellation's are in `tests/existing-trade.spec.ts`). QA runs them with `OREO_TRADE_ID`, or exports all of them with `npm run export:existing-trade -- --events`, which books one real trade per case.
 
 ### Coverage: where a case is repeated per product
 
@@ -97,7 +105,7 @@ A case is repeated for every product only where the product changes what is test
 
 ### Trade cancellation cases
 
-`tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: two tests, for `FX_TRF` only (see "Coverage" above). In both the maker cancels a live trade; then the checker logs in and, in `[TC-TRADE-CANCELLATION-<product>-UI-001]`, approves the cancellation (the trade ends as `DEAD` / `Cancelled`) or, in `-UI-002`, rejects it (the trade is `LIVE` / `New` again). Their `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
+`tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: two tests, for `FX_TRF` only (see "Coverage" above). In both the maker cancels a live trade; then the checker logs in and, in `[TC-TRADE-CANCELLATION-UI-001]`, approves the cancellation (the trade ends as `DEAD` / `Cancelled`) or, in `-UI-002`, rejects it (the trade is `LIVE` / `New` again). Their `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
 
 1. Set `apiBaseUrl` in `config.local.json`, with its prefix (`.../api/v1`), and make sure the `checker` account has its e-mail there and its password (the checker also logs in to the trade portal).
 2. Copy the product `.dat` files into `data/`, as for trade creation.
@@ -107,14 +115,14 @@ Its data is in `testdata/trade-cancellation.json` (the trade that is created, th
 
 ### Trade allocation cases
 
-`tests/trade-allocation.spec.ts` mirrors `trade_allocation.feature`: the maker allocates a live trade to subtrades from the trade portal (action menu, Allocation), the message `Trade <ID> has been allocated into <n> sub-trade(s).` is shown and the trade details (`/trade/<ID>`) show `DEAD`. Three tests: `[TC-TRADE-ALLOCATION-<product>-UI-001]` (two subtrades, 50/50, for `FX_TRF` only, see "Coverage"), `[TC-TRADE-ALLOCATION-UI-002]` (four subtrades, 30/30/30/10) and `[TC-TRADE-ALLOCATION-UI-003]` (`FX_PSCRIPT`, three subtrades, 34/34/32). The live trade of the `Given` is created through the API, so they need what the cancellation cases need (`apiBaseUrl`, both accounts, the `.dat` files, the element sync).
+`tests/trade-allocation.spec.ts` mirrors `trade_allocation.feature`: the maker allocates a live trade to subtrades from the trade portal (action menu, Allocation), the message `Trade <ID> has been allocated into <n> sub-trade(s).` is shown and the trade details (`/trade/<ID>`) show `DEAD`. Three tests: `[TC-TRADE-ALLOCATION-UI-001]` (two subtrades, 50/50, for `FX_TRF` only, see "Coverage"), `[TC-TRADE-ALLOCATION-UI-002]` (four subtrades, 30/30/30/10) and `[TC-TRADE-ALLOCATION-UI-003]` (`FX_PSCRIPT`, three subtrades, 34/34/32). The live trade of the `Given` is created through the API, so they need what the cancellation cases need (`apiBaseUrl`, both accounts, the `.dat` files, the element sync).
 
 How a trade is split is data: the row of the case in `testdata/trade-allocation.json` lists its subtrades in the order of the dialog's rows, each with an optional `counterpartyName` and `percentage`; a value that is left out keeps what the dialog proposes (the 50/50 case sets no percentage). The values and the comments are those of the E2E project's allocation test data. In the case file each value is case data named after its row (`subTrade1Percentage`), so the PO can try another split. **These cases have not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
 
 
 ### Trade early termination case
 
-`tests/trade-early-termination.spec.ts` mirrors `trade_early_termination.feature`: the maker opens Early Termination from the action menu of a live trade, selects the direction, types the amount and the currency, confirms the event (which starts the risk calculation, see `riskEngine`) and confirms the trade change; the message `EarlyTermination completed successfully` is shown and the blotter shows the trade as `DEAD` / `Terminated`. One test, `[TC-TRADE-EARLY-TERMINATION-<product>-UI-001]`, for `FX_TRF` only (see "Coverage"). The live trade of the `Given` is created through the API. Direction, amount and currency are case data (`testdata/trade-early-termination.json`), so the PO can change them for a run.
+`tests/trade-early-termination.spec.ts` mirrors `trade_early_termination.feature`: the maker opens Early Termination from the action menu of a live trade, selects the direction, types the amount and the currency, confirms the event (which starts the risk calculation, see `riskEngine`) and confirms the trade change; the message `EarlyTermination completed successfully` is shown and the blotter shows the trade as `DEAD` / `Terminated`. One test, `[TC-TRADE-EARLY-TERMINATION-UI-001]`, for `FX_TRF` only (see "Coverage"). The live trade of the `Given` is created through the API. Direction, amount and currency are case data (`testdata/trade-early-termination.json`), so the PO can change them for a run.
 
 Opening an event from the action menu and submitting it are shared by all lifecycle events (`flows.lifecycleEvent.openAction` / `submit`); a new event adds a flow that fills the dialog in between, a spec and a testdata file. **This case has not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
 
@@ -124,13 +132,13 @@ Five more events follow the pattern of the early termination, each with one test
 
 | Spec | Case | What the maker enters | Expected |
 |---|---|---|---|
-| `tests/trade-partial-termination.spec.ts` | `[TC-TRADE-PARTIAL-TERMINATION-<product>-UI-001]` | new notional, unwind fee amount | message `Trade <ID> updated with new notional ...`; trade details show the new notional, status `LIVE` |
-| `tests/trade-novation-remaining.spec.ts` | `[TC-TRADE-NOVATION-REMAINING-<product>-UI-001]` | target amount, new counterparty | message title `Novation completed. Original trade <ID> terminated.`; blotter `DEAD` / `Novated` |
-| `tests/trade-step-out-full.spec.ts` | `[TC-TRADE-STEP-OUT-FULL-<product>-UI-001]` | direction, amount, currency, counterparty | message `StepOutFull completed successfully`; blotter `DEAD` / `Novated` |
-| `tests/trade-step-out-partial.spec.ts` | `[TC-TRADE-STEP-OUT-PARTIAL-<product>-UI-001]` | the same plus the new notional | message `StepOutPartial completed successfully`; blotter `LIVE` / `Novated` |
-| `tests/trade-portfolio-reassignment.spec.ts` | `[TC-TRADE-PORTFOLIO-REASSIGNMENT-<product>-UI-001]` | new portfolio | message `PortfolioReassignment completed successfully`; blotter `LIVE` / `Amended`; trade details show the new portfolio |
-| `tests/trade-partial-novation-remaining.spec.ts` | `[TC-TRADE-PARTIAL-NOVATION-REMAINING-<product>-UI-001]` | remaining notional, new counterparty | trade details of the original trade (`LIVE`, remaining notional, its counterparty) and of the new trade (`LIVE`, the rest, the new counterparty) |
-| `tests/trade-amendment.spec.ts` | `[TC-TRADE-AMENDMENT-<product>-UI-002]`, `-UI-003` | on the trade detail page: new counterparty (`-UI-002`) or new risk portfolio (`-UI-003`), then the reason | `-UI-002`: checker approves, blotter `LIVE` / `Amended`, trade details show the new counterparty; `-UI-003`: checker rejects on the trade detail page, trade details show `LIVE` and the original portfolio |
+| `tests/trade-partial-termination.spec.ts` | `[TC-TRADE-PARTIAL-TERMINATION-UI-001]` | new notional, unwind fee amount | message `Trade <ID> updated with new notional ...`; trade details show the new notional, status `LIVE` |
+| `tests/trade-novation-remaining.spec.ts` | `[TC-TRADE-NOVATION-REMAINING-UI-001]` | target amount, new counterparty | message title `Novation completed. Original trade <ID> terminated.`; blotter `DEAD` / `Novated` |
+| `tests/trade-step-out-full.spec.ts` | `[TC-TRADE-STEP-OUT-FULL-UI-001]` | direction, amount, currency, counterparty | message `StepOutFull completed successfully`; blotter `DEAD` / `Novated` |
+| `tests/trade-step-out-partial.spec.ts` | `[TC-TRADE-STEP-OUT-PARTIAL-UI-001]` | the same plus the new notional | message `StepOutPartial completed successfully`; blotter `LIVE` / `Novated` |
+| `tests/trade-portfolio-reassignment.spec.ts` | `[TC-TRADE-PORTFOLIO-REASSIGNMENT-UI-001]` | new portfolio | message `PortfolioReassignment completed successfully`; blotter `LIVE` / `Amended`; trade details show the new portfolio |
+| `tests/trade-partial-novation-remaining.spec.ts` | `[TC-TRADE-PARTIAL-NOVATION-REMAINING-UI-001]` | remaining notional, new counterparty | trade details of the original trade (`LIVE`, remaining notional, its counterparty) and of the new trade (`LIVE`, the rest, the new counterparty) |
+| `tests/trade-amendment.spec.ts` | `[TC-TRADE-AMENDMENT-UI-002]`, `-UI-003` | on the trade detail page: new counterparty (`-UI-002`) or new risk portfolio (`-UI-003`), then the reason | `-UI-002`: checker approves, blotter `LIVE` / `Amended`, trade details show the new counterparty; `-UI-003`: checker rejects on the trade detail page, trade details show `LIVE` and the original portfolio |
 
 **These cases have not been run yet.** The event statuses `Novated` and `Amended`, and what else still has to be checked on the real system, are listed in `CLAUDE.md`, section 10.
 
@@ -298,7 +306,7 @@ Key points:
 - Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
 - Case data does not go into `config.local.json`: put it in `testdata/` and use it through `this.params(data)` in the flow.
 - OREO inputs are web components and the real `<input>` (or `<textarea>`) sits in the shadow DOM, so input targets need `inner: 'input'` or `inner: INNER_INPUT`; buttons can be clicked on the host element directly.
-- In a page or component, `ui.upload(target, 'data/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
+- In a page or component, `ui.upload(target, 'data/FX_TRF/FX_TRF.dat')` uploads a file from `data/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
 - Text fields of a target can be a parameter or a config reference too: `{ role: 'menuitem', name: p.direction }`.
 - A target can be narrowed by the text it contains: `{ ...blotter, inner: 'role=row', hasText: tradeId, nth: 0 }` is the first row of the blotter that shows that trade ID (`inner`, then `hasText`, then `nth`). `hasText` matches a part of the text, so the ID `T12` also finds the row of `T123`: search for the trade first.
 - `ui.clickAndAwait(target, request)` clicks and waits until the request the click triggers is answered (the risk calculation: `RiskCalculation.forNewTrade()` / `RiskCalculation.forTrade(tradeId)` in `framework/risk-engine.ts`); with `"riskEngine": "mock"` in the local config the request is answered by the test itself instead of the system.
@@ -334,7 +342,7 @@ export class TradesApi extends BaseApi {
 - `save` keeps fields of the JSON response as variables. Used later, on a page or in another API call, they become `${var:createdTradeId}` by themselves, like a value from `ui.read()`.
 - **Every value a step saves is shown**, so the trade a run created can be looked up in the system: the test output prints `createdTradeId = TRD-...` (and the test gets a `value` annotation); the PO's replay prints it under the step and again after "Run passed", shows it in the report (under the step and in the "Values from this run" table) and writes it to `result.json` (`values`). The same goes for a value from `ui.read()` or from a captured response.
 - A text inside `headers`, `body` or a JSON part can be a parameter or a config reference (`p.counterpartyName`, `cfg(...)`). A number is recorded as it is, since a parameter is always text: the PO cannot change it for a run.
-- A file part is a file under `data/` (`{ file: 'data/FX_TRF.dat' }`), like an upload.
+- A file part is a file under `data/` (`{ file: 'data/FX_TRF/FX_TRF.dat' }`), like an upload.
 - The request is sent with Playwright's own request client (`page.request`), from Node, not by the page: there is no screenshot for it, and the report shows the call and the values it saved. Any answer other than 2xx fails the step with the status and the start of the response.
 - Use it for preparing data only. What the case is about (the `When` and the `Then`) stays in the browser, or the PO's replay would show nothing.
 

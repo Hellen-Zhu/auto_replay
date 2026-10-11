@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf } = require('../../core/actions');
+const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams } = require('../../core/actions');
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
@@ -43,22 +43,45 @@ const caseDataOf = (doc, params) => Object.keys(params).map((name) => {
 // Case data without a value in the case file (version 6): what only the PO knows, e.g. the ID of an existing trade
 const askedParamsOf = (doc) => Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '');
 
-// Case data that names a data file (data/${param:product}.dat) can only be what has such a file in the package:
-// name -> the values to choose from, in alphabetical order
-function choicesOf(doc) {
+// Case data that names a data file, or the folder it is in (data/${param:product}/${param:datFile}), can only be
+// what the package has: name -> the values to choose from, in alphabetical order, for the case data as it is now.
+// A name that follows another one in the path (datFile after product) is listed for the current value of the
+// earlier one, so the names come back in the order they have to be chosen in (choiceOrder).
+const PARAM_PART = /^([^$]*)\$\{param:([^}]+)\}([^$]*)$/;
+const dataFileNames = (doc) => [...new Set(doc.steps.flatMap((step) => dataFilesOf(step).map(String)))];
+function choicesOf(doc, params) {
   const out = {};
-  for (const s of doc.steps) for (const f of dataFilesOf(s)) {
-    const m = /^([^$]*)\$\{param:([^}]+)\}([^$]*)$/.exec(String(f));
-    if (!m) continue;
-    const [, before, name, after] = m;
-    const cut = before.lastIndexOf('/') + 1;
-    let files = [];
-    try { files = fs.readdirSync(path.join(ROOT, before.slice(0, cut))); } catch { /* no such folder: nothing to choose */ }
-    const found = files.filter((n) => n.startsWith(before.slice(cut)) && n.endsWith(after) && n.length > before.length - cut + after.length)
-      .map((n) => n.slice(before.length - cut, n.length - after.length)).sort();
-    out[name] = out[name] ? out[name].filter((v) => found.includes(v)) : found;
+  for (const f of dataFileNames(doc)) {
+    const parts = f.split('/');
+    parts.forEach((part, i) => {
+      const m = PARAM_PART.exec(part);
+      if (!m) return;
+      const [, before, name, after] = m;
+      const dir = fillParams(parts.slice(0, i).join('/'), params);
+      let found = [];
+      if (!dir.includes('${param:')) {
+        try {
+          found = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })
+            // the last part of the path is a file, every part before it a folder
+            .filter((e) => (i < parts.length - 1 ? e.isDirectory() : !e.isDirectory()))
+            .map((e) => e.name)
+            .filter((n) => n.startsWith(before) && n.endsWith(after) && n.length > before.length + after.length)
+            .map((n) => n.slice(before.length, n.length - after.length)).sort();
+        } catch { /* no such folder: nothing to choose */ }
+      }
+      out[name] = out[name] ? out[name].filter((v) => found.includes(v)) : found;
+    });
   }
   return out;
+}
+// The names of choicesOf in the order of the path: a folder before the file in it
+function choiceOrder(doc) {
+  const order = [];
+  for (const f of dataFileNames(doc)) for (const part of f.split('/')) {
+    const m = PARAM_PART.exec(part);
+    if (m && !order.includes(m[2])) order.push(m[2]);
+  }
+  return order;
 }
 
 // Fails when this runner cannot run the case, before anything is asked or opened
@@ -68,7 +91,7 @@ function checkCase({ file, doc }, params) {
     throw new Error(`${path.basename(file)} is case format version ${doc.formatVersion}; this runner supports up to version ${FORMAT_VERSION}. Ask QA for the current UAT-Runner package.`);
   }
   // A file the case uploads or sends to the API that did not come with the package. Its name may hold case data
-  // (data/${param:product}.dat), so the check is repeated with the data of the run once the PO has changed it
+  // (data/${param:product}/${param:datFile}), so the check is repeated with the data of the run once the PO has changed it
   for (const s of doc.steps) for (const f of dataFilesOf(s, params || paramsOf(doc))) resolveDataFile(ROOT, f);
 }
 
@@ -157,23 +180,33 @@ async function askSettings(list, config) {
     }
     if (changeable.length && chose('d')) {
       console.log('\nType a new value, or just press Enter to keep the current one. Changes apply to this run only.');
-      const choices = choicesOf(single);
-      for (const k of changeable) {
-        const list = choices[k];
+      // values that name a data file last and in the order of the path: what can be chosen for the file depends
+      // on the folder that was chosen before it
+      const ordered = choiceOrder(single).filter((k) => changeable.includes(k));
+      for (const k of [...changeable.filter((n) => !ordered.includes(n)), ...ordered]) {
+        const list = ordered.includes(k) ? choicesOf(single, params)[k] : null;
         if (!list || !list.length) {
           const v = await ask(`  ${k} [${showData(params[k])}]: `);
           if (v !== '') params[k] = v;
           continue;
         }
-        // a value that needs its data file: the PO picks one of those that came with the package
-        console.log(`  ${k}: the values that have a data file in this package`);
+        // a value that needs its data file: the PO picks one of those that came with the package. The current
+        // value can be kept only while it is one of them (it is not after the folder before it was changed)
+        const valid = list.includes(params[k]);
+        if (!valid && list.length === 1) {
+          console.log(`  ${k}: ${list[0]}  (the only data file for the values above)`);
+          params[k] = list[0];
+          continue;
+        }
+        console.log(`  ${k}: the values that have a data file in this package${valid ? '' : ' for the values above'}`);
         list.forEach((v, i) => console.log(`    ${i + 1}. ${v}${v === params[k] ? '  (current)' : ''}`));
         for (;;) {
-          const v = (await ask(`  ${k} [${showData(params[k])}], number or name: `)).trim();
+          const v = (await ask(valid ? `  ${k} [${showData(params[k])}], number or name: ` : `  ${k}, number or name: `)).trim();
           const picked = /^\d+$/.test(v) ? list[Number(v) - 1] : list.find((x) => x.toLowerCase() === v.toLowerCase());
           if (picked) params[k] = picked;
-          if (v === '' || picked || state.inputEnded) break;
-          console.log(`    "${v}" has no data file: type one of the numbers or names above, or press Enter to keep ${params[k]}.`);
+          if ((v === '' && valid) || picked || state.inputEnded) break;
+          console.log(v === '' ? '    Type one of the numbers or names above.'
+            : `    "${v}" has no data file: type one of the numbers or names above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
         }
       }
     }

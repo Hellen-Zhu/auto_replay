@@ -5,6 +5,8 @@ import { BaseFlow, type Keyword } from './base.flow';
 /**
  * The data of a trade that is created through the API: the "basic" block of the request, without the product.
  * Text values are case data the PO can change for a run; premiumAmount is a number in the request and is recorded as it is.
+ * datFile is not part of the request's "basic" block: it names the dat file that is sent, one of the product's
+ * folder in data/, and is case data too; without it the product's default file is sent.
  */
 export interface TradeProvisioningData {
   counterpartyFmId: string;
@@ -13,6 +15,7 @@ export interface TradeProvisioningData {
   direction: string;
   premiumAmount: number;
   premiumCurrency: string;
+  datFile?: string;
 }
 
 /** What a StepIn trade created through the API needs on top: the values of the request's "udf" list */
@@ -61,6 +64,7 @@ export class TradeProvisioningFlow extends BaseFlow {
 
   private submit(text: string, product: string, data: TradeProvisioningData, keyword: Keyword, udf?: TradeUdf[]) {
     const p = this.params(data);
+    const file = data.datFile ? this.caseData('datFile', data.datFile) : undefined;
     return this.ui[keyword](text, () =>
       this.app.tradesApi.submitTrade(
         'maker',
@@ -74,7 +78,7 @@ export class TradeProvisioningFlow extends BaseFlow {
           premiumCurrency: p.premiumCurrency,
           ...(udf ? { udf } : {}),
         },
-        datFile(product),
+        datFile(product, file),
       ),
     );
   }

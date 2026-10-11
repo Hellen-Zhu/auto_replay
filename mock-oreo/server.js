@@ -11,6 +11,8 @@
 //   Whether the real component renders a <textarea> or an <input> there is not known (the mock renders a <textarea>);
 //   the tag of the reason select (sc-select here) is not known either, only that a click opens it and that its
 //   entries have the role menuitem;
+// - the rule that an uploaded dat file is named after its product (it starts with the product ID and ends with
+//   ".dat") is this mock's own.
 // - testids made up here because the real ones are not known yet (search box, all-trades blotter, the checker's
 //   Approve / Reject menu entries, their dialog and its confirm button): they are marked
 //   "mock testid" below. Point the element names at them with a scratch elements folder (OREO_ELEMENTS_DIR) when
@@ -417,7 +419,8 @@ http.createServer((req, res) => {
         return json(res, 400, { message: 'The trade data file is missing or empty' });
       }
       if (!t.counterparty || !t.portfolio || !t.productId || !t.direction) return json(res, 400, { message: 'Basic mandatory info is incomplete' });
-      if (t.fileName !== t.productId + '.dat') return json(res, 400, { message: `The uploaded file does not match product ${t.productId}` });
+      // The mock's own rule: a dat file of the product is named after it (<PRODUCT>.dat, or <PRODUCT>... .dat for a variant)
+      if (!String(t.fileName).startsWith(t.productId) || !String(t.fileName).endsWith('.dat')) return json(res, 400, { message: `The uploaded file does not match product ${t.productId}` });
       if (t.stepIn !== null && (!t.stepIn || !t.oldCounterparty)) return json(res, 400, { message: 'StepIn info is incomplete' });
       const stamp = Date.now() + Math.random().toString(16).slice(2, 10).toUpperCase();
       const id = 'TRD-' + stamp, taskId = 'CHK-' + stamp;

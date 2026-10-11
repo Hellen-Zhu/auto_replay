@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradePortfolioReassignmentData, TradeProvisioningData } from '../framework/flows';
-import { prepare } from './support';
+import { givenProduct, givenTradeId, loggedIn, type ProductData } from './support';
 
 // Mirrors trade_portfolio_reassignment.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -11,18 +11,27 @@ import { prepare } from './support';
 // Not ported: the feature's second scenario (-UI-002, the td_bf value of a customized formula). User decision: it
 // is not needed here.
 
-type Data = TradeProvisioningData & TradePortfolioReassignmentData;
+type Data = TradeProvisioningData & TradePortfolioReassignmentData & ProductData;
 
 test.describe('Trade portfolio reassignment', () => {
-  const product = 'FX_TRF';
-
-  test(`[TC-TRADE-PORTFOLIO-REASSIGNMENT-${product}-UI-001] Updated portfolio is displayed for ${product} trade after maker triggers Portfolio Reassignment`, async ({ Given, When, Then, And, flows, testData }) => {
-    prepare(product, `A live ${product} trade is created through the API; maker moves it to another portfolio from the trade portal; the trade is still Live with the event status Amended and its trade details show the new portfolio`);
-    const data = testData<Data>();
+  test('[TC-TRADE-PORTFOLIO-REASSIGNMENT-UI-001] Updated portfolio is displayed for a trade after maker triggers Portfolio Reassignment', async ({ Given, When, Then, And, flows, testData }) => {
+    const { product, data } = givenProduct(flows, testData<Data>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker moves it to another portfolio from the trade portal; the trade is still Live with the event status Amended and its trade details show the new portfolio');
 
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When(`perform Portfolio Reassignment event on the '${product}' trade`, () => flows.tradePortfolioReassignment.reassignPortfolio(tradeId, data));
+    await Then('the portfolio reassignment is completed successfully', () => flows.tradePortfolioReassignment.expectCompleted());
+    await And('the trade remains Live and is marked as Amended', () => flows.tradePortfolioReassignment.expectLiveAndAmended(tradeId));
+    await And('the trade details show the updated portfolio assignment', () => flows.tradePortfolioReassignment.expectUpdatedPortfolio(tradeId, data));
+  });
+
+  test('[TC-TRADE-PORTFOLIO-REASSIGNMENT-EXISTING-UI-001] Updated portfolio is displayed for a given Live trade after maker triggers Portfolio Reassignment', async ({ Given, When, Then, And, flows, testData }) => {
+    const tradeId = flows.trades.existingTrade(givenTradeId('Maker moves the live trade with the given ID to another portfolio from the trade portal; the trade is still Live with the event status Amended and its trade details show the new portfolio'));
+    const data = testData<TradePortfolioReassignmentData>();
+
+    await Given('maker is logged in to the trade portal', () => loggedIn(flows, 'maker'));
+    await And('the given trade is Live', () => flows.trades.expectLive(tradeId));
+    await When('perform Portfolio Reassignment event on the trade', () => flows.tradePortfolioReassignment.reassignPortfolio(tradeId, data));
     await Then('the portfolio reassignment is completed successfully', () => flows.tradePortfolioReassignment.expectCompleted());
     await And('the trade remains Live and is marked as Amended', () => flows.tradePortfolioReassignment.expectLiveAndAmended(tradeId));
     await And('the trade details show the updated portfolio assignment', () => flows.tradePortfolioReassignment.expectUpdatedPortfolio(tradeId, data));

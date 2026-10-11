@@ -226,7 +226,7 @@ export class UI {
   async clickAndCapture(target: TargetIn, capture: Capture): Promise<string> {
     return this.run({ action: 'click', target: this.toTarget(target), capture });
   }
-  /** Upload a file shipped with the cases; file is relative to the project root and must be inside data/, e.g. 'data/FX_TRF.dat' */
+  /** Upload a file shipped with the cases; file is relative to the project root and must be inside data/, e.g. 'data/FX_TRF/FX_TRF.dat' */
   upload(target: TargetIn, file: string) {
     return this.run({ action: 'upload', target: this.toTarget(target), value: file.replace(/\\/g, '/') });
   }
@@ -317,18 +317,20 @@ export class UI {
     return result;
   }
 
+  /** Longest value first: the name of a dat file (FX_TRF.dat) holds the product (FX_TRF) and must be found before it */
   private literalEntries(): string[][] {
-    return Object.entries(this.literals).map(([name, v]) => [v, '${param:' + name + '}']);
+    return Object.entries(this.literals).map(([name, v]) => [v, '${param:' + name + '}']).sort((a, b) => b[0].length - a[0].length);
   }
 
   private swap<S extends string | undefined>(s: S, entries: string[][]): S {
     if (typeof s !== 'string' || !entries.length) return s;
     // Only the literal text is checked: a placeholder that is already there (odd parts of the split) is left alone
-    return s.split(/(\$\{(?:var|cfg|param):[^}]+\})/).map((part, i) => {
-      if (i % 2) return part;
-      for (const [v, placeholder] of entries) part = part.split(v).join(placeholder);
-      return part;
-    }).join('') as S;
+    // (also one an earlier entry has just written, whose name could hold a later entry's value)
+    let out: string = s;
+    for (const [v, placeholder] of entries) {
+      out = out.split(/(\$\{(?:var|cfg|param):[^}]+\})/).map((part, i) => (i % 2 ? part : part.split(v).join(placeholder))).join('');
+    }
+    return out as S;
   }
 
   private variabilize(step: Step): Step {

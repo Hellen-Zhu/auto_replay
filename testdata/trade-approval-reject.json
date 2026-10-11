@@ -1,7 +1,6 @@
 {
   "use": ["given-trade"],
   "defaults": {
-    "product": "FX_TRF",
     "oldCounterpartyName": "10 AM JAK",
     "oldCounterpartyFmId": "300036957",
     "novationDate": "2026-06-10"

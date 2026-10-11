@@ -128,7 +128,7 @@ function resolveUrl(baseUrl, path, key = 'baseUrl') {
 }
 
 /**
- * Files to upload are shipped with the cases in the data folder next to them (e.g. data/FX_TRF.dat).
+ * Files to upload are shipped with the cases in the data folder next to them (e.g. data/FX_TRF/FX_TRF.dat).
  * A case file can only point inside that folder, never at an arbitrary path on the machine.
  */
 function resolveDataFile(rootDir, rel) {
@@ -288,7 +288,7 @@ function dataFilesOf(step, params) {
 
 /**
  * Text with its case data filled in: a step line such as "creates a new '${param:product}' trade", or the name of
- * a data file (data/${param:product}.dat). Case data without a value stays as it is written.
+ * a data file (data/${param:product}/${param:datFile}). Case data without a value stays as it is written.
  */
 function fillParams(text, params) {
   return String(text).replace(/\$\{param:([^}]+)\}/g, (m, name) => (params && params[name] !== undefined && String(params[name]) !== '' ? String(params[name]) : m));
@@ -298,7 +298,7 @@ function fillParams(text, params) {
  * Call the system's API directly, without the page, e.g. to prepare the trade a case works on:
  *   { action: 'api', method: 'POST', value: '/trades/create?tradeAction=SUBMIT',
  *     headers: { 'X-User-Id': '${cfg:accounts.maker.email}' },
- *     multipart: { trade: { json: { basic: { productId: 'FX_TRF' } } }, datFile: { file: 'data/FX_TRF.dat' } },
+ *     multipart: { trade: { json: { basic: { productId: 'FX_TRF' } } }, datFile: { file: 'data/FX_TRF/FX_TRF.dat' } },
  *     save: { createdTradeId: 'data.trade.id' } }
  * value is a path on apiBaseUrl of the local config: the API may be served from another address than the pages.
  * apiBaseUrl includes the prefix every request shares (e.g. .../api/v1), so that prefix is not part of value.

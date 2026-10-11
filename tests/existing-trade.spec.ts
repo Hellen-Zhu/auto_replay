@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
-import type { Flows, TradeCancellationData } from '../framework/flows';
-import { givenTradeId } from './support';
+import type { TradeCancellationData } from '../framework/flows';
+import { givenTradeId, loggedIn } from './support';
 
 // Cases that go on with a trade that is already in the system instead of creating their own (explicit user
 // requirement: the PO has often worked on a trade and wants to continue with it). They are an addition to the cases
@@ -12,13 +12,7 @@ import { givenTradeId } from './support';
 // Unlike every other case these cannot be repeated on the same trade: a run changes its state. No product in the
 // ID or the title, since the given trade decides it. Case IDs and titles are this repo's own: the E2E project has
 // no such scenarios.
-
-// The state check that follows opens the trade portal by its address, so the login must be over before it starts:
-// the case waits for the Trades page, which the cases that go on with a search do not need
-async function loggedIn(flows: Flows, role: string) {
-  await flows.auth.login(role);
-  await flows.trades.expectOnTradesPage('And');
-}
+// The other lifecycle events have their case on an existing trade in their own spec (TC-TRADE-<EVENT>-EXISTING-UI-...).
 
 test.describe('Existing trade', () => {
   test('[TC-EXISTING-TRADE-UI-001] Checker approves a given trade that is pending approval', async ({ Given, When, Then, And, flows }) => {

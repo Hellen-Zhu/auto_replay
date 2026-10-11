@@ -3,6 +3,7 @@
     "oldCounterpartyName": "10 AM JAK"
   },
   "cases": [
-    { "id": "TC-TRADE-CREATION-UI-005", "product": "FX_TRF" }
+    { "id": "TC-TRADE-CREATION-UI-005", "product": "FX_TRF", "datFile": "FX_TRF.dat" },
+    { "id": "TC-TRADE-CREATION-UI-006", "product": "FX_TRF", "datFile": "FX_TRF.dat" }
   ]
 }

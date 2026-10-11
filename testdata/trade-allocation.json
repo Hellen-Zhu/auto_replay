@@ -5,7 +5,7 @@
   },
   "cases": [
     {
-      "id": "TC-TRADE-ALLOCATION-FX_TRF-UI-001",
+      "id": "TC-TRADE-ALLOCATION-UI-001",
       "subTrades": [{ "counterpartyName": "10 AM JAK" }, { "counterpartyName": "10 AM JAK" }],
       "allocationComments": "Allocation of 2 sub-trades for FX_TRF trade with 50% each"
     },
@@ -21,6 +21,8 @@
     },
     {
       "id": "TC-TRADE-ALLOCATION-UI-003",
+      "product": "FX_PSCRIPT",
+      "datFile": "FX_PSCRIPT.dat",
       "subTrades": [
         { "counterpartyName": "10 AM JAK", "percentage": "34" },
         { "counterpartyName": "10 AM JAK", "percentage": "34" },

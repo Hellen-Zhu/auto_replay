@@ -10,9 +10,11 @@ type RequiredField = { [K in DataField]: Fields[K] extends { required: true } ? 
 
 /**
  * The data of one trade creation case (common values, defaults and its row of testdata/trade-creation.json):
- * one optional value per data field of NewTradePage.fields; the required ones must be there.
+ * one optional value per data field of NewTradePage.fields; the required ones must be there. "datFile" is not a
+ * field of the form: it names the dat file to upload, one of the product's folder in data/, for a case that lets
+ * the PO choose among the variants of the product's structure; without it the product's default file is uploaded.
  */
-export type TradeCreationData = { [K in RequiredField]: string } & { [K in Exclude<DataField, RequiredField>]?: string };
+export type TradeCreationData = { [K in RequiredField]: string } & { [K in Exclude<DataField, RequiredField>]?: string } & { datFile?: string };
 
 const FIELD_NAMES = Object.keys(NewTradePage.fields) as NewTradeField[];
 const fieldDef = (name: NewTradeField): NewTradeFieldDef => NewTradePage.fields[name];
@@ -24,8 +26,9 @@ const OPTIONAL_FIELDS = DATA_FIELDS.filter((name) => !fieldDef(name).required &&
 
 /**
  * Booking a new trade through the New Trade form, mirroring the E2E project's trade_creation snippets.
- * The product type is what is typed as the Product ID and it names the dat file; the data is recorded as case
- * data (${param:name}), which the PO can change for a run. Each create flow ends when the booking is confirmed
+ * The product type is what is typed as the Product ID and it names the folder of its dat files; the data is
+ * recorded as case data (${param:name}), which the PO can change for a run, the dat file included when the data
+ * names one ("datFile"). Each create flow ends when the booking is confirmed
  * and returns the new trade ID (recorded as ${var:createdTradeId}); the outcome is asserted by the case, e.g.
  * with expectPendingApproval(tradeId).
  */
@@ -44,7 +47,7 @@ export class TradeCreationFlow extends BaseFlow {
     await this.openNewTradeForm();
     await this.selectBasicInfo(product, data);
     await this.fillOptionalFields(data);
-    await this.uploadDat(product);
+    await this.uploadDat(product, data);
     return this.bookAndConfirm();
   }
 
@@ -62,7 +65,7 @@ export class TradeCreationFlow extends BaseFlow {
     const { newTrade } = this.app;
     const p = this.params(data);
     await this.openNewTradeForm();
-    await this.uploadDat(product);
+    await this.uploadDat(product, data);
     await this.selectBasicInfo(product, data);
     await this.fillOptionalFields(data);
     await this.ui.And(`I enable StepIn ${full ? 'full' : 'partial'} and select the old counterparty`, async () => {
@@ -83,7 +86,7 @@ export class TradeCreationFlow extends BaseFlow {
 
   private async selectBasicInfo(product: string, data: TradeCreationData) {
     const { newTrade } = this.app;
-    const p = this.params(data) as Record<NewTradeField, Val>;
+    const p = this.params(data) as unknown as Record<NewTradeField, Val>;
     checkFieldNames(data);
     await this.ui.And('I select the basic mandatory info', async () => {
       // The product type is what is typed as the Product ID
@@ -94,7 +97,7 @@ export class TradeCreationFlow extends BaseFlow {
   /** Every other field of NewTradePage.fields the case has a value for, in the order of the form; no step when there is none */
   private async fillOptionalFields(data: TradeCreationData) {
     const { newTrade } = this.app;
-    const p = this.params(data) as Record<NewTradeField, Val>;
+    const p = this.params(data) as unknown as Record<NewTradeField, Val>;
     const values = data as Partial<Record<NewTradeField, string>>;
     const names = OPTIONAL_FIELDS.filter((name) => values[name] !== undefined && values[name] !== '');
     if (!names.length) return;
@@ -103,8 +106,10 @@ export class TradeCreationFlow extends BaseFlow {
     });
   }
 
-  private async uploadDat(product: string) {
-    await this.ui.And(`I upload the ${product} dat file`, () => this.app.newTrade.uploadDat(datFile(product)));
+  /** The product's default dat file, or the one the data names, which is then case data the PO can change */
+  private async uploadDat(product: string, data: TradeCreationData) {
+    const file = data.datFile ? this.caseData('datFile', data.datFile) : undefined;
+    await this.ui.And(`I upload the ${product} dat file${file ? ` ${file}` : ''}`, () => this.app.newTrade.uploadDat(datFile(product, file)));
   }
 
   private async bookAndConfirm(): Promise<string> {
@@ -130,7 +135,7 @@ export class TradeCreationFlow extends BaseFlow {
 
 /** A name in the data that is not a field of the form would otherwise be ignored without a word */
 function checkFieldNames(data: object) {
-  const unknown = Object.keys(data).filter((name) => name !== 'id' && !DATA_FIELDS.includes(name as NewTradeField));
+  const unknown = Object.keys(data).filter((name) => name !== 'id' && name !== 'datFile' && !DATA_FIELDS.includes(name as NewTradeField));
   if (unknown.length) {
     throw new Error(`Unknown trade creation data: ${unknown.join(', ')}. The fields are listed in NewTradePage.fields (framework/pages/new-trade.page.ts): ${DATA_FIELDS.join(', ')}`);
   }
