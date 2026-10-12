@@ -60,7 +60,7 @@ export class Flows {
 export { BaseFlow, type Keyword } from './base.flow';
 export { datFile } from '../products';
 export { type TradeCreationData } from './trade-creation.flow';
-export { type TradeProvisioningData, type StepInProvisioningData } from './trade-provisioning.flow';
+export { type TradeProvisioningData, type StepInProvisioningData, type TradeType } from './trade-provisioning.flow';
 export { type TradeCancellationData } from './trade-cancellation.flow';
 export { type TradeAllocationData, type SubTradeData } from './trade-allocation.flow';
 export { type TradeEarlyTerminationData } from './trade-early-termination.flow';
