@@ -165,7 +165,7 @@ Five more events follow the pattern of the early termination, each with one test
 
 - To export all five in one go: `npm run export:existing-trade` (add `-- --headed` to watch, `-- --product=<PRODUCT>` for another product than `FX_TRF`). It creates three trades with the trade creation case of the product (so that product's `.dat` is needed) and runs each case on a trade in the right state: trade 1 `001 -> 003 -> 004`, trade 2 `002`, trade 3 `001 -> 003 -> 005`. It books three real trades per run and stops at the first case that does not pass.
 - They need no `.dat` file and no `apiBaseUrl`, and are not per product: the given trade decides the product. The checker must not be the user who submitted the trade or the cancellation.
-- In a flow: `const tradeId = flows.trades.existingTrade(<the ID>)`; from then on every use of that ID is recorded as `${param:tradeId}`. Such a case file is format version 6 and needs a runner package built from this version.
+- In a flow: `const tradeId = flows.trades.existingTrade(<the ID>)`; from then on every use of that ID is recorded as `${param:tradeId}`. Such a case needs a runner package built since those cases were added.
 - They cannot be part of a run of several cases (a batch asks nothing per case): the runner leaves them out and says so.
 
 ## QA: test data
@@ -384,7 +384,7 @@ npm run build:portable -- --no-zip        # produce the folder only, no zip
 
 This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported case files need to be sent to the PO, who drops them into the same folder under their `cases` folder, e.g. `cases/trade-cancellation/` (plus any new file under `data/` that a case uploads). The runner finds a case file anywhere under `cases/`, at any depth, so a file dropped directly into `cases` runs as well; it is just listed outside the folders. `testdata/` is not part of the package: a case file carries the data it uses.
 
-A case file is written in the lowest format version that can express it, and a runner refuses a file newer than itself with a message asking for the current package:
+**Every case file exported from this version on is format version 9**: its `steps` are one entry per step line of the scenario (`{ "step": "When ...", "actions": [ ... ] }`), with the actions behind that line inside it, so the scenario can be read at a glance. A runner refuses a file newer than itself with a message asking for the current package, so **send the PO a new package before any newly exported case**. The current runner still runs the older files, whose steps are a flat list of actions:
 
 | Version | The case uses | Runs on |
 |---|---|---|
@@ -394,7 +394,9 @@ A case file is written in the lowest format version that can express it, and a r
 | 4 | An API call (any case that prepares its trade through the API) | A runner built since the API call was added |
 | 5 | A click that waits for a request, which can be mocked (the risk calculation) | A runner built since `riskEngine` was added |
 | 6 | Case data that is entered for every run (the ID of an existing trade) | A runner built since those cases were added |
-| 7 | Case data in the name of a data file or in a step line (the product as case data) | A runner built from this version or later: send the PO a new package |
+| 7 | Case data in the name of a data file or in a step line (the product as case data) | A runner built since the product became case data |
+| 8 | The checks hidden / enabled / disabled / value of an input | A runner built since those checks were added |
+| 9 | Nested steps: every case exported now | A runner built from this version or later: send the PO a new package |
 
 ## PO: how to use it
 

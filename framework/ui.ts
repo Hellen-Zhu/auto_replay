@@ -369,14 +369,9 @@ export class UI {
     const asked = Object.keys(params).filter((name) => name in this.inputs);
     for (const name of asked) params[name] = '';
     const caseDoc = {
-      // A case is written in the lowest version that can express it, so that an older runner still runs what it can
-      // and refuses the rest: 2 adds the params block; 3 adds hasText in a target and button on a click, which a
-      // version 2 runner would ignore without a word (any row, a normal click); 4 adds the api action; 5 adds the
-      // request a click waits for (an older runner would click and never mock it); 6 adds case data without a value,
-      // which the runner asks for (an older runner would run with the empty text, e.g. find any trade's row); 7 adds
-      // case data in the name of a data file and in a step line (an older runner would look for a file of that name);
-      // 8 adds the checks expectHidden / expectEnabled / expectDisabled / expectValue
-      formatVersion: this.steps.some((s) => core.V8_ACTIONS.includes(s.action)) ? 8 : this.steps.some(namesCaseData) ? 7 : asked.length ? 6 : this.steps.some((s) => s.request) ? 5 : this.steps.some((s) => s.action === 'api') ? 4 : this.steps.some((s) => s.button || s.target?.hasText) ? 3 : hasParams ? 2 : 1,
+      // Version 9: the steps are nested, one entry per step line of the scenario with the actions behind it. Every
+      // case is written this way, so a runner older than version 9 refuses the file and asks for the current package
+      formatVersion: 9,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,
@@ -384,14 +379,24 @@ export class UI {
       exportedAt: new Date().toISOString(),
       requiredConfig: requiredConfig(this.steps, params),
       ...(hasParams ? { params } : {}),
-      // The scenario at a glance: the step lines of the case in order, as the feature lists them. For the reader only:
-      // the runner takes each line from the title of the step that starts it, so no format version depends on it
-      scenario: this.steps.flatMap((s) => (s.title ? [s.title] : [])),
-      steps: this.steps,
+      steps: nested(this.steps),
     };
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify(caseDoc, null, 2), 'utf-8');
   }
+}
+
+/**
+ * The recorded actions as the case file lists them: one entry per step line of the scenario (the title of the action
+ * that starts it) with the actions behind it. Actions recorded before the first step line are an entry without one.
+ */
+function nested(steps: Step[]): { step?: string; actions: Step[] }[] {
+  const groups: { step?: string; actions: Step[] }[] = [];
+  for (const { title, ...action } of steps) {
+    if (title || !groups.length) groups.push({ ...(title ? { step: title } : {}), actions: [] });
+    groups[groups.length - 1].actions.push(action as Step);
+  }
+  return groups;
 }
 
 function gitVersion(): string {
@@ -427,12 +432,6 @@ function stepTexts(steps: Step[]): string[] {
     for (const k of API_JSON) mapTexts(s[k], (t) => (texts.push(t), t));
     return texts;
   });
-}
-
-/** Does a step name case data where a runner before version 7 took the text as it is: its data file, its step line? */
-function namesCaseData(s: Step): boolean {
-  const texts = (core.dataFilesOf(s) as string[]).concat(s.title ?? '', s.substep ?? '');
-  return texts.some((t) => t.includes('${param:'));
 }
 
 /** The case data the steps really use, in the order of first use; this becomes the params block of the case file */
