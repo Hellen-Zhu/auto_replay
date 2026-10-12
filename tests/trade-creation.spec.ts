@@ -5,7 +5,7 @@ import { givenProduct, prepare as prepareCase, type ProductData } from './suppor
 
 // Mirrors trade_creation.feature of the E2E project, steps included: one test per scenario, each looping the products that
 // support it (framework/products.ts), since not every product supports StepIn full / partial. To cover another
-// product, add it to that registry and put its data/<PRODUCT>/<PRODUCT>.dat in place; nothing changes here (a case needs a
+// product, add it to that registry and put its testdata/dat/<PRODUCT>/<PRODUCT>.dat in place; nothing changes here (a case needs a
 // row in testdata/trade-creation.json only for values that differ from the shared ones).
 
 const prepare = (product: string, what: string) =>
@@ -63,7 +63,7 @@ test.describe('Trade creation', () => {
   });
 
   // Creation for a product and a dat file that the PO chooses. A product has more than one dat file: each is a
-  // variant of the product's structure, in data/<PRODUCT>/. A variant is data, not a case of its own: the product
+  // variant of the product's structure, in testdata/dat/<PRODUCT>/. A variant is data, not a case of its own: the product
   // and the file name are the case data "product" and "datFile" (the row in testdata/trade-creation.json), and the
   // runner offers the products of the package and, for the chosen product, its dat files. This repo's own case ID.
   test('[TC-TRADE-CREATION-UI-006] Maker creates a new trade from a chosen dat file of the product', async ({ When, And, Then, flows, testData }) => {

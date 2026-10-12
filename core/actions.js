@@ -145,15 +145,21 @@ function resolveUrl(baseUrl, path, key = 'baseUrl') {
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
+/** The folder of the files a case uploads or sends, relative to the root: one folder per product in it */
+const DATA_DIR = 'testdata/dat';
+/** A case file exported while the files were in data/ names them there: the same file is now in DATA_DIR */
+const dataPath = (rel) => String(rel).replace(/^data\//, DATA_DIR + '/');
+
 /**
- * Files to upload are shipped with the cases in the data folder next to them (e.g. data/FX_TRF/FX_TRF.dat).
+ * Files to upload are shipped with the cases in the folder DATA_DIR (e.g. testdata/dat/FX_TRF/FX_TRF.dat).
  * A case file can only point inside that folder, never at an arbitrary path on the machine.
  */
 function resolveDataFile(rootDir, rel) {
   if (!rootDir) throw new Error('The folder that holds the upload files is not known (ctx.rootDir is missing)');
-  const base = path.join(rootDir, 'data');
-  const file = path.resolve(rootDir, String(rel));
-  if (!file.startsWith(base + path.sep)) throw new Error(`Upload files must be inside the data folder: ${rel}`);
+  rel = dataPath(rel);
+  const base = path.join(rootDir, DATA_DIR);
+  const file = path.resolve(rootDir, rel);
+  if (!file.startsWith(base + path.sep)) throw new Error(`Upload files must be inside the folder ${DATA_DIR}: ${rel}`);
   if (!fs.existsSync(file)) throw new Error(`File to upload was not found: ${rel} (expected at ${file})`);
   return file;
 }
@@ -297,16 +303,16 @@ async function resolveDeep(value, ctx) {
   return value;
 }
 
-/** The files of the data folder a step needs: what an upload step uploads and the file parts of an api step */
+/** The files of DATA_DIR a step needs: what an upload step uploads and the file parts of an api step */
 function dataFilesOf(step, params) {
-  const files = step.action === 'upload' ? [step.value]
-    : step.action === 'api' ? Object.values(step.multipart || {}).filter((p) => p && p.file).map((p) => p.file) : [];
+  const files = (step.action === 'upload' ? [step.value]
+    : step.action === 'api' ? Object.values(step.multipart || {}).filter((p) => p && p.file).map((p) => p.file) : []).map(dataPath);
   return params ? files.map((f) => fillParams(f, params)) : files;
 }
 
 /**
  * Text with its case data filled in: a step line such as "creates a new '${param:product}' trade", or the name of
- * a data file (data/${param:product}/${param:datFile}). Case data without a value stays as it is written.
+ * a data file (testdata/dat/${param:product}/${param:datFile}). Case data without a value stays as it is written.
  */
 function fillParams(text, params) {
   return String(text).replace(/\$\{param:([^}]+)\}/g, (m, name) => (params && params[name] !== undefined && String(params[name]) !== '' ? String(params[name]) : m));
@@ -316,7 +322,7 @@ function fillParams(text, params) {
  * Call the system's API directly, without the page, e.g. to prepare the trade a case works on:
  *   { action: 'api', method: 'POST', value: '/trades/create?tradeAction=SUBMIT',
  *     headers: { 'X-User-Id': '${cfg:accounts.maker.email}' },
- *     multipart: { trade: { json: { basic: { productId: 'FX_TRF' } } }, datFile: { file: 'data/FX_TRF/FX_TRF.dat' } },
+ *     multipart: { trade: { json: { basic: { productId: 'FX_TRF' } } }, datFile: { file: 'testdata/dat/FX_TRF/FX_TRF.dat' } },
  *     save: { createdTradeId: 'data.trade.id' } }
  * value is a path on apiBaseUrl of the local config: the API may be served from another address than the pages.
  * apiBaseUrl includes the prefix every request shares (e.g. .../api/v1), so that prefix is not part of value.
@@ -340,7 +346,7 @@ async function callApi(page, step, apiPath, ctx, timeout) {
         const json = JSON.stringify(await resolveDeep(part.json, ctx));
         options.multipart[name] = { name: 'blob', mimeType: 'application/json', buffer: Buffer.from(json, 'utf-8') };
       } else {
-        throw new Error(`Part ${name} of ${what} must be { "json": ... } or { "file": "data/..." }`);
+        throw new Error(`Part ${name} of ${what} must be { "json": ... } or { "file": "testdata/dat/..." }`);
       }
     }
   } else if (step.body !== undefined) {
@@ -519,5 +525,5 @@ function describeStep(step, vars, params, config) {
 }
 
 module.exports = {
-  FORMAT_VERSION, V8_ACTIONS, flatSteps, readCase, resolveDataFile, dataFilesOf, fillParams, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath, isMocked,
+  FORMAT_VERSION, DATA_DIR, V8_ACTIONS, flatSteps, readCase, resolveDataFile, dataFilesOf, fillParams, resolveTarget, describeTarget, showPlaceholders, resolveValue, resolveUrl, executeStep, savedValues, describeStep, getPath, isMocked,
 };

@@ -73,7 +73,7 @@ export class NewTradePage extends BasePage {
     }
   }
 
-  /** file is relative to the project root and must be inside data/, e.g. 'data/FX_TRF/FX_TRF.dat' */
+  /** file is relative to the project root and must be inside testdata/dat/, e.g. 'testdata/dat/FX_TRF/FX_TRF.dat' */
   async uploadDat(file: string) {
     await this.ui.upload(this.fileInput, file);
   }

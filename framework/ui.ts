@@ -56,7 +56,7 @@ export type Capture = { url: string; method?: string; field: string; saveAs: str
  */
 export type AwaitedRequest = { url: string; method?: string; setting?: string; mock?: { status?: number; body: unknown } };
 
-/** One part of a multipart request: a JSON document, or a file shipped with the cases in data/ */
+/** One part of a multipart request: a JSON document, or a file shipped with the cases in testdata/dat/ */
 export type ApiPart = { json: unknown } | { file: string };
 
 /**
@@ -226,7 +226,7 @@ export class UI {
   async clickAndCapture(target: TargetIn, capture: Capture): Promise<string> {
     return this.run({ action: 'click', target: this.toTarget(target), capture });
   }
-  /** Upload a file shipped with the cases; file is relative to the project root and must be inside data/, e.g. 'data/FX_TRF/FX_TRF.dat' */
+  /** Upload a file shipped with the cases; file is relative to the project root and must be inside testdata/dat/, e.g. 'testdata/dat/FX_TRF/FX_TRF.dat' */
   upload(target: TargetIn, file: string) {
     return this.run({ action: 'upload', target: this.toTarget(target), value: file.replace(/\\/g, '/') });
   }

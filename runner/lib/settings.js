@@ -43,7 +43,7 @@ const caseDataOf = (doc, params) => Object.keys(params).map((name) => {
 // Case data without a value in the case file (version 6): what only the PO knows, e.g. the ID of an existing trade
 const askedParamsOf = (doc) => Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '');
 
-// Case data that names a data file, or the folder it is in (data/${param:product}/${param:datFile}), can only be
+// Case data that names a data file, or the folder it is in (testdata/dat/${param:product}/${param:datFile}), can only be
 // what the package has: name -> the values to choose from, in alphabetical order, for the case data as it is now.
 // A name that follows another one in the path (datFile after product) is listed for the current value of the
 // earlier one, so the names come back in the order they have to be chosen in (choiceOrder).
@@ -91,7 +91,7 @@ function checkCase({ file, doc }, params) {
     throw new Error(`${path.basename(file)} is case format version ${doc.formatVersion}; this runner supports up to version ${FORMAT_VERSION}. Ask QA for the current UAT-Runner package.`);
   }
   // A file the case uploads or sends to the API that did not come with the package. Its name may hold case data
-  // (data/${param:product}/${param:datFile}), so the check is repeated with the data of the run once the PO has changed it
+  // (testdata/dat/${param:product}/${param:datFile}), so the check is repeated with the data of the run once the PO has changed it
   for (const s of doc.steps) for (const f of dataFilesOf(s, params || paramsOf(doc))) resolveDataFile(ROOT, f);
 }
 

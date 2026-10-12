@@ -1,5 +1,5 @@
 // Product registry: the one place that says which product supports which scenario.
-// To add a product: add a line here with the capabilities it supports and put its data/<PRODUCT>/<PRODUCT>.dat in place.
+// To add a product: add a line here with the capabilities it supports and put its testdata/dat/<PRODUCT>/<PRODUCT>.dat in place.
 // Every spec that loops productsWith(...) then gets the product's cases, with their case IDs, by itself.
 
 /**
@@ -12,7 +12,7 @@ export type Capability =
   | 'stepInFull'
   | 'stepInPartial';
 
-/** Product type (also what is typed as the Product ID, and the name of its folder in data/ and of its default dat file) -> supported capabilities */
+/** Product type (also what is typed as the Product ID, and the name of its folder in testdata/dat/ and of its default dat file) -> supported capabilities */
 export const PRODUCTS: Record<string, readonly Capability[]> = {
   FX_PSCRIPT: ['create', 'stepInFull', 'stepInPartial'],
   FX_TRF: ['create', 'stepInFull', 'stepInPartial'],
@@ -28,7 +28,7 @@ export function productsWith(capability: Capability): string[] {
 export const defaultDatFile = (product: string) => `${product}.dat`;
 
 /**
- * A dat file of a product, shipped with the cases: data/<PRODUCT>/<file>. A product has a folder because it can have
+ * A dat file of a product, shipped with the cases: testdata/dat/<PRODUCT>/<file>. A product has a folder because it can have
  * several dat files, one per variant of its structure; which one a case uses is data, not a product of its own.
  */
-export const datFile = (product: string, file: string = defaultDatFile(product)) => `data/${product}/${file}`;
+export const datFile = (product: string, file: string = defaultDatFile(product)) => `testdata/dat/${product}/${file}`;

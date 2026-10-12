@@ -6,7 +6,7 @@ import { BaseFlow, type Keyword } from './base.flow';
  * The data of a trade that is created through the API: the "basic" block of the request, without the product.
  * Text values are case data the PO can change for a run; premiumAmount is a number in the request and is recorded as it is.
  * datFile is not part of the request's "basic" block: it names the dat file that is sent, one of the product's
- * folder in data/, and is case data too; without it the product's default file is sent.
+ * folder in testdata/dat/, and is case data too; without it the product's default file is sent.
  */
 export interface TradeProvisioningData {
   counterpartyFmId: string;

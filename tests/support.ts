@@ -21,7 +21,7 @@ export type ProductData = { product: string; datFile?: string };
 
 /**
  * For a case that is the same for every product: the product is case data ("product" of its test data, with
- * "datFile", the file of data/<product>/ the trade is created from), so the PO can run the case for another product
+ * "datFile", the file of testdata/dat/<product>/ the trade is created from), so the PO can run the case for another product
  * or another variant of the product's structure by changing them before the run. Skips the case while the dat file
  * is missing and sets the description; returns the product for the step lines and the flows, and the rest of the
  * data (the dat file included, which the flows read from it).

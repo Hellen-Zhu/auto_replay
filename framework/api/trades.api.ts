@@ -52,7 +52,7 @@ export class TradesApi extends BaseApi {
 
   /**
    * Submit a new trade as that user; it is then pending approval. file is the product's dat file, relative to the
-   * project root and inside data/. Returns the new trade's ID and the ID of the approval task, which are recorded
+   * project root and inside testdata/dat/. Returns the new trade's ID and the ID of the approval task, which are recorded
    * as ${var:createdTradeId} and ${var:createdTaskId} wherever a later step uses them.
    */
   async submitTrade(role: string, basic: TradeBasic, file: string): Promise<{ tradeId: string; taskId: string }> {

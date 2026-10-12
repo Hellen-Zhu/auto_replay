@@ -1,6 +1,6 @@
 # Upload files
 
-Files that cases upload, referenced from case files by relative path (for example `data/FX_TRF/FX_TRF.dat`).
+Files that cases upload, referenced from case files by relative path (for example `testdata/dat/FX_TRF/FX_TRF.dat`).
 
 - One folder per product, named after the product type; the product's default file has the same name:
   `FX_TRF/FX_TRF.dat`, `FX_PSCRIPT/FX_PSCRIPT.dat`, `FX_PSCRIPT_FSKO/FX_PSCRIPT_FSKO.dat`, ...

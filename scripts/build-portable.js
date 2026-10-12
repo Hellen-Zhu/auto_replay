@@ -10,13 +10,14 @@
 //
 // Output layout:
 //   UAT-Runner/
-//     run-case.bat   record-session.bat   view-trace.bat   node/node.exe   runner/   core/   cases/   data/   node_modules/
+//     run-case.bat   record-session.bat   view-trace.bat   node/node.exe   runner/   core/   cases/   testdata/dat/   node_modules/
 //     config.local.json (or config.local.example.json)
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
+const { DATA_DIR } = require('../core/actions');
 
 const ROOT = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
@@ -91,7 +92,8 @@ async function main() {
   copyDir(path.join(ROOT, 'core'), path.join(OUT, 'core'));
   copyDir(path.join(ROOT, 'cases'), path.join(OUT, 'cases'), (p) => fs.statSync(p).isDirectory() || p.endsWith('.json'));
   // Files the cases upload (e.g. the product .dat files)
-  if (fs.existsSync(path.join(ROOT, 'data'))) copyDir(path.join(ROOT, 'data'), path.join(OUT, 'data'));
+  // Only the dat folder of testdata/: the JSON test data stays with QA, a case file carries the values it uses
+  if (fs.existsSync(path.join(ROOT, DATA_DIR))) copyDir(path.join(ROOT, DATA_DIR), path.join(OUT, DATA_DIR));
   copyDir(path.join(ROOT, 'portable'), OUT);
   fs.mkdirSync(path.join(OUT, 'evidence'), { recursive: true });
 

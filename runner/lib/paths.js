@@ -1,4 +1,4 @@
-// Where the runner finds its files: the folder that holds runner/, core/, cases/, data/ and evidence/.
+// Where the runner finds its files: the folder that holds runner/, core/, cases/, testdata/dat/ and evidence/.
 
 const path = require('path');
 

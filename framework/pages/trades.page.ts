@@ -84,9 +84,13 @@ export class TradesPage extends BasePage {
   /** The checker's Approve / Reject entries of a row's action menu and the dialog that confirms the decision */
   readonly checkerAction = new CheckerAction(this.ui);
 
-  /** The first row of the blotter that shows this trade ID: the rows are only told apart by their text */
-  protected row(tradeId: Val): TargetIn {
-    return { ...this.allTradesBlotter, inner: 'role=row', hasText: tradeId, nth: 0 };
+  /**
+   * The row of this trade: the row with a cell whose whole text is the trade ID. "Contains the ID" is not enough:
+   * a trade that an event creates from another one carries its ID (<ID>-NOV-...), is found by the same search and
+   * can be listed first.
+   */
+  protected row(tradeId: string): TargetIn {
+    return { ...this.allTradesBlotter, inner: `:is(tr, [role="row"]):has(:text-is("${tradeId}"))`, nth: 0 };
   }
 
   async open() {
@@ -103,7 +107,7 @@ export class TradesPage extends BasePage {
   }
 
   /** Opens the action menu of the trade's row; in the blotter that is a right-click on the row */
-  async openActionMenu(tradeId: Val) {
+  async openActionMenu(tradeId: string) {
     await this.ui.rightClick(this.row(tradeId));
   }
 
@@ -175,7 +179,7 @@ export class TradesPage extends BasePage {
   }
 
   /** The trade's row shows this text (e.g. a status) in one of its columns */
-  async expectRowShows(tradeId: Val, text: Val) {
+  async expectRowShows(tradeId: string, text: Val) {
     await this.ui.expectText(this.row(tradeId), text);
   }
 }

@@ -11,7 +11,7 @@ type RequiredField = { [K in DataField]: Fields[K] extends { required: true } ? 
 /**
  * The data of one trade creation case (common values, defaults and its row of testdata/trade-creation.json):
  * one optional value per data field of NewTradePage.fields; the required ones must be there. "datFile" is not a
- * field of the form: it names the dat file to upload, one of the product's folder in data/, for a case that lets
+ * field of the form: it names the dat file to upload, one of the product's folder in testdata/dat/, for a case that lets
  * the PO choose among the variants of the product's structure; without it the product's default file is uploaded.
  */
 export type TradeCreationData = { [K in RequiredField]: string } & { [K in Exclude<DataField, RequiredField>]?: string } & { datFile?: string };
@@ -35,7 +35,7 @@ const OPTIONAL_FIELDS = DATA_FIELDS.filter((name) => !fieldDef(name).required &&
 export class TradeCreationFlow extends BaseFlow {
   /**
    * The product as case data, for a case that is the same for every product: the PO can run it for another product
-   * by changing "product" before the run (that product's dat file has to be in data/). Returns the product for the
+   * by changing "product" before the run (that product's dat file has to be in testdata/dat/). Returns the product for the
    * flows that follow; they record it as ${param:product} wherever they use it.
    */
   productAsCaseData(product: string): string {
