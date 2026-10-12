@@ -5,7 +5,8 @@ const path = require('path');
 const { CASES_DIR } = require('./paths');
 const { readCase } = require('../../core/actions');
 const state = require('./state');
-const { rl, interactive, plural } = require('./console');
+const { rl, plural } = require('./console');
+const { useKeys, textWidth, fit, padTo } = require('./menu');
 const { listCases, inFolder, folderEntries, searchCases, chooseCase } = require('./case-list');
 
 // ---------------- Case selection: the tree (console) ----------------
@@ -22,27 +23,8 @@ let cursorHidden = false;
 process.on('exit', () => { if (cursorHidden) process.stdout.write('\x1b[?25h'); });
 
 // The tree needs single key presses and a screen it can redraw: everything else gets the numbered list above
-const useTree = () => interactive && process.stdout.isTTY && !process.env.OREO_PLAIN_MENU
-  && process.stdout.rows >= 15 && process.stdout.columns >= 60;
+const useTree = useKeys;
 
-// Columns a text takes on a console: East Asian wide characters take two
-const isWide = (cp) => cp >= 0x1100 && (cp <= 0x115f || (cp >= 0x2e80 && cp <= 0xa4cf) || (cp >= 0xac00 && cp <= 0xd7a3)
-  || (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xfe30 && cp <= 0xfe6f) || (cp >= 0xff00 && cp <= 0xff60) || (cp >= 0xffe0 && cp <= 0xffe6) || cp >= 0x1f300);
-const textWidth = (s) => [...s].reduce((w, ch) => w + (isWide(ch.codePointAt(0)) ? 2 : 1), 0);
-// One console line: no line breaks or control characters, cut with "..." when it is longer than width
-function fit(text, width) {
-  const s = String(text).replace(/[\x00-\x1f\x7f]+/g, ' ');
-  if (textWidth(s) <= width) return s;
-  let out = '', w = 0;
-  for (const ch of s) {
-    const cw = isWide(ch.codePointAt(0)) ? 2 : 1;
-    if (w + cw > width - 3) break;
-    out += ch;
-    w += cw;
-  }
-  return `${out}...`;
-}
-const padTo = (s, width) => s + ' '.repeat(Math.max(0, width - textWidth(s)));
 // A text broken at spaces into at most max lines of the given width; what does not fit is cut
 function wrapText(text, width, max) {
   const lines = [];

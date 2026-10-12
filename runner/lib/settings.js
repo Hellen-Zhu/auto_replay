@@ -6,6 +6,7 @@ const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillPara
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
+const { useKeys, pickRow } = require('./menu');
 
 // ---------------- Saving settings ----------------
 // Update only the given keys in the config file and leave everything else in it untouched.
@@ -149,19 +150,23 @@ async function askSettings(list, config) {
   // What the PO can change is numbered, the settings first and the case data after them: a number at the prompt
   // changes that one value, and the lists are shown again
   const numbered = [...settingKeys.map((key) => ({ key })), ...changeable.map((param) => ({ param }))];
-  const no = (i) => `${String(i + 1).padStart(numbered.length > 9 ? 2 : 1)}. `;
+  // On a console that can show a list operated with the keyboard, the value is picked with the arrow keys instead
+  const keys = useKeys();
+  const no = (i) => (keys ? '' : `${String(i + 1).padStart(numbered.length > 9 ? 2 : 1)}. `);
+  const settingText = (k) => (isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k));
+  const paramText = (k) => (params[k] === '' ? '(to be entered below)' : showData(params[k]));
   const show = () => {
     if (hasSettings) {
       console.log('\nSettings for this run:');
       // a password is listed too, masked: one typed in for an earlier case of this window is used without asking,
       // its number lets the PO type it again; one that is not set is asked for below
-      settingKeys.forEach((k, i) => console.log(`  ${no(i)}${k}: ${isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k)}`));
+      settingKeys.forEach((k, i) => console.log(`  ${no(i)}${k}: ${settingText(k)}`));
     }
     if (paramNames.length) {
       console.log('\nCase data:');
       for (const k of paramNames) {
         const i = numbered.findIndex((e) => e.param === k);
-        console.log(`  ${i < 0 ? ' '.repeat(no(0).length) : no(i)}${k}: ${params[k] === '' ? '(to be entered below)' : showData(params[k])}`);
+        console.log(`  ${i < 0 ? ' '.repeat(no(0).length) : no(i)}${k}: ${paramText(k)}`);
       }
     }
   };
@@ -198,6 +203,16 @@ async function askSettings(list, config) {
     if (!valid && list.length === 1) {
       console.log(`  ${k}: ${list[0]}  (the only data file of that ${ordered[ordered.indexOf(k) - 1] || 'value'})`);
       params[k] = list[0];
+    } else if (keys) {
+      const rows = [{ text: `${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}` },
+        ...list.map((v) => ({ text: `  ${v}${v === params[k] ? '  (current)' : ''}`, value: v }))];
+      const hint = `Up/Down: move   Enter: choose${valid ? '   Esc: keep the current value' : ''}`;
+      // without a value that can be kept, Esc has nothing to go back to: the list is shown again
+      for (let r = {}; r.value === undefined && !(r.esc && valid);) {
+        r = await pickRow({ rows, start: params[k], hint });
+        if (r.value !== undefined) params[k] = r.value;
+      }
+      console.log(`  ${k}: ${params[k]}`);
     } else {
       console.log(`  ${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}`);
       list.forEach((v, i) => console.log(`    ${i + 1}. ${v}${v === params[k] ? '  (current)' : ''}`));
@@ -217,14 +232,44 @@ async function askSettings(list, config) {
     }
   };
 
-  show();
+  if (!keys || !numbered.length) show();
   if (!single && list.some((c) => Object.keys(c.doc.params || {}).length)) {
     console.log('\nCase data: each case runs with the values of its own case file. To change a value, run that case on its own.');
   }
   // Step by step (the run stops before each Given / When / Then block and each substep, so the PO can look at the
   // page) is not offered on the screen: S at the prompt below turns it on
   let stepByStep = false;
-  for (let changed = false; numbered.length;) {
+  // With the keyboard: the same lines as a list, Up / Down move, Enter on a value changes it, Enter on the last row
+  // goes on. The row that is highlighted first is the last one, so that plain Enter still starts the run.
+  if (keys && numbered.length) {
+    const RUN = {};
+    const hint = 'Up/Down: move   Enter: change the highlighted value, or continue   Ctrl+C: close';
+    let told = false;
+    console.log('');
+    for (;;) {
+      const rows = [];
+      if (hasSettings) rows.push({ text: 'Settings for this run:' }, ...settingKeys.map((k, i) => ({ text: `  ${k}: ${settingText(k)}`, value: numbered[i] })), { text: '' });
+      if (paramNames.length) {
+        rows.push({ text: 'Case data:' }, ...paramNames.map((k) => {
+          const e = numbered.find((x) => x.param === k);
+          return e ? { text: `  ${k}: ${paramText(k)}`, value: e } : { text: `    ${k}: ${paramText(k)}` };
+        }), { text: '' });
+      }
+      rows.push({ text: single ? 'Run the case' : `Run the ${list.length} cases`, value: RUN });
+      const r = await pickRow({ rows, start: RUN, hint, keys: ['s'] });
+      if (r.esc) continue;
+      if (r.key === 's') stepByStep = true;
+      if (r.key === 's' || r.value === RUN) break;
+      if (r.value.param && !told) { console.log('A change of case data applies to this run only.'); told = true; }
+      if (r.value.key) await changeSetting(r.value.key);
+      else await changeParam(r.value.param);
+      console.log('');
+    }
+    // the list is erased when it ends: what the run starts with stays on the screen
+    show();
+    console.log('');
+  }
+  for (let changed = false; numbered.length && !keys;) {
     if (changed) show();
     changed = false;
     const range = numbered.length === 1 ? 'type 1 to change it' : `type a number (1-${numbered.length}) to change that value`;

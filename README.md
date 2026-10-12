@@ -240,7 +240,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
    | Ctrl+C | Close the window |
 
    In a very small window the runner shows a plain numbered list instead (also with the environment variable `OREO_PLAIN_MENU=1`).
-3. The runner lists the settings (address, account) and the **case data** of the case, every line with a number. Press Enter to continue, or type a number to change that value (several at once also work: `2 5`).
+3. The runner lists the settings (address, account) and the **case data** of the case, with `Run the case` highlighted below them. **Enter** starts the run; **Up / Down** move to a value and **Enter** changes it: a product or dat file is picked from a list in the same way, any other value is typed. In the plain numbered list (step 2) every line has a number instead: type it to change that value (several at once also work: `2 5`).
    - **Passwords are always typed in** (hidden), once per account and window. A password in `config.local.json` is not used, and none is ever saved.
    - A change of case data applies to this run only; the case file is not modified. A product or a dat file is chosen from the ones in the package.
    - A case on an existing trade asks `Enter tradeId:`.
