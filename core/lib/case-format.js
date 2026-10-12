@@ -10,7 +10,8 @@
 // actions with the line as the title of the first action of its group;
 // 10 = the substeps are nested too: inside a step's actions, { substep, actions } instead of the substep as a field
 // of the first action of its group
-const FORMAT_VERSION = 10;
+// 11 = adds a part of an api step's JSON that depends on case data: { byParam, choices, values } (values.js)
+const FORMAT_VERSION = 11;
 
 /**
  * The actions of a case file as one flat list, which is what runs: a nested entry (version 9) gives its actions, the

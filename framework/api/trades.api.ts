@@ -1,4 +1,4 @@
-import type { Val } from '../ui';
+import type { Switch, Val } from '../ui';
 import { BaseApi } from './base.api';
 
 /** The "basic" block of a new trade, as the E2E project's API test data sends it (REQ-TPL-TRADE-CREATION-API-001) */
@@ -11,8 +11,11 @@ export interface TradeBasic {
   /** A number in the request, so it cannot be a case parameter (those are text) */
   premiumAmount: number;
   premiumCurrency: Val;
-  /** Only a StepIn trade has it: the E2E project's templates REQ-TPL-TRADE-CREATION-STEPIN-FULL / -PARTIAL-API-001 */
-  udf?: TradeUdf[];
+  /**
+   * Only a StepIn trade has it: the E2E project's templates REQ-TPL-TRADE-CREATION-STEPIN-FULL / -PARTIAL-API-001.
+   * As a Switch the list depends on case data (the trade type), and a normal trade is sent without it.
+   */
+  udf?: TradeUdf[] | Switch<TradeUdf[]>;
 }
 
 /** One user-defined field of a trade, as the "udf" list of the request carries it */

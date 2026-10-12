@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams } = require('../../core/actions');
+const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf } = require('../../core/actions');
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
@@ -190,8 +190,14 @@ async function askSettings(list, config) {
     for (const s of secrets) if (s.startsWith(scope)) { set(s, ''); toSave[s] = ''; }
   };
 
+  // case data that decides a part of a request (the trade type): the case file lists the values it can have
+  const fixed = single ? paramChoicesOf(single.steps) : {};
   const changeParam = async (k) => {
-    const list = ordered.includes(k) ? choicesOf(single, params)[k] : null;
+    const inPath = ordered.includes(k);
+    const list = inPath ? choicesOf(single, params)[k] : fixed[k] || null;
+    const heading = (valid) => (inPath
+      ? `${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}`
+      : `${k}: the values this case can be run with`);
     if (!list || !list.length) {
       const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it): `);
       if (v !== '') params[k] = v;
@@ -204,7 +210,7 @@ async function askSettings(list, config) {
       console.log(`  ${k}: ${list[0]}  (the only data file of that ${ordered[ordered.indexOf(k) - 1] || 'value'})`);
       params[k] = list[0];
     } else if (keys) {
-      const rows = [{ text: `${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}` },
+      const rows = [{ text: heading(valid) },
         ...list.map((v) => ({ text: `  ${v}${v === params[k] ? '  (current)' : ''}`, value: v }))];
       const hint = `Up/Down: move   Enter: choose${valid ? '   Esc: keep the current value' : ''}`;
       // without a value that can be kept, Esc has nothing to go back to: the list is shown again
@@ -214,7 +220,7 @@ async function askSettings(list, config) {
       }
       console.log(`  ${k}: ${params[k]}`);
     } else {
-      console.log(`  ${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}`);
+      console.log(`  ${heading(valid)}`);
       list.forEach((v, i) => console.log(`    ${i + 1}. ${v}${v === params[k] ? '  (current)' : ''}`));
       for (;;) {
         const v = (await ask(valid ? `  ${k} [${showData(params[k])}], number or name (Enter keeps it): ` : `  ${k}, number or name: `)).trim();
@@ -222,11 +228,11 @@ async function askSettings(list, config) {
         if (picked) params[k] = picked;
         if ((v === '' && valid) || picked || state.inputEnded) break;
         console.log(v === '' ? '    Type one of the numbers or names above.'
-          : `    "${v}" has no data file: type one of the numbers or names above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
+          : `    "${v}" ${inPath ? 'has no data file' : 'is not one of them'}: type one of the numbers or names above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
       }
     }
     // what follows in the path (the file after its folder) may no longer exist for the new value: chosen again
-    for (const next of ordered.slice(ordered.indexOf(k) + 1)) {
+    for (const next of inPath ? ordered.slice(ordered.indexOf(k) + 1) : []) {
       const l = choicesOf(single, params)[next];
       if (l && l.length && !l.includes(params[next])) { await changeParam(next); break; }
     }

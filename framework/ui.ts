@@ -37,6 +37,17 @@ export type Val = string | Ref;
 export const cfg = (p: string): Val => ({ cfg: p });
 
 /**
+ * A part of an api request that depends on case data: the entry of values under the current value of that
+ * parameter; a choice without an entry leaves the part out of the request. It is recorded as it is, so the case
+ * file holds every variant and the PO picks one of the choices before a run (case format version 11).
+ */
+export type Switch<T> = { byParam: string; choices: string[]; values: Record<string, T> };
+export function byParam<T>(param: Val, choices: readonly string[], values: Record<string, T>): Switch<T> {
+  if (typeof param === 'string' || !('param' in param)) throw new Error('byParam needs a parameter of ui.params(), e.g. p.tradeType');
+  return { byParam: param.param, choices: [...choices], values };
+}
+
+/**
  * The parameters of a case: one per field of its data. Used as a value, a parameter is recorded as ${param:name}
  * and its value goes into the params block of the case file, where the PO can see it and change it for a run.
  */
@@ -118,7 +129,8 @@ export class UI {
   // title, i.e. a row of the report; a step opened inside it (by a flow) is recorded as a substep, shown under
   // that row. A flow step that no case step wraps is itself the title.
   async step<R>(title: string, fn: () => Promise<R>): Promise<R> {
-    return test.step(title, async () => {
+    // Playwright's own report gets the line with the case data known so far filled in; the recording keeps the placeholder
+    return test.step(core.fillParams(title, this.paramValues), async () => {
       const outer = this.depth === 0;
       if (outer) this.pendingTitle = title;
       else this.pendingSubstep = title.replace(/^(Given|When|Then|And|But) /, ''); // the keyword belongs to the case's step
@@ -423,6 +435,8 @@ function mapTexts<T>(value: T, text: (s: string) => string, ref?: (r: Ref) => st
   const walk = (v: unknown): unknown => {
     if (typeof v === 'string') return text(v);
     if (ref && isRef(v)) return ref(v);
+    // of a part that depends on case data only the variants are texts of the request
+    if (core.isSwitch(v)) return { ...(v as object), values: walk((v as Switch<unknown>).values) };
     if (Array.isArray(v)) return v.map(walk);
     if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
     return v;
@@ -443,6 +457,8 @@ function stepTexts(steps: Step[]): string[] {
 function usedParams(steps: Step[], values: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const t of stepTexts(steps)) for (const m of t.matchAll(/\$\{param:([^}]+)\}/g)) out[m[1]] = values[m[1]];
+  // case data that decides a part of a request is used too, although no text holds it
+  for (const name of Object.keys(core.paramChoicesOf(steps))) out[name] = values[name];
   return out;
 }
 

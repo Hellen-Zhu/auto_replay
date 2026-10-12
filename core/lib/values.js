@@ -50,20 +50,61 @@ async function resolveValue(value, ctx, inParam) {
   return out + value.slice(last);
 }
 
+/**
+ * A part of a request that depends on case data (format version 11), anywhere inside the JSON of an api step:
+ *   "udf": { "byParam": "tradeType", "choices": ["Normal", "StepInFull", "StepInPartial"],
+ *            "values": { "StepInFull": [ ... ], "StepInPartial": [ ... ] } }
+ * It stands for the entry of values under the current value of that case data. A choice without an entry stands for
+ * nothing: the key (or list item) is left out of the request, so a Normal trade is sent without "udf".
+ */
+const isSwitch = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 3
+  && typeof v.byParam === 'string' && Array.isArray(v.choices) && !!v.values && typeof v.values === 'object' && !Array.isArray(v.values);
+
+const NOTHING = Symbol('nothing');
+function variantOf(sw, ctx) {
+  const v = ctx.params ? ctx.params[sw.byParam] : undefined;
+  if (v === undefined) throw new Error(`Case data ${sw.byParam} is not defined (the case file has no "${sw.byParam}" in its params)`);
+  if (!sw.choices.includes(String(v))) throw new Error(`Case data ${sw.byParam} is "${v}": it must be one of ${sw.choices.join(', ')}`);
+  return Object.prototype.hasOwnProperty.call(sw.values, String(v)) ? sw.values[String(v)] : NOTHING;
+}
+
 /** Resolve the placeholders of every text inside a JSON value (the headers, body and JSON parts of an api step) */
 async function resolveDeep(value, ctx) {
   if (typeof value === 'string') return resolveValue(value, ctx);
+  // a part that depends on case data: only the variant of this run is resolved
+  const pick = (v) => (isSwitch(v) ? variantOf(v, ctx) : v);
   if (Array.isArray(value)) {
     const out = [];
-    for (const v of value) out.push(await resolveDeep(v, ctx));
+    for (const v of value) if (pick(v) !== NOTHING) out.push(await resolveDeep(pick(v), ctx));
     return out;
+  }
+  if (isSwitch(value)) {
+    const v = variantOf(value, ctx);
+    return v === NOTHING ? undefined : resolveDeep(v, ctx);
   }
   if (value && typeof value === 'object') {
     const out = {};
-    for (const [k, v] of Object.entries(value)) out[k] = await resolveDeep(v, ctx);
+    for (const [k, v] of Object.entries(value)) if (pick(v) !== NOTHING) out[k] = await resolveDeep(pick(v), ctx);
     return out;
   }
   return value;
+}
+
+/**
+ * The case data that parts of the api steps depend on: name -> the values it may have, as the case file lists them.
+ * steps is the flat list of actions.
+ */
+function paramChoicesOf(steps) {
+  const out = {};
+  const walk = (v) => {
+    if (!v || typeof v !== 'object') return;
+    if (isSwitch(v)) {
+      if (!out[v.byParam]) out[v.byParam] = v.choices.map(String);
+      Object.values(v.values).forEach(walk);
+    } else Object.values(v).forEach(walk);
+  };
+  for (const s of steps || []) if (s && s.action === 'api') [s.headers, s.body, s.multipart].forEach(walk);
+  return out;
 }
 
 /**
@@ -97,4 +138,4 @@ function resolveUrl(baseUrl, path, key = 'baseUrl') {
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
-module.exports = { getPath, resolveValue, resolveDeep, fillParams, showPlaceholders, resolveUrl };
+module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, fillParams, showPlaceholders, resolveUrl };

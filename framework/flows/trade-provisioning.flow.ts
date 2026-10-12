@@ -1,4 +1,5 @@
 import type { TradeUdf } from '../api';
+import { byParam, type Switch } from '../ui';
 import { datFile } from '../products';
 import { BaseFlow, type Keyword } from './base.flow';
 
@@ -21,9 +22,9 @@ export interface StepInProvisioningData {
  * Text values are case data the PO can change for a run; premiumAmount is a number in the request and is recorded as it is.
  * datFile is not part of the request's "basic" block: it names the dat file that is sent, one of the product's
  * folder in testdata/dat/, and is case data too; without it the product's default file is sent.
- * tradeType decides the kind of trade a lifecycle event starts from (without it: Normal). It decides which request
- * is recorded (a StepIn trade has the "udf" list), so it is chosen in testdata before the case is exported and is
- * not case data the PO can change in the runner. A StepIn type needs the StepIn values too.
+ * tradeType is the kind of trade a lifecycle event starts from (without it: Normal) and is case data too: the
+ * request is recorded with the "udf" list of both StepIn types, and the type of the run decides which one is sent
+ * (none for Normal). So the StepIn values are needed whatever the type is.
  */
 export interface TradeProvisioningData extends Partial<StepInProvisioningData> {
   counterpartyFmId: string;
@@ -45,28 +46,31 @@ export class TradeProvisioningFlow extends BaseFlow {
   /**
    * A live trade of that product, of the trade type the data names (Normal, StepInFull, StepInPartial): the maker
    * submits it, the checker approves it. Returns the trade ID (recorded as ${var:createdTradeId}).
+   * The trade type is case data: the PO can run the case with another one of the three.
    */
   async provisionLiveTrade(product: string, data: TradeProvisioningData, keyword: Keyword = 'Given'): Promise<string> {
-    const { tradeId, taskId } = await this.submit(product, tradeTypeOf(data), data, keyword);
+    const type = this.params({ tradeType: tradeTypeOf(data) }).tradeType;
+    const udf = byParam(type, TRADE_TYPES, { StepInFull: this.stepInUdf('StepInFull', data), StepInPartial: this.stepInUdf('StepInPartial', data) });
+    const { tradeId, taskId } = await this.submit(product, '${param:tradeType} trade', udf, data, keyword);
     await this.ui.And('I approve the trade through the API as checker', () => this.app.tradesApi.approveTask('checker', taskId));
     return tradeId;
   }
 
   /** A normal trade of that product that is pending approval: the maker submits it, nobody decides. Returns the trade ID */
   async provisionPendingTrade(product: string, data: TradeProvisioningData, keyword: Keyword = 'Given'): Promise<string> {
-    return (await this.submit(product, 'Normal', data, keyword)).tradeId;
+    return (await this.submit(product, KIND.Normal, undefined, data, keyword)).tradeId;
   }
 
   /** A StepIn full or partial trade of that product that is pending approval. Returns the trade ID */
   async provisionPendingStepInTrade(product: string, type: StepInType, data: TradeProvisioningData, keyword: Keyword = 'Given'): Promise<string> {
-    return (await this.submit(product, type, data, keyword)).tradeId;
+    return (await this.submit(product, KIND[type], this.stepInUdf(type, data), data, keyword)).tradeId;
   }
 
-  private submit(product: string, type: TradeType, data: TradeProvisioningData, keyword: Keyword) {
+  /** kind is how the step line names the trade; udf is the list of a StepIn trade, fixed or depending on the trade type */
+  private submit(product: string, kind: string, udf: TradeUdf[] | Switch<TradeUdf[]> | undefined, data: TradeProvisioningData, keyword: Keyword) {
     const p = this.params(data);
     const file = data.datFile ? this.caseData('datFile', data.datFile) : undefined;
-    const udf = type === 'Normal' ? undefined : this.stepInUdf(type, data);
-    return this.ui[keyword](`I submit a new ${product} ${KIND[type]} through the API as maker`, () =>
+    return this.ui[keyword](`I submit a new ${product} ${kind} through the API as maker`, () =>
       this.app.tradesApi.submitTrade(
         'maker',
         {
