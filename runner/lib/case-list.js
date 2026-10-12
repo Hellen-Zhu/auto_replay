@@ -27,6 +27,15 @@ function listCases(dir = CASES_DIR) {
     });
 }
 
+// A file or folder that is dropped into the window arrives as its path, typed in by the console: in quotes when it
+// has a space. A text that starts like a path is taken for one and not for a search.
+const looksLikePath = (text) => /^(["']|[A-Za-z]:[\\/]|\\\\|\/)/.test(text);
+/** The file or folder a typed text names, or null when the text is not the path of one */
+function droppedPath(text) {
+  const p = text.trim().replace(/^(["'])(.*)\1$/, '$2');
+  return path.isAbsolute(p) && fs.existsSync(p) ? p : null;
+}
+
 // A list longer than this is cut: with hundreds of cases the PO narrows it by typing text instead of scrolling
 const LIST_MAX = 40;
 const inFolder = (c, dir) => !dir || c.dir === dir || c.dir.startsWith(`${dir}/`);
@@ -103,13 +112,23 @@ async function chooseCase(cases) {
       const what = hasFolders && hasCases ? 'open a folder or run a case' : hasFolders ? 'open a folder' : 'run a case';
       question = `\nEnter a number to ${what} (${shown.length > 1 ? `1-${shown.length}; ` : ''}just Enter = 1), `
         + `or type ${search ? 'other text to search again' : 'text to search, e.g. a product or part of a case ID'}`
-        + `${search || back.length ? ', or B to go back' : ''}: `;
+        + `${search || back.length ? ', or B to go back' : ''}. A case file dropped into this window is run: `;
     }
     const answer = await ask(question);
     list = true;
 
     if ((search || back.length) && /^b$/i.test(answer)) {
       if (search) search = ''; else dir = back.pop();
+      continue;
+    }
+    const dropped = droppedPath(answer);
+    if (dropped) {
+      place = { dir, back, search };
+      return { dropped };
+    }
+    if (looksLikePath(answer)) {
+      console.log(`\nThere is no file or folder ${answer}`);
+      list = false;
       continue;
     }
     // A number picks from the list; anything else is searched for, also digits with a leading zero such as 001
@@ -136,4 +155,4 @@ async function chooseCase(cases) {
   }
 }
 
-module.exports = { listCases, inFolder, folderEntries, searchCases, chooseCase };
+module.exports = { listCases, inFolder, folderEntries, searchCases, looksLikePath, droppedPath, chooseCase };

@@ -7,6 +7,8 @@
 //                                              another, or several at the same time. After a run the window goes back
 //                                              to the list for the next case
 //   drag a case .json onto run-case.bat     -> run that case directly
+//   drop a case .json or a folder of cases  -> the console types its path: Enter runs it (a typed text that starts
+//   into the open window                       like a path is taken for a path, not for a search)
 //   drag a folder or several case files     -> run all those cases together
 //   node runner/runner.js cases/<folder>/xxx.json
 //   node runner/runner.js cases/<folder>

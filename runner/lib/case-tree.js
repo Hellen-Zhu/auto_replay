@@ -7,7 +7,7 @@ const { readCase } = require('../../core/actions');
 const state = require('./state');
 const { rl, plural } = require('./console');
 const { useKeys, textWidth, fit, padTo } = require('./menu');
-const { listCases, inFolder, folderEntries, searchCases, chooseCase } = require('./case-list');
+const { listCases, inFolder, folderEntries, searchCases, looksLikePath, droppedPath, chooseCase } = require('./case-list');
 
 // ---------------- Case selection: the tree (console) ----------------
 // On a console the cases are a tree that is redrawn in place: at first only the folders (one per lifecycle event), a
@@ -49,7 +49,8 @@ function flowText(items, width) {
 // The rows of the tree as it is now: every folder, and below an open folder what it holds. With a search text only
 // the matching cases are left and every folder that holds one is shown open.
 function treeRows(cases, st) {
-  const shown = st.filter ? searchCases(cases, '', st.filter) : cases;
+  // a path (a file dropped into the window) is not searched for
+  const shown = looksLikePath(st.filter) ? [] : st.filter ? searchCases(cases, '', st.filter) : cases;
   const grouped = cases.some((c) => c.dir);
   const rows = [];
   const folderRow = (folder, name, list, depth) => {
@@ -72,7 +73,8 @@ function treeRows(cases, st) {
   return { rows, shown };
 }
 
-/** Resolves to the cases to run (one, or the ticked ones), or to QUIT */
+/** Resolves to the cases to run (one, or the ticked ones), to { dropped: path } for a file or folder that was
+ * dropped into the window, or to QUIT */
 function pickCases(cases) {
   const out = process.stdout;
   const st = tree;
@@ -82,6 +84,7 @@ function pickCases(cases) {
     st.open = new Set(top.length === 1 && top[0].folder ? [top[0].folder] : []);
   }
   let rows = [], shown = [], cur = 0, drawn = 0, win = 1;
+  let missing = false; // Enter was pressed on a path that names no file or folder
 
   // The folders above a row, nearest first: where the cursor goes with Left, or when its row is no longer shown
   const parents = (key) => {
@@ -113,12 +116,14 @@ function pickCases(cases) {
     const W = Math.max(20, (out.columns || 80) - 1); // one column less than the window, so that no line ever wraps
     const H = out.rows || 24;
     const ticked = st.ticked.size;
-    const hints = flowText([
+    const dropping = looksLikePath(st.filter);
+    const hints = flowText(dropping ? ['Enter: run this case file or folder of cases', 'Esc: clear', 'Ctrl+C: close'] : [
       'Up/Down: move',
       !st.filter && 'Right/Left: open or close a folder',
       ticked ? `Enter: run the ${plural(ticked)} you ticked` : 'Enter: run the case',
       'Space: tick a case or a whole folder, to run several',
       st.filter ? 'Esc: clear the search' : 'Type: search',
+      !st.filter && 'Drop a case file into this window: run it',
       !st.filter && ticked && 'Esc: untick all',
       'Ctrl+C: close',
     ].filter(Boolean), W - 2).map((l) => `  ${l}`);
@@ -128,10 +133,11 @@ function pickCases(cases) {
     win = scroll ? room - 2 : room;
     st.top = Math.max(0, Math.min(Math.max(Math.min(st.top, cur), cur - win + 1), rows.length - win));
 
-    const lines = [fit(st.filter
+    const lines = [fit(dropping ? `File: ${st.filter}` : st.filter
       ? `Search: ${st.filter}   (${shown.length} of ${plural(cases.length)}${ticked ? `, ${ticked} ticked` : ''})`
       : `Choose a case to run   (${plural(cases.length)}${ticked ? `, ${ticked} ticked` : ''})`, W), ''];
-    if (!rows.length) lines.push(fit(`  No case matches "${st.filter}".`, W));
+    if (dropping) lines.push(fit(missing ? '  There is no file or folder with this path.' : '  Press Enter to run it.', W));
+    else if (!rows.length) lines.push(fit(`  No case matches "${st.filter}".`, W));
     const part = rows.slice(st.top, st.top + win);
     const idWidth = Math.min(48, Math.max(0, ...rows.filter((r) => r.case).map((r) => textWidth(r.case.id))));
     if (scroll) lines.push(st.top > 0 ? `      ... ${st.top} more above` : '');
@@ -200,7 +206,19 @@ function pickCases(cases) {
         return;
       }
       let toFirstCase = false;
-      switch (key.name) {
+      // The path of a dropped file is typed in by the console. In it a space is a character, and Enter runs the file
+      const dropping = looksLikePath(st.filter);
+      const name = dropping && key.name === 'space' ? '' : key.name;
+      if (dropping && (name === 'return' || name === 'enter')) {
+        const file = droppedPath(st.filter);
+        missing = !file;
+        if (!file) { paint(); return; }
+        st.filter = '';
+        done({ dropped: file });
+        return;
+      }
+      missing = false;
+      switch (name) {
         case 'up': moveTo(cur - 1); break;
         case 'down': moveTo(cur + 1); break;
         case 'pageup': moveTo(cur - win); break;
@@ -250,7 +268,7 @@ function pickCases(cases) {
           break;
         default:
           // Any other character is searched for. A space cannot be part of it: Space ticks
-          if (key.meta || typeof s !== 'string' || [...s].length !== 1 || s <= ' ' || s === '\x7f') return;
+          if (key.meta || typeof s !== 'string' || [...s].length !== 1 || s < ' ' || (s === ' ' && !dropping) || s === '\x7f') return;
           st.filter += s;
           toFirstCase = true;
       }
@@ -286,12 +304,28 @@ async function chooseCases() {
     console.log(`\nThere are no cases in the cases folder. Put the .json case files provided by QA into:\n  ${CASES_DIR}\n`);
     return null;
   }
-  if (!useTree()) return [await chooseCase(cases)];
-  const picked = await pickCases(cases);
-  if (picked === QUIT) return QUIT;
-  if (picked.length === 1) console.log(`Selected: ${picked[0].doc.name || picked[0].id}`);
-  else printSelected(picked);
-  return picked;
+  for (;;) {
+    const asTree = useTree();
+    const picked = asTree ? await pickCases(cases) : await chooseCase(cases);
+    if (picked === QUIT) return QUIT;
+    if (picked.dropped) {
+      // A file or folder dropped into the window is run like one dragged onto run-case.bat. What cannot be run is
+      // said, and the list comes back
+      let list = null;
+      try {
+        list = casesFromArgs([picked.dropped]);
+      } catch (e) {
+        console.log(`\n${path.basename(picked.dropped)} is not a case file (${e.message.split('\n')[0]})`);
+      }
+      if (!list) continue;
+      if (list.length === 1) console.log(`${asTree ? '' : '\n'}Selected: ${list[0].doc.name || list[0].id}`);
+      return list;
+    }
+    if (!asTree) return [picked];
+    if (picked.length === 1) console.log(`Selected: ${picked[0].doc.name || picked[0].id}`);
+    else printSelected(picked);
+    return picked;
+  }
 }
 
 // Cases named on the command line: a case file or a folder dragged onto run-case.bat, or several of them.

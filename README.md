@@ -221,7 +221,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
 ## PO: how to use it
 
 1. Unzip `UAT-Runner.zip`; nothing needs to be installed.
-2. Double-click **run-case.bat** and choose a case with the keyboard (or drag a case `.json` onto the bat file):
+2. Double-click **run-case.bat** and choose a case with the keyboard (or drag a case `.json` onto the bat file, or drop it into the window that is already open and press Enter: the console types the path of the file, and a case file may be anywhere on the computer):
 
    ```
    Choose a case to run   (14 cases)
@@ -252,7 +252,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
 
 ### Running several cases
 
-- Tick cases with Space and press Enter, or drag a folder or several case files onto run-case.bat.
+- Tick cases with Space and press Enter, or drag a folder or several case files onto run-case.bat. A folder of cases can also be dropped into the open window (one file or one folder per drop), then Enter.
 - The settings are asked for once; case data cannot be changed (run a case on its own for that).
 - Then choose: **Enter** = one after another; **a number** (2 to 8) = that many at the same time, each in its own Edge window. Running at the same time logs the same account in from several browsers: start with 2.
 - A case that cannot be run (it needs a newer runner, a data file is missing, it needs a trade ID) is left out and listed.
