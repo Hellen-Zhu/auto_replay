@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OREO UAT Replay Demo</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #14213D; overflow: hidden; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  section { box-sizing: border-box; width: 1920px; height: 1080px; }
+  section * { box-sizing: border-box; }
+  p, h2, h3, ul { margin: 0; }
+  ul { padding-left: 1.2em; }
+  aside { display: none; }
+  x-shape[kind="arrow-right"] { display: block; flex: none; clip-path: polygon(0 30%, 62% 30%, 62% 0, 100% 50%, 62% 100%, 62% 70%, 0 70%); }
+</style>
+</head>
+<body>
+<div id="stage">
+<section id="overview" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans SC', Arial, sans-serif;padding:96px 128px;display:flex;flex-direction:column;justify-content:space-between;gap:36px">
+<div style="display:flex;flex-direction:column;gap:14px">
+<p style="font-size:24px;font-weight:700;letter-spacing:3px;color:#C2551D">OREO UAT REPLAY · DEMO</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.15">QA 跑一次，PO 双击即可真实回放</h2>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">录制与回放共用同一个执行核心：QA 跑通的是什么，PO 回放的就是什么</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:20px">
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14213D;padding:28px;border-radius:16px">
+<p style="font-size:24px;font-weight:700;color:#F2A65A">01</p>
+<h3 style="font-size:30px;font-weight:700;line-height:1.3;color:#F7F6F2">QA 本地执行</h3>
+<p style="font-size:24px;line-height:1.4;color:#C9D3E3">Playwright 跑用例，通过才导出</p>
+</div>
+<x-shape kind="arrow-right" style="width:44px;height:24px;background:#C2551D;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14213D;padding:28px;border-radius:16px">
+<p style="font-size:24px;font-weight:700;color:#F2A65A">02</p>
+<h3 style="font-size:30px;font-weight:700;line-height:1.3;color:#F7F6F2">导出 case 文件</h3>
+<p style="font-size:24px;line-height:1.4;color:#C9D3E3">JSON 步骤数据，不是代码，可审计</p>
+</div>
+<x-shape kind="arrow-right" style="width:44px;height:24px;background:#C2551D;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14213D;padding:28px;border-radius:16px">
+<p style="font-size:24px;font-weight:700;color:#F2A65A">03</p>
+<h3 style="font-size:30px;font-weight:700;line-height:1.3;color:#F7F6F2">分发免安装包</h3>
+<p style="font-size:24px;line-height:1.4;color:#C9D3E3">便携文件夹，直接用本机 Edge</p>
+</div>
+<x-shape kind="arrow-right" style="width:44px;height:24px;background:#C2551D;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14213D;padding:28px;border-radius:16px">
+<p style="font-size:24px;font-weight:700;color:#F2A65A">04</p>
+<h3 style="font-size:30px;font-weight:700;line-height:1.3;color:#F7F6F2">PO 双击回放</h3>
+<p style="font-size:24px;line-height:1.4;color:#C9D3E3">真实浏览器逐步重跑，自动留证</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FDFCFA;padding:36px;border:1px solid #DEDACF;border-radius:16px">
+<h3 style="font-size:32px;font-weight:700;line-height:1.25;color:#C2551D">为什么做</h3>
+<ul style="font-size:24px;line-height:1.5;color:#2D3748">
+<li>PO 不能装软件，也不写代码</li>
+<li>复现问题只能靠截图和口述</li>
+<li>交易 ID 每次不同，点击录制无法重放</li>
+<li>每轮验收都要重复手工操作</li>
+</ul>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FDFCFA;padding:36px;border:1px solid #DEDACF;border-radius:16px">
+<h3 style="font-size:32px;font-weight:700;line-height:1.25;color:#C2551D">PO 拿到什么</h3>
+<ul style="font-size:24px;line-height:1.5;color:#2D3748">
+<li>用例树：键盘选择、搜索、多选</li>
+<li>可换数据：产品、dat 文件、交易 ID</li>
+<li>批量执行，可多条同时跑</li>
+<li>证据：报告、截图、trace 回放</li>
+<li>密码现场输入，不保存</li>
+</ul>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FDFCFA;padding:36px;border:1px solid #DEDACF;border-radius:16px">
+<h3 style="font-size:32px;font-weight:700;line-height:1.25;color:#C2551D">覆盖与进展</h3>
+<ul style="font-size:24px;line-height:1.5;color:#2D3748">
+<li><b>44 条用例</b>，覆盖 13 个场景</li>
+<li>创建、审批、取消、分配、终止、更替、修改</li>
+<li>真实系统首轮：<b>28 条中 23 条通过</b></li>
+<li>下一步：修复 5 条失败，PO 机器试跑</li>
+</ul>
+</div>
+</div>
+<aside>开场一句话：QA 用 Playwright 跑通一次，系统自动导出 case 文件；PO 不装任何软件，双击就能在自己电脑的 Edge 里把同一条用例真实重跑一遍。
+演示顺序：1) 打开 runner，展示用例树和搜索；2) 选一条用例，现场输入密码，按 D 换产品或 dat 文件；3) 看浏览器逐步执行；4) 打开 report 和 trace 回放；5) 多选几条批量跑。
+数字说明：44 条用例、13 个 spec 是代码中的现状；28 条中 23 条通过是真实系统第一次完整运行的结果，其余用例在 mock 上验证或尚未运行。并行执行、Windows / Edge 上的便携包还需在 PO 机器上确认。</aside>
+</section>
+</div>
+<script>
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    document.getElementById('stage').style.transform = 'scale(' + s + ') translate(-50%, -50%)';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+</script>
+</body>
+</html>
