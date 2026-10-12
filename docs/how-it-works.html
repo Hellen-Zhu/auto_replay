@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OREO UAT Replay - How It Works</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #14213D; overflow: hidden; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  section { box-sizing: border-box; width: 1920px; height: 1080px; background: #F7F6F2; color: #14213D;
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+    padding: 64px 112px; display: flex; flex-direction: column; justify-content: space-between; gap: 28px; }
+  section * { box-sizing: border-box; }
+  p, h2, h3, ul { margin: 0; }
+  ul { padding-left: 1.2em; }
+  code { font-family: Menlo, Consolas, monospace; }
+  .eyebrow { font-size: 24px; font-weight: 700; letter-spacing: 3px; color: #C2551D; }
+  h2 { font-size: 56px; font-weight: 700; line-height: 1.15; }
+  .sub { font-size: 28px; line-height: 1.4; color: #4A5568; }
+  .head { display: flex; flex-direction: column; gap: 12px; }
+  .row { display: flex; flex-direction: row; align-items: stretch; gap: 20px; }
+  .side { flex: 1; display: flex; flex-direction: column; gap: 12px; background: #14213D; padding: 28px; border-radius: 16px; }
+  .side h3 { font-size: 30px; font-weight: 700; color: #F7F6F2; }
+  .side .tag { font-size: 24px; font-weight: 700; color: #F2A65A; }
+  .layer { background: #22335A; border-radius: 10px; padding: 10px 18px; font-size: 24px; line-height: 1.35; color: #C9D3E3; }
+  .layer b { color: #F7F6F2; }
+  .mid { flex: 0.9; display: flex; flex-direction: column; gap: 16px; }
+  .core { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: #C2551D; color: #FFF8F1; padding: 24px 28px; border-radius: 16px; }
+  .core h3 { font-size: 30px; font-weight: 700; }
+  .core p { font-size: 24px; line-height: 1.4; }
+  .file { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: #FDFCFA; border: 2px dashed #C2551D; padding: 24px 28px; border-radius: 16px; }
+  .file h3 { font-size: 30px; font-weight: 700; color: #C2551D; }
+  .file p { font-size: 24px; line-height: 1.4; color: #2D3748; }
+  .arrow { flex: none; align-self: center; width: 44px; height: 24px; background: #C2551D; }
+  .arrow.right { clip-path: polygon(0 30%, 62% 30%, 62% 0, 100% 50%, 62% 100%, 62% 70%, 0 70%); }
+  .arrow.left { clip-path: polygon(100% 30%, 38% 30%, 38% 0, 0 50%, 38% 100%, 38% 70%, 100% 70%); }
+  .card { flex: 1; display: flex; flex-direction: column; gap: 10px; background: #FDFCFA; padding: 26px 28px; border: 1px solid #DEDACF; border-radius: 16px; }
+  .card h3 { font-size: 28px; font-weight: 700; line-height: 1.25; color: #C2551D; }
+  .card p { font-size: 24px; line-height: 1.45; color: #2D3748; }
+</style>
+</head>
+<body>
+<div id="stage">
+<section id="how-it-works">
+<div class="head">
+<p class="eyebrow">OREO UAT REPLAY · 原理</p>
+<h2>录的是“动作”，不是鼠标点击</h2>
+<p class="sub">QA 执行时每个动作都被记录成数据；PO 回放时由同一段代码把这些数据重新执行一遍</p>
+</div>
+<div class="row">
+<div class="side">
+<p class="tag">QA 录制侧 · Playwright</p>
+<h3>四层结构，逐层向下调用</h3>
+<div class="layer"><b>Case</b>：场景步骤 Given / When / Then</div>
+<div class="layer"><b>Flow</b>：业务步骤，如“创建交易”</div>
+<div class="layer"><b>Page / Component / API</b>：定位器与原子操作</div>
+<div class="layer"><b>ui.ts</b>：执行每个动作，同时记录下来</div>
+</div>
+<div class="arrow right"></div>
+<div class="mid">
+<div class="core">
+<h3>共享执行核心 core/actions.js</h3>
+<p>两侧都调用它来执行每一步，所以 QA 跑通的和 PO 回放的完全一致</p>
+</div>
+<div class="file">
+<h3>case 文件（JSON）</h3>
+<p>用例通过后自动导出：步骤、定位器、数据，没有代码</p>
+</div>
+</div>
+<div class="arrow left"></div>
+<div class="side">
+<p class="tag">PO 回放侧 · 免安装 runner</p>
+<h3>读数据，逐步执行</h3>
+<div class="layer"><b>选择</b>：用例树中选一条或多条</div>
+<div class="layer"><b>确认</b>：地址、账号、现场输入密码</div>
+<div class="layer"><b>执行</b>：本机 Edge 中逐步重跑</div>
+<div class="layer"><b>留证</b>：报告、每步截图、trace</div>
+</div>
+</div>
+<div class="row">
+<div class="card">
+<h3>为什么能重放</h3>
+<p>记录的是“填写 / 点击 / 校验 + 定位器”，不是坐标；等待由执行核心自动处理</p>
+</div>
+<div class="card">
+<h3>每次不同的值</h3>
+<p>交易 ID 在运行时从页面或接口响应中取得，存为变量 <code>${var}</code>，后续步骤引用它</p>
+</div>
+<div class="card">
+<h3>环境、数据、步骤分离</h3>
+<p><code>${cfg}</code> 地址和账号只在本机配置；<code>${param}</code> 业务数据随 case 走，PO 可改</p>
+</div>
+<div class="card">
+<h3>前置数据走 API</h3>
+<p>事件所需的交易由 API 步骤创建，浏览器里只演示被测的操作和结果</p>
+</div>
+</div>
+</section>
+</div>
+<script>
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    document.getElementById('stage').style.transform = 'scale(' + s + ') translate(-50%, -50%)';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+</script>
+</body>
+</html>
