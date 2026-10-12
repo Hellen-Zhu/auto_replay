@@ -1,479 +1,278 @@
-# OREO UAT Replay Tool (MVP)
+# OREO UAT Replay Tool
 
-QA runs a case locally with Playwright → once it passes, a **case file** (JSON) is exported automatically → the PO double-clicks the **portable runner** to replay it, really driving Edge on their own computer and producing an execution report with screenshots.
+QA runs a case locally with Playwright → once it passes, a **case file** (JSON) is exported automatically → the PO double-clicks the **portable runner** to replay it, really driving Edge on their own computer and producing a report with screenshots.
 
 ```
 QA: npx playwright test  ──export──►  cases/trade-creation/TC-TRADE-CREATION-FX_TRF-UI-001.json
                                           │ put on the shared drive
-PO: double-click run-case.bat → pick a case in the tree of folders, or tick several → Edge opens and runs → evidence/xxx/report.html
+PO: double-click run-case.bat → pick a case, or tick several → Edge opens and runs → evidence/xxx/report.html
 ```
 
-A case file contains **no server address and no password**, only relative paths and config references (`${cfg:accounts.maker.password}`). Those values live in each computer's own `config.local.json`.
-
-Two kinds of data are kept apart:
+A case file contains **no server address and no password**. Two kinds of data are kept apart:
 
 | | Environment | Case data |
 |---|---|---|
-| What | Server address, accounts, passwords | What a case types or selects: counterparty, portfolio, direction, notional... |
+| What | Server address, accounts, passwords | What a case types or selects: counterparty, portfolio, product... |
 | Where | `config.local.json` on each computer, never committed | `testdata/*.json`, committed |
-| In the case file | `${cfg:accounts.maker.email}` (the value is not in the file) | `${param:counterpartyName}` plus the value in the `params` block of the file |
-| For the PO | Asked for when missing; its number in the list changes it for a run | Comes with the case; its number in the list changes it for a run |
+| In the case file | `${cfg:accounts.maker.email}` (a reference, no value) | `${param:counterpartyName}` plus its value in `params` |
+| For the PO | Asked for when missing; can be changed for a run | Comes with the case; can be changed for a run |
+
+This file is the guide for using the project. Design decisions, the case file format, what is known of the OREO pages and what still has to be checked on the real system are in `CLAUDE.md`.
 
 ## Layout
 
 | Path | Purpose |
 |---|---|
-| `core/actions.js` | Execution core. QA runs and PO replays go through the same code |
-| `core/config.js` | Reads `config.local.json` |
-| `framework/components/` | Component objects: controls and regions shared by several pages (`TopBar`, `Combobox`, `ConfirmDialog`, `TradeChangeConfirmation`, `Toast`), atomic operations only |
-| `framework/api/` | API objects: one class per API area (`TradesApi`), holding its requests and one atomic operation per request; used to prepare data a case needs, see "QA: preparing data through the API" |
-| `framework/pages/` | Page objects: one class per page, holding its locators (by element name, see `elements/`) and its atomic operations |
-| `framework/elements.ts` | `element('<name>')`: looks a locator up in `elements/` by the name the E2E project gives it |
-| `framework/app.ts` | `App`: one instance of every page and shared component, each created on first use |
-| `framework/ui.ts` | Action wrapper: execute + record, handles dynamic values, case data and passwords automatically |
-| `framework/data.ts` | Reads `testdata/<name>.json` with the shared blocks it uses and finds the row of a case ID (behind the `testData` fixture) |
-| `framework/fixtures.ts` | Provides `flows`, `app` and `ui` to every test; exports to `cases/<spec name>/` automatically after a test passes |
-| `framework/flows/` | Flow layer: business steps reported as Given / When / Then, composed from atomic operations; one file per business domain (`auth`, `trades`, `tradeCreation`, `tradeProvisioning`, `tradeCancellation`, `tradeApproval`, `tradeAllocation`, `lifecycleEvent`, `tradeEarlyTermination`, `tradeAmendment`, `tradePartialNovationRemaining`, ...) |
-| `tests/` | Test cases, one spec per lifecycle event: `trade-creation.spec.ts` (normal / StepIn full / StepIn partial, each for the products that support it), `trade-cancellation.spec.ts`, `trade-allocation.spec.ts`, `trade-early-termination.spec.ts`, `trade-partial-termination.spec.ts`, `trade-novation-remaining.spec.ts`, `trade-step-out-full.spec.ts`, `trade-step-out-partial.spec.ts`, `trade-portfolio-reassignment.spec.ts`, `trade-amendment.spec.ts`, `trade-partial-novation-remaining.spec.ts`; `support.ts` holds what the specs share |
-| `testdata/` | Case data: `common.json` (values shared by all cases), `shared/` (blocks of values shared by several specs) and one `<name>.json` per spec. QA side only; the values a case uses are copied into its case file |
-| `elements/` | Element locators, a copy of `src/test/resources/elements` of the E2E project (`pages/`, `components/`). Refreshed with `npm run sync:elements`, never edited here. QA side only |
-| `testdata/dat/` | Files the cases upload (one `.dat` per product); shipped to the PO with the package |
-| `runner/runner.js`, `runner/lib/` | PO-side runner: `runner.js` is the entry, its parts (case list and tree, settings, execution, batch, report, view server, recording) are the modules in `runner/lib/` |
-| `portable/run-case.bat` | The launcher the PO double-clicks; a case file, several of them or a folder of cases can be dragged onto it |
-| `portable/record-session.bat` | Records a manual session (no case): the PO works by hand with the trace on, e.g. to report a bug |
-| `portable/view-trace.bat` | Opens the list of earlier runs with their report and trace viewer links |
-| `scripts/build-portable.js` | Builds the portable runner |
-| `scripts/sync-elements.js` | Refreshes `elements/` from the E2E project and checks it against the page objects |
-| `scripts/export-existing-trade-cases.js` | Runs the five cases on an existing trade once each, on trades it creates, so that their case files are exported |
-| `mock-oreo/` | Mock OREO pages, for local demos only |
-| `.claude/skills/porting-java-e2e-cases/` | Claude Code skill: implements a case of the E2E project here, see "QA: porting a case from the E2E project" |
+| `tests/` | Cases, one spec per lifecycle event; `support.ts` holds what the specs share |
+| `framework/flows/` | Business steps (Given / When / Then), one class per domain: `flows.<domain>.<step>()` |
+| `framework/pages/`, `components/`, `api/` | Locators or requests, and atomic operations on them |
+| `framework/ui.ts` | Executes each action and records it; `fixtures.ts` exports the case after a pass |
+| `framework/products.ts` | Product registry: which product supports which kind of creation |
+| `core/actions.js` | Execution core, shared by QA's run and the PO's replay |
+| `testdata/` | Case data: `common.json`, `shared/`, one `<spec name>.json` per spec |
+| `testdata/dat/<PRODUCT>/` | The dat files cases upload or send; shipped to the PO |
+| `elements/` | Element locators, a copy of the E2E project's; never edited here |
+| `cases/<spec name>/` | Exported case files |
+| `runner/`, `portable/*.bat` | The PO's runner and its launchers |
+| `scripts/` | `build-portable`, `sync-elements`, `export-existing-trade-cases` |
+| `mock-oreo/` | Mock OREO, for local tries only |
+| `.claude/skills/porting-java-e2e-cases/` | Claude Code skill that ports a case of the E2E project |
 
-## QA: first-time setup
+## QA: setup and running
 
 ```bash
-npm install                            # uses the local Edge, no browser download
+npm install                                        # uses the local Edge, no browser download
 copy config.local.example.json config.local.json
 ```
 
-Edit `config.local.json`: fill in `baseUrl` (the real server address), `apiBaseUrl` (the address of the API **including its path prefix**, e.g. `https://<api host>/api/v1`; it is not the pages' address, and only cases that call the API need it) and the account and password for each role. The file is in `.gitignore` and is never committed.
+Fill in `config.local.json` (it is in `.gitignore`):
+
+- `baseUrl`: the address of the pages.
+- `apiBaseUrl`: the address of the API **including the prefix its requests share** (`https://<api host>/api/v1`). It is not the pages' address.
+- `accounts.<role>`: e-mail and password of the maker and the checker.
+- `riskEngine`: `"real"` (default) waits for the system's risk calculation, up to `timeouts.response` (60 s); `"mock"` answers it in the browser, so a case does not fail because the risk engine is slow or down. For QA's run only: the PO's runner always uses `real`.
 
 ```bash
-npx playwright test                    # run every case; passing ones are exported to cases/<spec name>/
-npx playwright test --headed           # watch the browser while it runs
-npx playwright test --workers=4        # run 4 cases at a time (one at a time by default)
-npm run replay                         # replay with the runner, exactly what the PO sees
+npx playwright test               # run every case; passing ones are exported to cases/<spec name>/
+npx playwright test --headed      # watch the browser
+npx playwright test -g FX_TRF     # only the cases whose title matches
+npx playwright test --workers=4   # 4 cases at a time (default: one at a time)
+npm run replay                    # replay with the runner, as the PO sees it
+npm run record                    # record a manual session
+npm run mock                      # the mock OREO on http://localhost:4173
+npx tsc -p .                      # type check
 ```
 
-**Running cases side by side.** The cases do not depend on each other (each creates its own trade and exports its own case file), so `--workers=<n>` runs `n` of them at a time, each in its own browser; with `--headed` that is `n` windows. The exported case files are the same as in a run one by one, and each `createdTradeId = ...` line in the console then starts with its case ID. It is one at a time by default because the UAT environment is shared: on the mock 13 cases take 18 s with 4 workers instead of 53 s, but it has not been tried on the real system, where every case logs in with the same account at the same time. Start with 2 or 3 workers; if cases then fail at the login or lose their session, go back to the default and tell us what the system showed.
+- Before the first run: copy the dat files to `testdata/dat/<PRODUCT>/<PRODUCT>.dat` (variants of a product go into the same folder under their own names) and run `npm run sync:elements -- <E2E project>`. A case whose dat file is missing is skipped.
+- Cases do not depend on each other, so they can run side by side. On the real system every case logs in with the same account: start with 2 or 3 workers.
+- To try without the real system: `npm run mock`, then `baseUrl` = `http://localhost:4173`, `apiBaseUrl` = `http://localhost:4173/api/v1`, maker password `maker1`. `MOCK_RISK_ENGINE=down npm run mock` makes its risk calculation fail, to see what `riskEngine` does.
 
-Case files are kept **one folder per spec**, i.e. per lifecycle event: `tests/trade-cancellation.spec.ts` exports to `cases/trade-cancellation/<case ID>.json`, the same name as its test data file. Nothing has to be set up for a new spec: its folder is created by the first export. The runner shows these folders to the PO instead of one long list (see "PO: how to use it").
+## The cases
 
-`riskEngine` decides what happens to the third-party risk calculation the system calls when a trade is booked or an event is triggered on one: `"real"` (default) waits for its answer, up to `timeouts.response` (60 s by default); `"mock"` answers it in the browser with a fixed success, so a case does not fail because the risk engine is slow or down. The exported case file is the same either way. This setting is for QA's own run (`npx playwright test`): the runner, i.e. the PO, always uses `"real"` and does not offer it. A run with `"mock"` says so on the screen and in its report.
+| Spec (`tests/<name>.spec.ts`) | Case IDs | What |
+|---|---|---|
+| `trade-creation` | `TC-TRADE-CREATION-<PRODUCT>-UI-001` to `-003` | Maker creates a normal / StepIn full / StepIn partial trade, per product that supports it |
+| | `TC-TRADE-CREATION-UI-004` | The same for a product and dat file chosen as case data |
+| `trade-approval-reject` | `TC-TRADE-APPROVAL-REJECT-UI-001` to `-004` | Checker approves or rejects a pending new trade (normal, StepIn full, StepIn partial) |
+| `trade-cancellation` | `TC-TRADE-CANCELLATION-UI-001` | Maker cancels a live trade; pending checker approval |
+| `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` to `-003` | Maker allocates to 2, 4 or 3 subtrades |
+| `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-UI-001` | Maker triggers the event from the trade's action menu |
+| `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002`, `-003` | Maker amends the counterparty / the risk portfolio; pending checker approval |
+| every event spec | `TC-TRADE-<EVENT>-EXISTING-UI-...` | The event on a trade that already exists |
+| `existing-trade` | `TC-EXISTING-TRADE-UI-001` to `-005` | On an existing trade: checker decides on a new trade, maker cancels, checker decides on the cancellation |
 
-> To see what `riskEngine` does on the mock: `MOCK_RISK_ENGINE=down npm run mock` (PowerShell: `$env:MOCK_RISK_ENGINE='down'; npm run mock`) makes the mock's risk calculation fail; the cases then fail with `"real"` and pass with `"mock"`.
+How the cases are cut:
 
-> To try it without the real system: `npm run mock` starts the mock pages; set `baseUrl` to `http://localhost:4173`, `apiBaseUrl` to `http://localhost:4173/api/v1` and the maker password to `maker1`. The values in `testdata/` are those of the real system; the mock offers them too. The mock's header comment says which of its testids are real and which are only its own guess.
-
-### Trade creation cases
-
-`tests/trade-creation.spec.ts` has three tests (normal trade, StepIn full, StepIn partial), each run for its own list of products, since not every product supports StepIn, mirroring `trade_creation.feature` of the E2E project. Before running them:
-
-1. Copy the product `.dat` files into `testdata/dat/`, one folder per product: `testdata/dat/FX_TRF/FX_TRF.dat`, `testdata/dat/FX_PSCRIPT/FX_PSCRIPT.dat`, ...; a case whose product has no file is skipped. Other dat files of the same product (variants of its structure) go into the same folder under their own names.
-2. Check the values in `testdata/common.json` (counterparty, portfolio, direction) and `testdata/trade-creation.json` (old counterparty for StepIn).
-
-To add a product, add one line to the registry in `framework/products.ts` with the capabilities it supports (`create`, `stepInFull`, `stepInPartial`) and put its `.dat` file in `testdata/dat/<PRODUCT>/`; the specs pick it up through `productsWith(...)`. To run everything of one product: `npx playwright test -g FX_TRF`.
-
-A variation in data only (direction Sell, another counterparty) is not a case of its own: the PO runs an existing case and changes its case data before the run (the number of the value in the runner's list).
-
-`[TC-TRADE-CREATION-UI-004]` creates a trade of a chosen product and dat file (login, create, pending approval). It is one case for every product: **the product is case data** (`"product"` in its testdata row), so the PO runs it for another product by changing `product` before the run (its number in the list); the runner lists the products that have a folder under `testdata/dat/` in the package, numbered, and takes a number or a name (a name without a dat file is asked for again). In the flow this is `flows.tradeCreation.productAsCaseData(product)`: from then on every use of the product (the typed Product ID, the name of the dat file, the step lines) is recorded as `${param:product}`.
-
-**A case logs in once.** No case needs both the maker and the checker in the browser: what the other role did before is the `Given`. The checker approving a new trade is `[TC-TRADE-APPROVAL-REJECT-UI-001]`, whose trade the maker submits through the API (there is no creation case that goes on to the checker). Where no API request is known for the maker's part (a pending cancellation, a pending amendment), the maker's case ends at "pending checker approval" and the checker's decision is a case on a given trade, run with the trade ID the maker's case printed.
-
-#### Choosing the product and its dat file
-
-A product has more than one dat file: each is a variant of the product's structure. A variant is data, not a case of its own. Every case that is not repeated per product takes `product` and `datFile` (a file name in `testdata/dat/<product>/`) from its case data: `[TC-TRADE-CREATION-UI-004]` creates a trade from them and checks it is pending approval; the lifecycle event cases create their `Given` trade from them through the API (`testdata/shared/given-trade.json`). In the runner, a change of the product asks for the product first (the folders of `testdata/dat/` in the package) and then for the dat file (the files in that product's folder); after a change of product a folder with a single file is taken without asking. What a case checks that depends on the file (a notional, for one) is case data too and has to be changed with it.
-
-#### An event on a trade that already exists
-
-Each lifecycle event also has a case that works on an existing live trade whose ID is entered for the run: `TC-TRADE-<EVENT>-EXISTING-UI-001` in the event's spec (`TC-TRADE-AMENDMENT-EXISTING-UI-002` to `-005` for the amendment: `-002` / `-003` are the maker's amendments, `-004` / `-005` the checker's decision on a trade with a pending amendment; the cancellation's are in `tests/existing-trade.spec.ts`). QA runs them with `OREO_TRADE_ID`, or exports all of them with `npm run export:existing-trade -- --events`, which books one real trade per case (one for a maker's amendment and the checker's decision on it together).
-
-### Coverage: where a case is repeated per product
-
-A case is repeated for every product only where the product changes what is tested. Creating a trade does (the dat file, the product ID), so the creation cases loop the registry. The checker's decision and the cancellation use the same pages for every product, so they run for one product (`FX_TRF`), with one case per kind of trade or outcome that differs. A case tests one thing: the trade it needs beforehand is created through the API, and it logs in as one role only.
-
-### Trade approval and rejection cases
-
-`tests/trade-approval-reject.spec.ts` holds the checker's decision on a new trade, one case per kind of trade: the product is case data (`"product": "FX_TRF"`, from the shared block of its testdata file), so the case IDs have no product in them. `[TC-TRADE-APPROVAL-REJECT-UI-001]` (a normal trade is approved and is `LIVE` / `New`), `-UI-002` (a normal trade is rejected and is a draft again, `DRFT`), `-UI-003` (a StepIn full trade is approved and is `LIVE`) and `-UI-004` (a StepIn partial trade is rejected and is a draft again). The titles all read "... when Checker approves / rejects the submission". The pending trade of the `Given` is submitted through the API; a StepIn trade carries a `udf` list (`stepInType`, `oldCptyName`, `oldCptyFmId`, `novationDate`) in its `basic` block, whose values are in `testdata/trade-approval-reject.json`. Only the checker logs in. They need `apiBaseUrl`, the e-mails of both accounts (the maker's is the sender of the submit request) and the checker's password.
-
-### Trade cancellation cases
-
-`tests/trade-cancellation.spec.ts` mirrors `trade_cancellation.feature`: one test, for `FX_TRF` only (see "Coverage" above): in `[TC-TRADE-CANCELLATION-UI-001]` the maker cancels a live trade and the cancellation is pending checker approval (`PARV` / `Cancelled`). The checker's decision on it is not part of this case (a case logs in once): it is `[TC-EXISTING-TRADE-UI-004]` (approve, `DEAD` / `Cancelled`) and `-UI-005` (reject, `LIVE` / `New`), run on the trade this case leaves behind, whose ID it prints. The feature's two scenarios end with the checker in the same browser; they are split this way because no API request that leaves a trade with a pending cancellation is known. Its `Given a Live '<product>' trade exists in the blotter` is not done in the browser: the trade is submitted and approved **through the API** (see "QA: preparing data through the API"), and the cancellation itself is done in the trade portal. Before running it:
-
-1. Set `apiBaseUrl` in `config.local.json`, with its prefix (`.../api/v1`), and make sure the `checker` account has its e-mail there and its password (the checker also logs in to the trade portal).
-2. Copy the product `.dat` files into `testdata/dat/`, as for trade creation.
-3. Run `npm run sync:elements -- <E2E project>`: the trade portal, confirmation dialog and checker action elements these cases use come from the E2E project's element files.
-
-Its data is in `testdata/trade-cancellation.json` (the trade that is created, the cancellation reason and comments). Parts of this case were written from what is known of the E2E project and still have to be checked on the real system; they are listed in `CLAUDE.md`, section 10.
-
-### Trade allocation cases
-
-`tests/trade-allocation.spec.ts` mirrors `trade_allocation.feature`: the maker allocates a live trade to subtrades from the trade portal (action menu, Allocation), the message `Trade <ID> has been allocated into <n> sub-trade(s).` is shown and the trade details (`/trade/<ID>`) show `DEAD`. Three tests: `[TC-TRADE-ALLOCATION-UI-001]` (two subtrades, 50/50, for `FX_TRF` only, see "Coverage"), `[TC-TRADE-ALLOCATION-UI-002]` (four subtrades, 30/30/30/10) and `[TC-TRADE-ALLOCATION-UI-003]` (`FX_PSCRIPT`, three subtrades, 34/34/32). The live trade of the `Given` is created through the API, so they need what the cancellation cases need (`apiBaseUrl`, both accounts, the `.dat` files, the element sync).
-
-How a trade is split is data: the row of the case in `testdata/trade-allocation.json` lists its subtrades in the order of the dialog's rows, each with an optional `counterpartyName` and `percentage`; a value that is left out keeps what the dialog proposes (the 50/50 case sets no percentage). The values and the comments are those of the E2E project's allocation test data. In the case file each value is case data named after its row (`subTrade1Percentage`), so the PO can try another split. **These cases have not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
-
-
-### Trade early termination case
-
-`tests/trade-early-termination.spec.ts` mirrors `trade_early_termination.feature`: the maker opens Early Termination from the action menu of a live trade, selects the direction, types the amount and the currency, confirms the event (which starts the risk calculation, see `riskEngine`) and confirms the trade change; the message `EarlyTermination completed successfully` is shown and the blotter shows the trade as `DEAD` / `Terminated`. One test, `[TC-TRADE-EARLY-TERMINATION-UI-001]`, for `FX_TRF` only (see "Coverage"). The live trade of the `Given` is created through the API. Direction, amount and currency are case data (`testdata/trade-early-termination.json`), so the PO can change them for a run.
-
-Opening an event from the action menu and submitting it are shared by all lifecycle events (`flows.lifecycleEvent.openAction` / `submit`); a new event adds a flow that fills the dialog in between, a spec and a testdata file. **This case has not been run yet**; what still has to be checked on the real system is listed in `CLAUDE.md`, section 10.
-
-### Other lifecycle event cases
-
-Five more events follow the pattern of the early termination, each with one test for `FX_TRF`, its own flow and its data in `testdata/<spec name>.json` (the values of the E2E project's test data, all case data the PO can change):
-
-| Spec | Case | What the maker enters | Expected |
-|---|---|---|---|
-| `tests/trade-partial-termination.spec.ts` | `[TC-TRADE-PARTIAL-TERMINATION-UI-001]` | new notional, unwind fee amount | message `Trade <ID> updated with new notional ...`; trade details show the new notional, status `LIVE` |
-| `tests/trade-novation-remaining.spec.ts` | `[TC-TRADE-NOVATION-REMAINING-UI-001]` | target amount, new counterparty | message title `Novation completed. Original trade <ID> terminated.`; blotter `DEAD` / `Novated` |
-| `tests/trade-step-out-full.spec.ts` | `[TC-TRADE-STEP-OUT-FULL-UI-001]` | direction, amount, currency, counterparty | message `StepOutFull completed successfully`; blotter `DEAD` / `Novated` |
-| `tests/trade-step-out-partial.spec.ts` | `[TC-TRADE-STEP-OUT-PARTIAL-UI-001]` | the same plus the new notional | message `StepOutPartial completed successfully`; blotter `LIVE` / `Novated` |
-| `tests/trade-portfolio-reassignment.spec.ts` | `[TC-TRADE-PORTFOLIO-REASSIGNMENT-UI-001]` | new portfolio | message `PortfolioReassignment completed successfully`; blotter `LIVE` / `Amended`; trade details show the new portfolio |
-| `tests/trade-partial-novation-remaining.spec.ts` | `[TC-TRADE-PARTIAL-NOVATION-REMAINING-UI-001]` | remaining notional, new counterparty | trade details of the original trade (`LIVE`, remaining notional, its counterparty) and of the new trade (`LIVE`, the rest, the new counterparty) |
-| `tests/trade-amendment.spec.ts` | `[TC-TRADE-AMENDMENT-UI-002]`, `-UI-003` | on the trade detail page: new counterparty (`-UI-002`) or new risk portfolio (`-UI-003`), then the reason | the amendment is pending checker approval (blotter `PARV`). The checker's decision is a case on a given trade: `-EXISTING-UI-004` (approves: blotter `LIVE` / `Amended`, trade details show the new counterparty) and `-EXISTING-UI-005` (rejects on the trade detail page: trade details show `LIVE` and the original portfolio) |
-
-**These cases have not been run yet.** The event statuses `Novated` and `Amended`, and what else still has to be checked on the real system, are listed in `CLAUDE.md`, section 10.
-
-### Cases on an existing trade
-
-`tests/existing-trade.spec.ts` holds cases that go on with a trade that is **already in the system** instead of creating their own, for a PO who has worked on a trade and wants to continue with it. They are an addition to the cases above, which prepare their own trade and can be repeated.
-
-| Case | Who | The given trade must be | Afterwards |
-|---|---|---|---|
-| `[TC-EXISTING-TRADE-UI-001]` | checker approves the new trade | `PARV` | `LIVE` |
-| `[TC-EXISTING-TRADE-UI-002]` | checker rejects the new trade | `PARV` | `DRFT` |
-| `[TC-EXISTING-TRADE-UI-003]` | maker cancels the trade | `LIVE` | `PARV` / `Cancelled` |
-| `[TC-EXISTING-TRADE-UI-004]` | checker approves the cancellation | `PARV` / `Cancelled` | `DEAD` / `Cancelled` |
-| `[TC-EXISTING-TRADE-UI-005]` | checker rejects the cancellation | `PARV` / `Cancelled` | `LIVE` / `New` |
-
-- The trade ID is **case data that is entered for every run** (`tradeId`): the runner asks the PO "Enter tradeId:" before the run. The exported case file holds the name with an empty value, never an ID.
-- After the login the case first checks that the trade is in the state of the table; a trade in another state fails there and nothing is done to it.
-- QA gives the ID in the environment variable `OREO_TRADE_ID`; without it these cases are skipped, so a normal `npx playwright test` is not affected. A run changes the trade, so run one case at a time, each with a trade in the right state:
+- **Minimal coverage.** A case is repeated per product only where the product changes what is tested (creation). Everything else runs for one product, with one case per kind of trade or outcome.
+- **The product and its dat file are case data** (`product`, `datFile`) in every case that is not repeated per product, so the PO runs it for another product by changing them before the run. A variation in data only (direction Sell, another counterparty, another dat file) is never a case of its own.
+- **A case logs in once.** What the other role did before is the `Given`, prepared through the API: a lifecycle event starts from a live trade that the maker submits and the checker approves through the API. Where no such request is known (a pending cancellation, a pending amendment), the maker's case ends at "pending checker approval" and the checker's decision is a case on an existing trade.
+- **Cases on an existing trade** take the trade ID as case data that is entered for every run; the case first checks the trade is in the state it starts from. QA gives the ID in `OREO_TRADE_ID` and the cases are skipped without it. They change the trade, so they cannot be repeated on the same one:
 
   ```bash
   # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-EXISTING-TRADE-UI-003"
   OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-EXISTING-TRADE-UI-003"
+  npm run export:existing-trade                # creates three trades and runs the five existing-trade cases on them
+  npm run export:existing-trade -- --events    # also the cases of the event specs; one more real trade per case
   ```
 
-- To export all five in one go: `npm run export:existing-trade` (add `-- --headed` to watch, `-- --product=<PRODUCT>` for another product than `FX_TRF`). It creates three trades with the trade creation case of the product (so that product's `.dat` is needed) and runs each case on a trade in the right state: trade 1 `001 -> 003 -> 004`, trade 2 `002`, trade 3 `001 -> 003 -> 005`. It books three real trades per run and stops at the first case that does not pass.
-- They need no `.dat` file and no `apiBaseUrl`, and are not per product: the given trade decides the product. The checker must not be the user who submitted the trade or the cancellation.
-- In a flow: `const tradeId = flows.trades.existingTrade(<the ID>)`; from then on every use of that ID is recorded as `${param:tradeId}`. Such a case needs a runner package built since those cases were added.
-- They cannot be part of a run of several cases (a batch asks nothing per case): the runner leaves them out and says so.
+Not every case has been run on the real system, and some were never run at all: the status per event and what still has to be checked are in `CLAUDE.md`, section 10.
 
 ## QA: test data
-
-Case data lives in `testdata/`, not in `config.local.json`:
 
 ```jsonc
 // testdata/common.json: values shared by every case
 { "counterpartyName": "10 AM NY", "portfolioId": "CM_OIL_CRU_OPT", "direction": "Buy" }
 
-// testdata/trade-creation.json: values of this spec, and a row only for a case that needs something different
+// testdata/trade-creation.json: values of this spec, and a row only for a case that differs
 {
   "defaults": { "oldCounterpartyName": "10 AM JAK" },
-  "cases": [
-    { "id": "TC-TRADE-CREATION-UI-004", "product": "FX_PSCRIPT" }
-  ]
+  "cases": [ { "id": "TC-TRADE-CREATION-UI-004", "product": "FX_TRF", "datFile": "FX_TRF.dat" } ]
+}
+
+// testdata/trade-cancellation.json: "use" takes a block several specs share (testdata/shared/given-trade.json)
+{
+  "use": ["given-trade"],
+  "defaults": { "cancelReason": "DEALER_ERROR" }
 }
 ```
 
-(The real files are plain JSON, without comments.)
+(The real files are plain JSON, without comments, and may hold more values.)
 
-- Values that several specs share, but not all of them, are a block in `testdata/shared/`: a spec's file lists it (`"use": ["given-trade"]`) and gets its values between `common.json` and its own `defaults`. `shared/given-trade.json` holds the API data of the trade every lifecycle event starts from, so it is written once instead of in each event's file.
-- A case gets `common.json`, then `defaults` of its spec's file, then its own row: **the row wins over `defaults`, `defaults` win over `common.json`**. So a value shared by everything is written once. **A case that needs nothing different has no row at all** (only `-UI-005` has one, for its product); `cases`, `defaults` and even the file are optional.
-- `id` is the full case ID. **The data is matched at run time**: a test title starts with its case ID in `[ ]` (the spec may build it, e.g. `[TC-TRADE-CREATION-${product}-UI-001]`), and the `testData` fixture looks that ID up in `testdata/<spec file name>.json` (`tests/trade-creation.spec.ts` → `testdata/trade-creation.json`). Take care with the spelling of an `id`: a row that matches no case is simply not used. The ID is also the exported file name (`cases/<spec file name>/<id>.json`).
-- In the test: `const data = testData<TradeCreationData>()`, then hand it to the flow.
-- In the flow, `const p = this.params(data)` turns the data into parameters. `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value is written into the `params` block of the case file, so the PO sees it before the run and can change it for one run. Only the parameters a case really uses are written.
-- What decides **the scenario itself** (which steps, which file, which title: the product) stays in the spec and is passed to the flow as a plain argument; each scenario is its own test and its own flow (`createTrade`, `createStepInFullTrade`, `createStepInPartialTrade`). It is recorded as it is and the PO cannot change it.
-- `testdata/` and the exported case files are committed, so they hold business values only. A value that must not be committed is written as a reference to local config, e.g. `"counterpartyName": "${cfg:tradeData.counterpartyName}"`; the PO is then asked for it like any other setting. Passwords never go here (the run fails if a test data value contains one).
-- A missing value fails the case with the name of the field, e.g. `Test data "oldCounterpartyName" is not set`.
+- A case gets `common.json` → the blocks listed under `use` (`testdata/shared/<block>.json`, values several specs share) → `defaults` → its own row; the later one wins. Everything is optional, and **a case that needs nothing different has no row**.
+- **Data is matched by case ID**: a test title starts with its ID in `[ ]`, and `testData<...>()` looks that ID up in `testdata/<spec file name>.json`. A row whose `id` matches no case is simply not used. The ID is also the exported file name.
+- In the flow, `const p = this.params(data)`: `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value goes into the `params` block of the case file. Only parameters a case really uses are written.
+- What decides the scenario stays in the spec and is passed to the flow as a plain argument.
+- `testdata/` is committed: business values only. A value that must stay local is a reference, `"${cfg:tradeData.counterpartyName}"`. Passwords never go here.
+- A missing value fails the case with the name of the field.
 
 ## QA: element locators
 
-Locators are not written again in this project: they are the element files of the Java + Cucumber E2E project, copied as they are into `elements/` (same `pages/` and `components/` folders, same file names):
+Locators are the element files of the Java + Cucumber E2E project, copied as they are into `elements/`:
 
 ```json
-[
-  { "name": "new_trade.book_btn", "lookupDetails": { "findBy": "testId", "value": "create-trade-book-btn" } }
-]
+{ "name": "new_trade.book_btn", "lookupDetails": { "findBy": "testId", "value": "create-trade-book-btn" } }
 ```
 
-A page object or component refers to an element by that name: `element('new_trade.book_btn')`. The element files only know the control itself, so what is specific to how this project operates it is added at the place of use, e.g. the real `<input>` inside a web component: `element('new_trade.portfolio_select', { inner: 'input' })`. For a text field use `{ inner: INNER_INPUT }` (exported by `framework/elements.ts`): it matches the `<input>` or `<textarea>` inside the component, exactly as the E2E project's `type value '...' into '...'` step does. This holds for every text field, also one whose element name ends in `_textarea`: the element is the web component, and filling it directly fails with `Element is not an <input>, <textarea>, <select> or [contenteditable]`.
-
-To refresh `elements/` after the E2E project changed:
+A page or component uses an element by its name: `element('new_trade.book_btn')`. An element file names the web component; the real control inside it is added where it is used: `element('<name>', { inner: INNER_INPUT })` for every text field (filling the component itself fails with `Element is not an <input> ...`).
 
 ```bash
 npm run sync:elements -- "C:\path\to\the-e2e-project"    # or set OREO_E2E_DIR once
-npm run sync:elements                                      # no path: only checks elements/ against the page objects
+npm run sync:elements                                      # no path: only checks elements/ against framework/
 ```
 
-- It copies every `*.json` under `src/test/resources/elements`, removes the ones that no longer exist there, and lists what was added / changed / removed. Then run the cases and commit `elements/`.
-- It fails when a page object uses a name that is not defined (e.g. renamed in the E2E project), and it lists the testids that are still hand-written in `framework/` although an element defines them, with the `element('...')` to use instead.
-- A wrong name also fails the case at run time, with the names that do exist for that page.
-- Never edit `elements/` by hand: the next sync overwrites it. **A new element is added in the E2E project** and synced. Until it exists there, a hand-written `{ testId: '...' }` works as before.
-- Only `findBy: testId` is supported so far. The sync reports any other kind it sees; supporting one is one line in `FIND_BY` of `framework/elements.ts`.
-- The sync refuses to copy a file that seems to contain a server address. To try the element files of another folder without copying them, set `OREO_ELEMENTS_DIR`.
-- The PO package is not affected: an exported case file already contains the resolved locators, so `elements/` is not packaged.
+- The sync mirrors the files (added / changed / removed), fails on a name that `framework/` uses but no file defines, and lists hand-written testids that an element already defines.
+- Never edit `elements/` by hand. **A new element is added in the E2E project** and synced; until then a hand-written `{ testId: '...' }` works.
+- Only `findBy: testId` is supported so far.
 
 ## QA: writing a new case
 
-The framework follows the Page Object Model, in three layers. Each layer only calls the one below it:
+Three layers, each calling only the one below:
 
-| Layer | Where | Contains | Example |
-|---|---|---|---|
-| Case | `tests/*.spec.ts` | The scenario: which flows, in which order, with which data | `flows.tradeCreation.createTrade(product, data)` |
-| Flow | `framework/flows/*.flow.ts` | Business steps: a Given / When / Then line of the report and the atomic operations behind it | `I book the trade and confirm` |
-| Page / component | `framework/pages/`, `framework/components/` | Locators and **atomic operations**: one thing a user does (fill one field, click one button, pick one dropdown value) or one check | `newTrade.clickBook()` |
-
-**1. Page / component: atomic operations.** Locators stay inside the class (`protected`); the outside only sees methods:
+| Layer | Where | Contains |
+|---|---|---|
+| Case | `tests/*.spec.ts` | The scenario's step lines and data; calls flows only |
+| Flow | `framework/flows/*.flow.ts` | Business steps composed of atomic operations; no locators, no `ui.xxx` |
+| Page / component / API object | `framework/pages/`, `components/`, `api/` | Locators or requests, and atomic operations built on `this.ui.xxx`; no sequences |
 
 ```ts
-// framework/pages/trades.page.ts
-export class TradesPage extends BasePage {
-  static readonly path = '/trades';
-  protected readonly searchInput = element('trade_portal.search_input', { inner: INNER_INPUT });
-  protected readonly allTradesBlotter = element('trade_portal.all_trade_blotter');
+// tests/trade-cancellation.spec.ts (shortened)
+test('[TC-TRADE-CANCELLATION-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it',
+  async ({ flows, testData, Given, When, Then, And }) => {
+    const { product, data } = givenProduct(flows, testData<TradeCancellationData>(), '...');
+    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
+    await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
+    await When('perform cancellation for the trade from trade portal', () => flows.tradeCancellation.cancelFromTradePortal(tradeId, data));
+    await Then('the cancellation is submitted successfully', () => flows.tradeCancellation.expectSubmitted());
+  });
+```
 
-  // The first row of the blotter that shows this trade ID: the rows are only told apart by their text
-  protected row(tradeId: Val): TargetIn {
-    return { ...this.allTradesBlotter, inner: 'role=row', hasText: tradeId, nth: 0 };
-  }
+- **A case reads like the feature file**: one `Given / When / Then / And / But('step text', () => flows...)` line per step. Each line is a row of the PO's report; the steps a flow opens inside it are shown as substeps.
+- An action flow does not assert its outcome: the `Then` is a separate `expect...` flow called by the case.
+- Every action goes through `this.ui.xxx`; a direct call on `page` is not recorded.
+- A value a step produces (`ui.read`, a captured response, an API `save`) becomes a variable by itself when it is used later, so a replay uses its own trade ID. It is also printed (`createdTradeId = ...`) and shown in the report.
+- The click that starts a risk calculation is `ui.clickAndAwait(target, RiskCalculation.forTrade(tradeId))`: it waits for the answer, or mocks it when `riskEngine` is `mock`.
+- A form with many fields is a table: a new New Trade field is one line in `NewTradePage.fields` plus its value in testdata.
+- New things have a fixed place: a page extends `BasePage` and is registered in `App`; a domain extends `BaseFlow` and is registered in `Flows`; a product is one line in `framework/products.ts` plus its dat file; a new lifecycle event is a spec, a flow that fills its dialog between `flows.lifecycleEvent.openAction` and `submit`, and a testdata file.
+- Accounts and passwords are always `cfg('accounts.<role>....')`. Only **passing** cases are exported.
 
-  async searchTrade(tradeId: Val) { await this.ui.fill(this.searchInput, tradeId); }
-  async openActionMenu(tradeId: Val) { await this.ui.rightClick(this.row(tradeId)); }   // the action menu is a context menu
+### Preparing data through the API
+
+```ts
+// framework/api/trades.api.ts (shortened)
+static readonly submit: ApiRequest = { method: 'POST', path: '/trades/create?tradeAction=SUBMIT' };
+
+async submitTrade(role: string, basic: TradeBasic, file: string) {
+  const saved = await this.ui.api({
+    ...TradesApi.submit,
+    headers: this.as(role),                                    // X-User-Id: that role's e-mail from the local config
+    multipart: { trade: { json: { basic } }, datFile: { file } },
+    save: { createdTradeId: 'data.trade.id', createdTaskId: 'data.checkerContext.taskId' },
+  });
+  return { tradeId: saved.createdTradeId, taskId: saved.createdTaskId };
 }
 ```
 
-A control used on several pages is a component (`framework/components/`), e.g. `new Combobox(this.ui, element('...', { inner: 'input' })).select(value)`.
+- The call is recorded in the case file like any other step, so the PO's replay creates its own trade.
+- An API object holds the requests and one operation per request; a flow composes them (`flows.tradeProvisioning.provisionLiveTrade`); a case never calls them.
+- The API has no login: `this.as('maker')` sends that role's e-mail as `X-User-Id`, as a config reference.
+- A path **starts after the prefix** that `apiBaseUrl` carries: `/trades/create`, never `/api/v1/trades/create`, never a full address.
+- Use it for the `Given` only: the `When` and the `Then` stay in the browser, or the replay shows nothing.
 
-A form with many fields is a table instead of one operation per field: `NewTradePage.fields` maps each field name to its element and kind of control (`combobox`, `text`), and `newTrade.setField(name, value)` operates it according to the kind. **To support another New Trade field, add one line to that table and write its value in testdata** (in the case's row, or in `defaults` for every case): the create flows fill every optional field a case has a value for, in the order of the table, in one `And I fill the optional fields` step. A name in the data that is not in the table fails the case. Only a new kind of control needs new code. A new page is registered in `framework/app.ts` (`App`).
-
-**2. Flow: business steps.** A flow method wraps atomic operations in the Given / When / Then line the PO reads in the report. Flows are grouped by business domain, one class per file (`auth.flow.ts`, `trades.flow.ts`, `trade-creation.flow.ts`); a new domain extends `BaseFlow` and is registered in `framework/flows/index.ts` (`Flows`), which makes it available as `flows.<domain>`:
-
-```ts
-// framework/flows/trades.flow.ts
-export class TradesFlow extends BaseFlow {
-  async openActionMenu(tradeId: string, keyword: Keyword = 'When') {
-    const { trades } = this.app;
-    await this.ui[keyword]('I search for the trade and open its action menu', async () => {
-      await trades.searchTrade(tradeId);       // becomes ${var:createdTradeId} automatically
-      await trades.openActionMenu(tradeId);
-    });
-  }
-}
-```
-
-A flow that needs case data takes it as one typed object and turns it into parameters (see "QA: test data"):
-
-```ts
-// framework/flows/trade-creation.flow.ts
-private async selectBasicInfo(product: string, data: TradeCreationData) {
-  const p = this.params(data);      // case data: recorded as ${param:name}; the product is recorded as it is
-  ...
-  await newTrade.setField('counterpartyName', p.counterpartyName);
-  await newTrade.setField('productId', product);
-```
-
-**3. Case: the scenario.** A case uses the `flows` fixture and nothing else; its data comes from `testdata/`, matched by the case ID in the title:
-
-```ts
-test('[TC-TRADE-SEARCH-FX_TRF-UI-001] Checker finds a new FX_TRF trade', async ({ flows, testData }) => {
-  const data = testData<TradeCreationData>();                                      // shared values + row "TC-TRADE-SEARCH-FX_TRF-UI-001" of testdata/trade-search.json, if any
-  await When('maker is logged in to the trade portal', () => flows.auth.login('maker'));   // the step as in the feature file
-  const tradeId = await flows.tradeCreation.createTrade('FX_TRF', data);           // When I open the New Trade form ... And I book the trade and confirm
-  await flows.tradeCreation.expectPendingApproval(tradeId);                        // Then the trade is created with pending approval status
-  await flows.auth.login('checker', 'And');                                        // And I log in as checker
-  await flows.trades.openActionMenu(tradeId);                                      // When I search for the trade and open its action menu
-});
-```
-
-Key points:
-
-- Cases hold no locators, no `ui.xxx` and no page calls: only flows and data. Flows hold no locators and no `ui.click / ui.fill`: only page / component operations. Pages and components hold no Given / When / Then and no multi-step sequences.
-- An action flow does not assert its own outcome: `createTrade` ends at the confirmed booking and returns the trade ID, and the case states the expected result with a separate `expect...` flow (the `Then`). This keeps the scenario readable in the case and lets another case expect something else after the same action.
-- **A case is written like the scenario of a feature file**: each line is `await Given / When / Then / And / But('step text', () => flows.<domain>.<step>(...))`, using the fixtures of the same names; the step returns what the flow returns (`const tradeId = await And("creates a new 'FX_TRF' trade", () => flows.tradeCreation.createTrade(product, data))`). That step is a row of the PO's report; the steps the flow opens inside it (`I open the New Trade form`, `I book the trade and confirm`, ...) are recorded as `substep` and shown as headings in the row's action list, like a feature step and the snippet behind it. A flow called outside any case step still reports its own steps as rows.
-- Inside a page or component every action goes through `this.ui.xxx`. Do not call `page` directly, or the action will not be recorded.
-- The case ID in `[ ]` at the start of the title sets the exported file name (a title without one can use an `@case:xxx` tag instead). The test title is shown as the **Scenario**, and each `ui.Given / When / Then / And / But('...', ...)` group (written in the flow layer) becomes one line of it in the PO's run log and report, so write them as business-readable sentences.
-- A value read with `ui.read()` is **turned into a variable automatically** when it is used later, so the PO's replay uses the freshly generated value.
-- Use `cfg('accounts.maker.password')` for accounts and passwords; even a password typed in plain text by mistake is replaced with a config reference on export.
-- Case data does not go into `config.local.json`: put it in `testdata/` and use it through `this.params(data)` in the flow.
-- OREO inputs are web components and the real `<input>` (or `<textarea>`) sits in the shadow DOM, so input targets need `inner: 'input'` or `inner: INNER_INPUT`; buttons can be clicked on the host element directly.
-- In a page or component, `ui.upload(target, 'testdata/dat/FX_TRF/FX_TRF.dat')` uploads a file from `testdata/dat/`; `ui.clickAndCapture(target, { url, method, field, saveAs })` clicks and reads a value out of the response the click triggers (for example the new trade ID), which then behaves like a value from `ui.read()`.
-- Text fields of a target can be a parameter or a config reference too: `{ role: 'menuitem', name: p.direction }`.
-- A target can be narrowed by the text it contains: `{ ...blotter, inner: 'role=row', hasText: tradeId, nth: 0 }` is the first row of the blotter that shows that trade ID (`inner`, then `hasText`, then `nth`). `hasText` matches a part of the text, so the ID `T12` also finds the row of `T123`: search for the trade first.
-- `ui.clickAndAwait(target, request)` clicks and waits until the request the click triggers is answered (the risk calculation: `RiskCalculation.forNewTrade()` / `RiskCalculation.forTrade(tradeId)` in `framework/risk-engine.ts`); with `"riskEngine": "mock"` in the local config the request is answered by the test itself instead of the system.
-- `ui.rightClick(target)` clicks with the right mouse button, which opens a context menu such as the action menu of a blotter row.
-- Only **passing** cases are exported.
-
-## QA: preparing data through the API
-
-A case that works on an existing trade (cancel, approve, step in...) does not have to book that trade through the UI first: a step can call the system's API, and the call is recorded in the case file like any other step, so the PO's replay creates its own trade.
-
-```ts
-// framework/api/trades.api.ts: the request and one atomic operation for it
-export class TradesApi extends BaseApi {
-  static readonly submit: ApiRequest = { method: 'POST', path: '/trades/create?tradeAction=SUBMIT' };
-  static readonly approve = (taskId: string): ApiRequest => ({ method: 'POST', path: `/checker/tasks/${taskId}/approve`, body: {} });
-
-  async submitTrade(role: string, basic: TradeBasic, file: string) {
-    const saved = await this.ui.api({
-      ...TradesApi.submit,
-      headers: this.as(role),                                    // X-User-Id: that role's e-mail from the local config
-      multipart: { trade: { json: { basic } }, datFile: { file } },
-      save: { createdTradeId: 'data.trade.id', createdTaskId: 'data.checkerContext.taskId' },
-    });
-    return { tradeId: saved.createdTradeId, taskId: saved.createdTaskId };
-  }
-}
-```
-
-- API objects are the same layer as pages and components: they hold the requests (path, method, fields of the response) and one operation per request, built on `this.ui.api(...)`. A flow composes them into a business step (`flows.tradeProvisioning.provisionLiveTrade(product, data)`); a case never calls them. A new API object extends `BaseApi` and is registered in `App`.
-- **The API has no login**: a request only says who sends it, with that user's e-mail in the `X-User-Id` header. `this.as('maker')` writes it as a reference to `accounts.maker.email`, so the e-mail is never in the case file.
-- `path` is always relative and **starts after the prefix all requests share**: the address is `apiBaseUrl` in `config.local.json`, which ends with that prefix (`.../api/v1`), so a path is `/trades/create`, never `/api/v1/trades/create` (the API is not on the pages' address). A full address in a path is refused. A wrong `apiBaseUrl` shows as HTTP 404 or "did not return JSON", with a hint to check it.
-- `TradesApi` so far: `submitTrade(role, basic, file)`, `approveTask(role, taskId)`, `rejectTask(role, taskId)`. Approve and reject were taken from the browser's Network tab; their body is an empty JSON object, which is inferred from the request's content length and still has to be confirmed by the first run on the real system.
-- `save` keeps fields of the JSON response as variables. Used later, on a page or in another API call, they become `${var:createdTradeId}` by themselves, like a value from `ui.read()`.
-- **Every value a step saves is shown**, so the trade a run created can be looked up in the system: the test output prints `createdTradeId = TRD-...` (and the test gets a `value` annotation); the PO's replay prints it under the step and again after "Run passed", shows it in the report (under the step and in the "Values from this run" table) and writes it to `result.json` (`values`). The same goes for a value from `ui.read()` or from a captured response.
-- A text inside `headers`, `body` or a JSON part can be a parameter or a config reference (`p.counterpartyName`, `cfg(...)`). A number is recorded as it is, since a parameter is always text: the PO cannot change it for a run.
-- A file part is a file under `testdata/dat/` (`{ file: 'testdata/dat/FX_TRF/FX_TRF.dat' }`), like an upload.
-- The request is sent with Playwright's own request client (`page.request`), from Node, not by the page: there is no screenshot for it, and the report shows the call and the values it saved. Any answer other than 2xx fails the step with the status and the start of the response.
-- Use it for preparing data only. What the case is about (the `When` and the `Then`) stays in the browser, or the PO's replay would show nothing.
-
-## QA: porting a case from the E2E project
-
-A case that already exists in the Java + Cucumber E2E project does not have to be rewritten by hand: the Claude Code skill in `.claude/skills/porting-java-e2e-cases/` implements it here. Open this project in Claude Code and ask for it, or call the skill directly:
+### Porting a case from the E2E project
 
 ```
 /porting-java-e2e-cases C:\path\to\the-e2e-project src\test\resources\features\ui\trading\trade_cancellation.feature
 ```
 
-A third argument limits it to one case ID; the project path can also come from `OREO_E2E_DIR`.
-
-The two projects have the same layers, so the skill translates level by level:
-
-| E2E project | This project |
-|---|---|
-| Feature step | The case's step, with the same text |
-| FLOW snippet | Flow method; its lines become the substeps |
-| PAGE / COMPONENT snippet, built-in or Java step | Atomic operation of a page / component |
-| Java step that prepares data through the API (`... is provisioned via playwright api`) | One operation per request in an API object (`framework/api/`), composed by a method of `flows.tradeProvisioning` |
-| Request template in the test data yml (`REQ-TPL-...`) | The payload's interface in the API object; its values in `testdata/` |
-| Element key | `element('<same key>')`, after `npm run sync:elements` |
-| Stored variable | `testdata/`, or the value a flow returns (a captured trade ID) |
-
-- It syncs `elements/` first, reuses the flows and operations that exist, and ends with a report per case ID: ported and passed, ported but not run, or not ported and why.
-- For a step that prepares data through the API it reads the Java code instead of the page: the step's method and its helpers, the call that sends each request (method, path, who sends it, the multipart parts), the request template the test data yml holds for it, and the response fields the code stores. Each request then becomes a `static` request and one operation of an API object, in the style of "QA: preparing data through the API"; the template's values go to `testdata/`. The report lists every request it read and every part it had to conclude rather than read.
-- It stops instead of guessing: a step that is neither a browser action nor an API call whose request is fully readable (a database check, a file check, a request built inside a library), an API call or a response check in a `When` / `Then`, a payload value the Java code computes at run time, an element that is not defined or not found by testid, or a control this project cannot operate yet leaves the whole scenario unported, with what is needed. It never invents an element name, a testid, a data value or any part of an API request.
-- It does not commit. Review the changes, run the cases against UAT (every run books real trades, through the API too) and commit them yourself.
-- Two complete traces are next to the skill: `example-trade-creation.md` (browser only) and `example-trade-cancellation.md` (a trade prepared through the API, then the browser).
+The skill translates level by level (feature step → case step, FLOW snippet → flow method, PAGE / COMPONENT snippet → atomic operation, element key → `element('<same key>')`, API provisioning step → API object operation). It stops instead of guessing and never commits; review, run and commit yourself.
 
 ## Packaging for the PO
 
 ```bash
 npm run build:portable                    # copies your local node.exe, no internet needed
 npm run build:portable -- --with-config   # include your baseUrl and accounts (passwords are stripped)
-npm run build:portable -- --no-zip        # produce the folder only, no zip
+npm run build:portable -- --no-zip        # the folder only
 ```
 
-This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported case files need to be sent to the PO, who drops them into the same folder under their `cases` folder, e.g. `cases/trade-cancellation/` (plus any new file under `testdata/dat/` that a case uploads). The runner finds a case file anywhere under `cases/`, at any depth, so a file dropped directly into `cases` runs as well; it is just listed outside the folders. `testdata/` is not part of the package: a case file carries the data it uses.
+This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files have to be sent: the PO drops them into the package's `cases` folder (plus any new file under `testdata/dat/`).
 
-**Every case file exported from this version on is format version 10**: `scenario` lists the step lines of the case on their own, with the case data of the file filled in, so the scenario can be read at a glance; `steps` are one entry per step line (`{ "step": "When ...", "actions": [ ... ] }`), and inside it one entry per substep (`{ "substep": "I log in as maker", "actions": [ ... ] }`) with the actions behind it. The runner ignores `scenario`. The file does not carry its format version (nor the spec it came from): it is read as the current format, so an older runner cannot recognize it as too new and fails at its first step. **Send the PO a new package before any newly exported case**. The current runner still runs the older files, whose steps are a flat list of actions:
-
-| Version | The case uses | Runs on |
-|---|---|---|
-| 1 | Steps only | Every runner |
-| 2 | Case data (`params`) | A runner built since case data was added |
-| 3 | A right-click, or a target narrowed with `hasText` (any case that works on a blotter row) | A runner built since those were added |
-| 4 | An API call (any case that prepares its trade through the API) | A runner built since the API call was added |
-| 5 | A click that waits for a request, which can be mocked (the risk calculation) | A runner built since `riskEngine` was added |
-| 6 | Case data that is entered for every run (the ID of an existing trade) | A runner built since those cases were added |
-| 7 | Case data in the name of a data file or in a step line (the product as case data) | A runner built since the product became case data |
-| 8 | The checks hidden / enabled / disabled / value of an input | A runner built since those checks were added |
-| 9 | Nested steps | A runner built since the steps were nested |
-| 10 | Nested substeps and the `scenario` list: every case exported now | A runner built from this version or later: send the PO a new package |
+**Build and send a new package whenever the case format or the runner changed.** A case file does not carry its format version, so an older runner cannot tell that a file is too new and fails at its first step. The current runner still runs older files.
 
 ## PO: how to use it
 
-1. Unzip `UAT-Runner.zip` (nothing needs to be installed).
-2. Double-click **run-case.bat** and choose the case with the keyboard; or drag a case `.json` onto the bat file.
-   - The list shows only the folders at first, one per kind of event (trade creation, trade cancellation...), each with the number of cases in it:
+1. Unzip `UAT-Runner.zip`; nothing needs to be installed.
+2. Double-click **run-case.bat** and choose a case with the keyboard (or drag a case `.json` onto the bat file):
 
-     ```
-     Choose a case to run   (14 cases)
+   ```
+   Choose a case to run   (14 cases)
 
-     > + [ ] trade-cancellation/   (3 cases)
-       + [ ] trade-creation/   (11 cases)
-     ```
+   > + [ ] trade-cancellation/   (3 cases)
+     + [ ] trade-creation/   (11 cases)
+   ```
 
-   - **Up / Down** move the highlighted row (also PageUp / PageDown, Home / End). **Right** or Enter opens a folder and shows its cases below it; **Left** closes it. **Enter on a case runs it.**
-   - **Type text to search**: a product (`trf`), part of a case ID (`cancellation-fx_trf`). Only the matching cases stay, in their folders. Backspace deletes a character, Esc clears the search.
-   - The description of the highlighted case is shown below the list. A list longer than the window scrolls.
-   - Case files that lie directly in `cases/` (not in a folder) are in a row `(not in a folder)` after the folders.
-   - **Ctrl+C** closes the window.
-   - In a very small window the runner shows a plain numbered list instead: type the number of a folder, then the number of the case (plain Enter = number 1, `B` goes back, any other text is a search). If the keyboard list does not look right on a computer, set the environment variable `OREO_PLAIN_MENU=1` before starting the bat to always get the numbered list.
-3. The runner shows the system address and account it is about to use. Every line of the list has a number: press Enter to continue, or type the number of a value to change just that one (several numbers at once also work, `2 5`); the list is then shown again with the new value, until you press Enter. Changing the address or an account means its password is asked for again; the number of a password lets you type it again. Anything missing is prompted for. **The password of every account the case logs in with is always typed in** (the input is hidden): the runner does not use a password that is in `config.local.json` and says so when it finds one. That file is for the address and the account names; only QA's own Playwright run reads the passwords in it. After typing in an address or account, the runner offers to save it to `config.local.json` for next time; passwords are never saved.
-   If the case comes with **case data** (counterparty, portfolio...), it is listed there too. Its values are numbered in the same list: type the number of a value to change it for this run, e.g. to book against another counterparty. A product or a dat file is chosen from the ones in the package; after another product the dat file is chosen again. The case file itself is not modified, and the report shows the data the run used and marks what was changed.
-   A case **on an existing trade** (folder `existing-trade`) then asks for the trade: `Enter tradeId:`. Type the ID of a trade that is in the state the case starts from (its description says which); the case checks that state first and stops if it is another one.
-   A case that books a trade or triggers an event lists **riskEngine** there: `real` waits for the system's risk calculation, `mock` answers it without the risk engine . **The runner always uses `real`**, whatever the config file says, and neither shows nor offers this setting: only QA's own Playwright run can mock the risk calculation.
-   A case that prepares its data through the API also needs the **API address** (`apiBaseUrl`, with its path prefix such as `/api/v1`); it is shown, asked for and saved like the system address.
-   The case starts as soon as this prompt is answered. (Not mentioned on the screen: typing `S` at this prompt runs the case **step by step**, stopping before each Given / When / Then block until Enter is pressed.)
-4. Edge opens and runs the steps. To pause at any moment, click the black console window and press `P`: the run stops once the current step has finished, and Enter resumes it. The browser stays open while paused; clicking around in it by hand may make the remaining steps fail. **Ctrl+C** stops the run and closes the window.
-   When a single case has finished, the browser is **not closed**: it stays on the page the case ended on, so you can look at the result (or at what went wrong) and go on by hand. It closes when you press Enter in the console window to choose the next case. What you do in it after the run is not in the report or the full replay. Several cases run in one go close their browsers as they finish.
-5. When it finishes, the report opens automatically. It reads as the scenario: one row per Given / When / Then step with its result and a screenshot (pauses and their length are shown too); click "N actions" under a step to see the individual actions behind it. Values the run produced, such as the ID of the trade it created, are listed above the steps ("Values from this run") and under the step that produced them.
-6. The console and the bottom of the report give two links: **Report** (the report as a URL) and **Full replay** (Playwright's trace viewer for this run: every action with before / after snapshots, console and network). They are `http://127.0.0.1:9400/...` addresses served by the runner itself, so they work only on this computer and only while the runner window stays open. The links of every case run in that window keep working until it is closed.
-7. **The window stays open for the next case**: press Enter to go back to the case list, which comes back as you left it (open folders, search), or type `Q` to close. The address, the account and the password you typed in are kept while the window is open, so they are not asked for again (a password is asked for once per account and window, the first time a case needs it) (a change made with `C` stays for the next cases too; a password is kept in memory only and never saved). A case that cannot be run, e.g. because its file needs a newer runner, shows its error and the window goes on.
-8. To open an earlier run later, double-click **view-trace.bat**: it opens a page listing every run with its Report and Full replay links.
-9. If something goes wrong, send the matching folder under `evidence/` to QA; they can drop it into their own `evidence/` folder and open it the same way.
+   | Key | Does |
+   |---|---|
+   | Up / Down | Move the highlighted row |
+   | Right / Left | Open / close a folder |
+   | Enter | Open a folder, or run the case |
+   | Typing | Search (a product, part of a case ID); Backspace deletes, Esc clears |
+   | Space | Tick a case, or every case of a folder |
+   | Ctrl+C | Close the window |
+
+   In a very small window the runner shows a plain numbered list instead (also with the environment variable `OREO_PLAIN_MENU=1`).
+3. The runner lists the settings (address, account) and the **case data** of the case, every line with a number. Press Enter to continue, or type a number to change that value (several at once also work: `2 5`).
+   - **Passwords are always typed in** (hidden), once per account and window. A password in `config.local.json` is not used, and none is ever saved.
+   - A change of case data applies to this run only; the case file is not modified. A product or a dat file is chosen from the ones in the package.
+   - A case on an existing trade asks `Enter tradeId:`.
+   - A typed-in address or account can be saved to `config.local.json` for next time.
+4. Edge opens and runs the steps. Press `P` in the console window to pause after the current step, Enter to resume; Ctrl+C stops the run.
+5. The report opens: one row per Given / When / Then step with its result and screenshot, and the values the run produced (e.g. the ID of the trade it created). The console and the report also give two links: **Report** and **Full replay** (Playwright's trace viewer). They work on this computer only, while the runner window is open.
+6. After a single case the browser stays open, so you can look at the result or go on by hand (that is not in the report). Press Enter to close it and choose the next case, or type `Q` to close the window.
+7. **view-trace.bat** lists earlier runs with their links. If something goes wrong, send the run's folder under `evidence/` to QA.
 
 ### Running several cases
 
-- **Tick the cases with Space**, then press Enter: Space on a case ticks that case (`[x]`), Space on a folder ticks every case in it (`[-]` = only some of them are ticked). Ticks can be combined with the search: search for `trf`, tick, search for something else, tick. Esc (without a search) unticks everything.
-- Or **drag a folder** of cases, or several case files, onto run-case.bat (with the plain numbered list this is the way to run several cases).
-- The settings (address, account, password) are asked for **once** for all the cases. Case data cannot be changed here: each case runs with the values of its own case file; to change a value, run that case on its own.
-- Then choose how to run them:
-  - **Enter: one after another**, each exactly as when it is run alone (every step on the screen, `P` pauses);
-  - **a number, e.g. `4`: that many at the same time** (at most 8), each in an Edge window of its own. The console then shows one line when a case starts and one when it ends. `P` is not available; Ctrl+C stops everything.
-- A case that cannot be run (its file needs a newer runner, a data file is missing, it needs a value typed in such as the ID of an existing trade) is left out and listed; the others run.
-- Every case gets its own evidence folder and report as usual. At the end a **summary** opens (`evidence/batch_<time>/report.html`): one row per case with its result, duration, the values it produced (e.g. the trade ID) and the links to its report and full replay. Ctrl+C during the run still writes the summary of what was done so far.
-- Running at the same time logs the same account in from several browsers at once. Start with 2 and check that the system accepts it before using more.
+- Tick cases with Space and press Enter, or drag a folder or several case files onto run-case.bat.
+- The settings are asked for once; case data cannot be changed (run a case on its own for that).
+- Then choose: **Enter** = one after another; **a number** (2 to 8) = that many at the same time, each in its own Edge window. Running at the same time logs the same account in from several browsers: start with 2.
+- A case that cannot be run (it needs a newer runner, a data file is missing, it needs a trade ID) is left out and listed.
+- At the end a summary opens (`evidence/batch_<time>/report.html`): one row per case with its result, values and links.
 
-## PO: recording a bug by hand
+### Recording a bug by hand
 
-When something goes wrong outside a case, the PO can record what they do instead of describing it:
+1. Double-click **record-session.bat**; Edge opens on the system address.
+2. Work as usual; the console lists each click and each value entered.
+3. Press Enter in the console window (or close the browser). A report opens, with the Full replay link.
+4. Send the `evidence/recording_<time>/` folder to QA.
 
-1. Double-click **record-session.bat** and optionally type one line about the problem.
-2. Edge opens on the system address. Log in and work as usual; the console lists each click and each value entered as it is recorded.
-3. When done, press Enter in the console window (or close the browser window).
-4. A report opens: the actions done by hand, each with the time, page and a screenshot, plus the **Full replay** link (trace viewer: page snapshots, console and network of the whole session).
-5. Send the `evidence/recording_<time>/` folder to QA.
-
-Notes:
-
-- Password fields are shown as `******` in the report, but `trace.zip` records the page and network traffic as they are, **including the password that was typed**. Share the folder only inside the team, never on a public site.
-- Clicks, values entered and the Enter key are listed; scrolling, hovering and drag and drop are not, although they are still visible in the trace's screen recording.
-- A recording is evidence, not a case: it cannot be replayed by the runner. QA turns it into a case when it is worth repeating.
-- QA can do the same locally with `npm run record`.
+A recording is evidence, not a case: it cannot be replayed. Password fields are masked in the report, but **`trace.zip` contains what was typed, the passwords included**: share the folder inside the team only, never on a public site.
 
 ## Known limitations
 
-- No video by default (recording depends on Playwright's ffmpeg, which usually cannot be downloaded on the intranet); per-step screenshots and the trace are enough to reproduce. If needed, set `"evidence": { "video": true }` in `config.local.json` and install ffmpeg manually.
-- The report and trace viewer links are local (`127.0.0.1`), not shareable URLs; to show a run to someone else, send them the evidence folder. If port 9400 is taken, set `"evidence": { "viewPort": 9500 }` in `config.local.json`.
-- To open Full replay in Playwright's official viewer instead of the bundled one, set `"evidence": { "traceViewer": "official" }` in `config.local.json`; the link then points to `https://trace.playwright.dev/?trace=...`. That site does not store traces: it runs in the browser and reads `trace.zip` from this computer, so the link still works only here and while the runner window is open, and it needs internet access to `trace.playwright.dev`.
-- The PO's computer needs Edge (default) or Chrome (set `browser.channel` to `"chrome"`).
-- The keyboard-operated case list and running several cases at the same time were verified on macOS against the mock only. Still to check on a PO computer: how the list is drawn in the Windows console (fallback: `OREO_PLAIN_MENU=1`), and whether the real system accepts one account logged in from several browsers at once.
-- The company must allow running `node.exe` and `.bat` from a shared drive or an unzipped folder; test on one PO machine first.
-- The login page path is `/login` (`LoginPage.path` in `framework/pages/login.page.ts`). The root `/` is not used: for a user who is signed in it opens the trade portal.
-- A replay really operates in UAT (real bookings, real approvals); make sure the environment can take repeated runs. A case with API steps creates a new trade on every replay.
-- The risk engine mode (`riskEngine`: `real` / `mock`) was verified on the mock only. With `mock` the risk calculation is not sent at all, so such a run does not prove the risk engine works; the report says so. Case files that wait for the calculation are format version 5 and need a runner package built from this version.
-- The cases on an existing trade (`existing-trade`) were verified on the mock only. They check the trade's state as text in its blotter row; what a pending new trade shows as event status on the real system is not known, so only its status `PARV` is checked.
-- An API step has no screenshot: the report shows the call and the values it saved (e.g. the new trade ID), and the following steps show the result in the browser.
-- API calls are sent from Node, not from Edge, so they do not use the certificates Windows trusts. If the API address is `https` with a company certificate and the call fails with a certificate error, tell QA: this is not handled yet.
+- A replay really operates in UAT: real bookings, real approvals. A case with API steps creates a new trade on every replay.
+- The PO's computer needs Edge (default) or Chrome (`browser.channel`: `"chrome"`), and the company must allow running `node.exe` and `.bat` from an unzipped folder. Test on one PO machine first.
+- The runner's case list, running several cases at the same time and the browser that stays open were verified on macOS against the mock only, not on Windows / Edge.
+- No video by default: it needs Playwright's ffmpeg, which cannot be downloaded on the intranet. Screenshots and the trace are enough to reproduce.
+- The report and trace viewer links are local (`127.0.0.1:9400`; another port: `"evidence": { "viewPort": 9500 }`). To show a run to someone else, send the evidence folder.
+- An API step has no screenshot: the report shows the call and the values it saved. API calls are sent from Node, which does not use the certificates Windows trusts: an `https` API with a company certificate may fail, which is not handled yet.
+- With `"riskEngine": "mock"` the risk calculation is not sent at all, so such a run does not prove the risk engine works; the report says so.
