@@ -368,10 +368,12 @@ export class UI {
     // A value the PO enters is written empty: the one of this run (a trade that is used up by now) is of no use
     const asked = Object.keys(params).filter((name) => name in this.inputs);
     for (const name of asked) params[name] = '';
+    const steps = nested(this.steps);
     const caseDoc = {
-      // Version 9: the steps are nested, one entry per step line of the scenario with the actions behind it. Every
-      // case is written this way, so a runner older than version 9 refuses the file and asks for the current package
-      formatVersion: 9,
+      // Version 10: the steps are nested, one entry per step line of the scenario, and inside it one entry per
+      // substep with the actions behind it. Every case is written this way, so a runner older than version 10
+      // refuses the file and asks for the current package
+      formatVersion: 10,
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,
@@ -379,7 +381,11 @@ export class UI {
       exportedAt: new Date().toISOString(),
       requiredConfig: requiredConfig(this.steps, params),
       ...(hasParams ? { params } : {}),
-      steps: nested(this.steps),
+      // The step lines on their own, to read the scenario at a glance, with the case data of this file filled in
+      // ("a Live 'FX_TRF' trade ..."). For the reader only: the runner takes the lines from steps, where they follow
+      // the data of the run
+      scenario: steps.filter((s) => s.step).map((s) => core.fillParams(s.step, params)),
+      steps,
     };
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify(caseDoc, null, 2), 'utf-8');
@@ -389,12 +395,23 @@ export class UI {
 /**
  * The recorded actions as the case file lists them: one entry per step line of the scenario (the title of the action
  * that starts it) with the actions behind it. Actions recorded before the first step line are an entry without one.
+ * Inside an entry the substeps are nested in the same way: a substep runs up to the next one or to the end of its
+ * step line, and the actions before the first substep stay directly in the entry.
  */
-function nested(steps: Step[]): { step?: string; actions: Step[] }[] {
-  const groups: { step?: string; actions: Step[] }[] = [];
-  for (const { title, ...action } of steps) {
-    if (title || !groups.length) groups.push({ ...(title ? { step: title } : {}), actions: [] });
-    groups[groups.length - 1].actions.push(action as Step);
+type SubstepEntry = { substep: string; actions: Step[] };
+type StepEntry = { step?: string; actions: (Step | SubstepEntry)[] };
+
+function nested(steps: Step[]): StepEntry[] {
+  const groups: StepEntry[] = [];
+  let sub: SubstepEntry | undefined;
+  for (const { title, substep, ...action } of steps) {
+    if (title || !groups.length) {
+      groups.push({ ...(title ? { step: title } : {}), actions: [] });
+      sub = undefined;
+    }
+    const group = groups[groups.length - 1];
+    if (substep) group.actions.push((sub = { substep, actions: [] }));
+    (sub ? sub.actions : group.actions).push(action as Step);
   }
   return groups;
 }

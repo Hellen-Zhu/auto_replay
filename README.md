@@ -384,7 +384,7 @@ npm run build:portable -- --no-zip        # produce the folder only, no zip
 
 This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, only newly exported case files need to be sent to the PO, who drops them into the same folder under their `cases` folder, e.g. `cases/trade-cancellation/` (plus any new file under `testdata/dat/` that a case uploads). The runner finds a case file anywhere under `cases/`, at any depth, so a file dropped directly into `cases` runs as well; it is just listed outside the folders. `testdata/` is not part of the package: a case file carries the data it uses.
 
-**Every case file exported from this version on is format version 9**: its `steps` are one entry per step line of the scenario (`{ "step": "When ...", "actions": [ ... ] }`), with the actions behind that line inside it, so the scenario can be read at a glance. A runner refuses a file newer than itself with a message asking for the current package, so **send the PO a new package before any newly exported case**. The current runner still runs the older files, whose steps are a flat list of actions:
+**Every case file exported from this version on is format version 10**: `scenario` lists the step lines of the case on their own, with the case data of the file filled in, so the scenario can be read at a glance; `steps` are one entry per step line (`{ "step": "When ...", "actions": [ ... ] }`), and inside it one entry per substep (`{ "substep": "I log in as maker", "actions": [ ... ] }`) with the actions behind it. The runner ignores `scenario`. A runner refuses a file newer than itself with a message asking for the current package, so **send the PO a new package before any newly exported case**. The current runner still runs the older files, whose steps are a flat list of actions:
 
 | Version | The case uses | Runs on |
 |---|---|---|
@@ -396,7 +396,8 @@ This produces `dist/UAT-Runner.zip`; put it on the shared drive. After that, onl
 | 6 | Case data that is entered for every run (the ID of an existing trade) | A runner built since those cases were added |
 | 7 | Case data in the name of a data file or in a step line (the product as case data) | A runner built since the product became case data |
 | 8 | The checks hidden / enabled / disabled / value of an input | A runner built since those checks were added |
-| 9 | Nested steps: every case exported now | A runner built from this version or later: send the PO a new package |
+| 9 | Nested steps | A runner built since the steps were nested |
+| 10 | Nested substeps and the `scenario` list: every case exported now | A runner built from this version or later: send the PO a new package |
 
 ## PO: how to use it
 

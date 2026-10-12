@@ -12,18 +12,23 @@ const { expect } = require('@playwright/test');
 // 7 = adds case data in the name of a data file and in a step line;
 // 8 = adds the checks expectHidden, expectEnabled, expectDisabled and expectValue;
 // 9 = the steps are nested: one entry per step line of the scenario, { step, actions }, instead of a flat list of
-// actions with the line as the title of the first action of its group
-const FORMAT_VERSION = 9;
+// actions with the line as the title of the first action of its group;
+// 10 = the substeps are nested too: inside a step's actions, { substep, actions } instead of the substep as a field
+// of the first action of its group
+const FORMAT_VERSION = 10;
 
 /**
  * The actions of a case file as one flat list, which is what runs: a nested entry (version 9) gives its actions, the
  * first one carrying the step line as its title, as a file up to version 8 has it. A flat list is returned as it is.
+ * A substep entry among those actions (version 10) gives its actions in the same way, the first one carrying the substep.
  */
 function flatSteps(steps) {
   if (!Array.isArray(steps) || !steps.some((s) => s && Array.isArray(s.actions))) return steps;
   return steps.flatMap((group) => {
     if (!group || !Array.isArray(group.actions)) throw new Error('A case file cannot mix nested steps ({ step, actions }) with plain actions');
-    return group.actions.map((action, i) => (i === 0 && group.step ? { title: group.step, ...action } : action));
+    const actions = group.actions.flatMap((entry) =>
+      entry && Array.isArray(entry.actions) ? entry.actions.map((action, i) => (i === 0 && entry.substep ? { substep: entry.substep, ...action } : action)) : [entry]);
+    return actions.map((action, i) => (i === 0 && group.step ? { title: group.step, ...action } : action));
   });
 }
 
