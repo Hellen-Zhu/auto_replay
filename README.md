@@ -85,13 +85,13 @@ To add a product, add one line to the registry in `framework/products.ts` with t
 
 A variation in data only (direction Sell, another counterparty) is not a case of its own: the PO runs an existing case and changes its case data with `D`.
 
-`[TC-TRADE-CREATION-UI-006]` creates a trade of a chosen product and dat file (login, create, pending approval). It is one case for every product: **the product is case data** (`"product"` in its testdata row), so the PO runs it for another product by changing `product` with `D` before the run; the runner lists the products that have a folder under `testdata/dat/` in the package, numbered, and takes a number or a name (a name without a dat file is asked for again). In the flow this is `flows.tradeCreation.productAsCaseData(product)`: from then on every use of the product (the typed Product ID, the name of the dat file, the step lines) is recorded as `${param:product}`.
+`[TC-TRADE-CREATION-UI-004]` creates a trade of a chosen product and dat file (login, create, pending approval). It is one case for every product: **the product is case data** (`"product"` in its testdata row), so the PO runs it for another product by changing `product` with `D` before the run; the runner lists the products that have a folder under `testdata/dat/` in the package, numbered, and takes a number or a name (a name without a dat file is asked for again). In the flow this is `flows.tradeCreation.productAsCaseData(product)`: from then on every use of the product (the typed Product ID, the name of the dat file, the step lines) is recorded as `${param:product}`.
 
 **A case logs in once.** No case needs both the maker and the checker in the browser: what the other role did before is the `Given`. The checker approving a new trade is `[TC-TRADE-APPROVAL-REJECT-UI-001]`, whose trade the maker submits through the API (there is no creation case that goes on to the checker). Where no API request is known for the maker's part (a pending cancellation, a pending amendment), the maker's case ends at "pending checker approval" and the checker's decision is a case on a given trade, run with the trade ID the maker's case printed.
 
 #### Choosing the product and its dat file
 
-A product has more than one dat file: each is a variant of the product's structure. A variant is data, not a case of its own. Every case that is not repeated per product takes `product` and `datFile` (a file name in `testdata/dat/<product>/`) from its case data: `[TC-TRADE-CREATION-UI-006]` creates a trade from them and checks it is pending approval; the lifecycle event cases create their `Given` trade from them through the API (`testdata/shared/given-trade.json`). In the runner, `D` asks for the product first (the folders of `testdata/dat/` in the package) and then for the dat file (the files in that product's folder); after a change of product a folder with a single file is taken without asking. What a case checks that depends on the file (a notional, for one) is case data too and has to be changed with it.
+A product has more than one dat file: each is a variant of the product's structure. A variant is data, not a case of its own. Every case that is not repeated per product takes `product` and `datFile` (a file name in `testdata/dat/<product>/`) from its case data: `[TC-TRADE-CREATION-UI-004]` creates a trade from them and checks it is pending approval; the lifecycle event cases create their `Given` trade from them through the API (`testdata/shared/given-trade.json`). In the runner, `D` asks for the product first (the folders of `testdata/dat/` in the package) and then for the dat file (the files in that product's folder); after a change of product a folder with a single file is taken without asking. What a case checks that depends on the file (a notional, for one) is case data too and has to be changed with it.
 
 #### An event on a trade that already exists
 
@@ -103,7 +103,7 @@ A case is repeated for every product only where the product changes what is test
 
 ### Trade approval and rejection cases
 
-`tests/trade-approval-reject.spec.ts` holds the checker's decision on a new trade, one case per kind of trade: the product is case data (`"product": "FX_TRF"`, from the shared block of its testdata file), so the case IDs have no product in them. `[TC-TRADE-APPROVAL-REJECT-UI-001]` (a normal trade is approved and is `LIVE` / `New`), `-UI-002` (a normal trade is rejected and is a draft again, `DRFT`), `-UI-003` (a StepIn full trade is approved and is `LIVE`) and `-UI-004` (the same for StepIn partial). The pending trade of the `Given` is submitted through the API; a StepIn trade carries a `udf` list (`stepInType`, `oldCptyName`, `oldCptyFmId`, `novationDate`) in its `basic` block, whose values are in `testdata/trade-approval-reject.json`. Only the checker logs in. They need `apiBaseUrl`, the e-mails of both accounts (the maker's is the sender of the submit request) and the checker's password.
+`tests/trade-approval-reject.spec.ts` holds the checker's decision on a new trade, one case per kind of trade: the product is case data (`"product": "FX_TRF"`, from the shared block of its testdata file), so the case IDs have no product in them. `[TC-TRADE-APPROVAL-REJECT-UI-001]` (a normal trade is approved and is `LIVE` / `New`), `-UI-002` (a normal trade is rejected and is a draft again, `DRFT`), `-UI-003` (a StepIn full trade is approved and is `LIVE`) and `-UI-004` (a StepIn partial trade is rejected and is a draft again). The titles all read "... when Checker approves / rejects the submission". The pending trade of the `Given` is submitted through the API; a StepIn trade carries a `udf` list (`stepInType`, `oldCptyName`, `oldCptyFmId`, `novationDate`) in its `basic` block, whose values are in `testdata/trade-approval-reject.json`. Only the checker logs in. They need `apiBaseUrl`, the e-mails of both accounts (the maker's is the sender of the submit request) and the checker's password.
 
 ### Trade cancellation cases
 
@@ -182,7 +182,7 @@ Case data lives in `testdata/`, not in `config.local.json`:
 {
   "defaults": { "oldCounterpartyName": "10 AM JAK" },
   "cases": [
-    { "id": "TC-TRADE-CREATION-UI-006", "product": "FX_PSCRIPT" }
+    { "id": "TC-TRADE-CREATION-UI-004", "product": "FX_PSCRIPT" }
   ]
 }
 ```

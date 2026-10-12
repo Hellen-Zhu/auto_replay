@@ -49,7 +49,7 @@ test.describe('Trade creation', () => {
   // variant of the product's structure, in testdata/dat/<PRODUCT>/. A variant is data, not a case of its own: the product
   // and the file name are the case data "product" and "datFile" (the row in testdata/trade-creation.json), and the
   // runner offers the products of the package and, for the chosen product, its dat files. This repo's own case ID.
-  test('[TC-TRADE-CREATION-UI-006] Maker creates a new trade from a chosen dat file of the product', async ({ When, And, Then, flows, testData }) => {
+  test('[TC-TRADE-CREATION-UI-004] Maker creates a new trade from a chosen dat file of the product', async ({ When, And, Then, flows, testData }) => {
     const { product, data } = givenProduct(flows, testData<TradeCreationData & ProductData>(), 'Maker books a new trade of the product in the case data from the dat file in the case data (one of the files in the folder of the product) and verifies it is created with pending approval status');
 
     await When('maker is logged in to the trade portal', () => flows.auth.login('maker'));

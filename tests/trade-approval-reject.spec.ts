@@ -14,13 +14,14 @@ import { givenProduct, type ProductData } from './support';
 // is checked "in trade details"; here the decision is made from the trade portal and the result is checked in the
 // blotter, and the step lines say so. The feature's way is written as flows.tradeDetail (approve, reject,
 // expectDraft, expectLive, from trade_detail.snippet) but not used: the mock's trade detail page has no checker
-// buttons and no status badge, so these cases would no longer run there. UI-004 was not seen: its ID and title
-// are taken to continue UI-003.
+// buttons and no status badge, so these cases would no longer run there. UI-004 (StepIn partial, rejected)
+// is this repo's case (user decision); the titles are this repo's too, all in the form "... when Checker approves /
+// rejects the submission".
 
 type Data = TradeProvisioningData & StepInProvisioningData & ProductData;
 
 test.describe('Trade approval and rejection', () => {
-  test(`[TC-TRADE-APPROVAL-REJECT-UI-001] Trade is Live after Maker submits and Checker approves`, async ({ Given, When, Then, And, flows, testData }) => {
+  test(`[TC-TRADE-APPROVAL-REJECT-UI-001] Trade is Live when Checker approves the submission`, async ({ Given, When, Then, And, flows, testData }) => {
     const { product, data } = givenProduct(flows, testData<Data>(), 'A trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
 
     const tradeId = await Given(`a Draft Pending Approval '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingTrade(product, data));
@@ -40,7 +41,7 @@ test.describe('Trade approval and rejection', () => {
     await And('the trade is reverted to Draft', () => flows.tradeApproval.expectDraft(tradeId));
   });
 
-  test(`[TC-TRADE-APPROVAL-REJECT-UI-003] StepIn Full trade is Live after Maker submits and Checker approves`, async ({ Given, When, Then, And, flows, testData }) => {
+  test(`[TC-TRADE-APPROVAL-REJECT-UI-003] StepIn Full trade is Live when Checker approves the submission`, async ({ Given, When, Then, And, flows, testData }) => {
     const { product, data } = givenProduct(flows, testData<Data>(), 'A StepIn full trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
 
     const tradeId = await Given(`a Draft Pending Approval '${product}' StepIn Full trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingStepInTrade(product, 'StepInFull', data));
@@ -50,13 +51,13 @@ test.describe('Trade approval and rejection', () => {
     await And('the StepIn Full trade is Live', () => flows.tradeApproval.expectLive(tradeId));
   });
 
-  test(`[TC-TRADE-APPROVAL-REJECT-UI-004] StepIn Partial trade is Live after Maker submits and Checker approves`, async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A StepIn partial trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
+  test(`[TC-TRADE-APPROVAL-REJECT-UI-004] StepIn Partial trade reverts to Draft when Checker rejects the submission`, async ({ Given, When, Then, And, flows, testData }) => {
+    const { product, data } = givenProduct(flows, testData<Data>(), 'A StepIn partial trade of the product in the case data is submitted through the API; checker rejects it from the trade portal and the trade is a draft again');
 
     const tradeId = await Given(`a Draft Pending Approval '${product}' StepIn Partial trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingStepInTrade(product, 'StepInPartial', data));
     await When('checker is logged in to the trade portal', () => flows.auth.login('checker'));
-    await And('approves the pending trade from trade portal', () => flows.tradeApproval.approveFromTradePortal(tradeId));
-    await Then('the trade is approved successfully', () => flows.tradeApproval.expectApproved());
-    await And('the StepIn Partial trade is Live', () => flows.tradeApproval.expectLive(tradeId));
+    await And('rejects the pending trade from trade portal', () => flows.tradeApproval.rejectFromTradePortal(tradeId));
+    await Then('the trade is rejected successfully', () => flows.tradeApproval.expectRejected());
+    await And('the StepIn Partial trade is reverted to Draft', () => flows.tradeApproval.expectDraft(tradeId));
   });
 });
