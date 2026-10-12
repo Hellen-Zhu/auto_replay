@@ -28,7 +28,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `framework/pages/`, `components/`, `api/` | Locators or requests, and atomic operations on them |
 | `framework/ui.ts` | Executes each action and records it; `fixtures.ts` exports the case after a pass |
 | `framework/products.ts` | Product registry: which product supports which kind of creation |
-| `core/actions.js` | Execution core, shared by QA's run and the PO's replay |
+| `core/actions.js`, `core/lib/` | Execution core, shared by QA's run and the PO's replay. `actions.js` is the entry; the code is in the modules of `core/lib/` |
 | `testdata/` | Case data: `common.json`, `shared/`, one `<spec name>.json` per spec |
 | `testdata/dat/<PRODUCT>/` | The dat files cases upload or send; shipped to the PO |
 | `elements/` | Element locators, a copy of the E2E project's; never edited here |
