@@ -60,6 +60,14 @@ export class TradeAmendmentFlow extends BaseFlow {
     });
   }
 
+  /**
+   * In the blotter the trade waits for the checker's decision on the amendment. Inferred: that a pending amendment
+   * shows the status of a pending new trade or cancellation; its event status is not known and not checked.
+   */
+  async expectPendingCheckerApproval(tradeId: string, keyword: Keyword = 'Then') {
+    await this.tradesFlow.expectPendingApproval(tradeId, keyword);
+  }
+
   /** In the blotter the trade is still live, with the event status Amended */
   async expectLiveAndAmended(tradeId: string, keyword: Keyword = 'Then') {
     await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.live, TradesPage.eventStatus.amended, keyword);

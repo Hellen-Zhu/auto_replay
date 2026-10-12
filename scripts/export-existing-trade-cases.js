@@ -17,7 +17,8 @@
 // Every run books three real trades in the system the local config points at. It stops at the first case that
 // does not pass; nothing is rolled back.
 // With --events it goes on with the case on an existing trade that each other lifecycle event has in its own spec
-// (TC-TRADE-<EVENT>-EXISTING-UI-...): one more trade per case, made Live by 001, then the event. That books ten
+// (TC-TRADE-<EVENT>-EXISTING-UI-...): one more trade per case, made Live by 001, then the event (for the amendment the
+// maker's case and then the checker's on the same trade). That books ten
 // more real trades. The values those cases check come from testdata/ and are those of data/<PRODUCT>/<PRODUCT>.dat
 // of FX_TRF (the notionals of the partial novation, for one).
 // Any other argument is passed on to Playwright (--headed, --trace ...).
@@ -40,7 +41,7 @@ const passOn = args.filter((a) => a !== productArg && a !== '--events');
 const existing = (n) => `TC-EXISTING-TRADE-UI-00${n}`;
 const own = (...numbers) => numbers.map((n) => ({ spec: SPEC, caseId: existing(n) }));
 // An event's case on an existing trade is in the event's spec: the trade is made Live first
-const event = (name, n = 1) => [...own(1), { spec: `tests/trade-${name}.spec.ts`, caseId: `TC-TRADE-${name.toUpperCase()}-EXISTING-UI-00${n}` }];
+const event = (name, ...numbers) => [...own(1), ...(numbers.length ? numbers : [1]).map((n) => ({ spec: `tests/trade-${name}.spec.ts`, caseId: `TC-TRADE-${name.toUpperCase()}-EXISTING-UI-00${n}` }))];
 const PLAN = [
   own(1, 3, 4),
   own(2),
@@ -53,8 +54,9 @@ const PLAN = [
     event('step-out-full'),
     event('step-out-partial'),
     event('portfolio-reassignment'),
-    event('amendment', 2),
-    event('amendment', 3),
+    // the maker amends, then the checker decides: two cases, each with its own login
+    event('amendment', 2, 4),
+    event('amendment', 3, 5),
     event('partial-novation-remaining'),
   ] : []),
 ];

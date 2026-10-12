@@ -45,23 +45,6 @@ test.describe('Trade creation', () => {
     });
   }
 
-  // The one journey that goes through the pages from end to end: maker books, checker approves. The checker's part
-  // does not depend on the product, so this is one case and the product is its case data (the row in
-  // testdata/trade-creation.json): the PO runs it for another product by changing "product" before the run. The
-  // other decisions are in trade-approval-reject.spec.ts, on a trade created through the API. It is scenario UI-001
-  // of the E2E project's approval feature with the Given done in the browser; the case ID is this repo's.
-  test('[TC-TRADE-CREATION-UI-005] Trade is Live after Maker submits and Checker approves', async ({ When, And, Then, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<TradeCreationData & ProductData>(), 'Maker books a new trade of the product in the case data from the dat file of the case data, checker approves it from the trade portal and the trade is live');
-
-    await When('maker is logged in to the trade portal', () => flows.auth.login('maker'));
-    const tradeId = await And(`creates a new '${product}' trade`, () => flows.tradeCreation.createTrade(product, data));
-    await Then('trade is created with pending approval status and info', () => flows.tradeCreation.expectPendingApproval(tradeId));
-    await When('checker is logged in to the trade portal', () => flows.auth.login('checker'));
-    await And('approves the pending trade from trade portal', () => flows.tradeApproval.approveFromTradePortal(tradeId));
-    await Then('the trade is approved successfully', () => flows.tradeApproval.expectApproved());
-    await And('the trade is Live and marked as New', () => flows.trades.expectLiveAndNew(tradeId));
-  });
-
   // Creation for a product and a dat file that the PO chooses. A product has more than one dat file: each is a
   // variant of the product's structure, in testdata/dat/<PRODUCT>/. A variant is data, not a case of its own: the product
   // and the file name are the case data "product" and "datFile" (the row in testdata/trade-creation.json), and the

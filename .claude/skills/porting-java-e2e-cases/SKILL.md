@@ -173,6 +173,7 @@ export class TradesApi extends BaseApi {
 - **Inferred is said.** A part that was concluded rather than read (as the `{}` body of approve / reject was, from a content length) is stated in the request's comment and listed under "to verify".
 - **Compare before changing.** When the Java source of a request this project already has is at hand, compare the two (the body of approve / reject; how the product ID and the dat file are chosen per product: this project sends the product type and `testdata/dat/<PRODUCT>/<PRODUCT>.dat`). Report a difference before changing an operation that other cases use.
 - A second user who only sends requests is not a second login: `this.as('<role>')`.
+- **A case logs in once.** A scenario in which a second role logs in to the browser is split at that login: the first role's steps are one case, ending with the check of the pending state; the second role's steps are another case whose `Given` is the first part done through the API. When the request for that is not known, the second case works on a given trade (`flows.trades.existingTrade(givenTradeId(...))`) and the report says which request is needed.
 - A case with an API step needs `apiBaseUrl` with its prefix (`.../api/v1`) and the e-mail of every role that sends a request in `config.local.json`. Say so in the report when a role is new.
 - An address or an account that the Java source hard-codes is never copied.
 - `TradeProvisioningSteps` has more steps of this kind (a trade with a pending cancellation, several trades, a StepIn trade that is pending approval, an amendment). None of them is ported yet: each is traced as above. A field that is read from a list (`/data/results/0/checkerTaskId`) is saved as `data.results.0.checkerTaskId`.
@@ -206,7 +207,7 @@ Skip the whole scenario (a case that silently lacks a step claims a coverage it 
 - a request that is not completely readable, a payload value computed at run time, an API call or a response assertion in a `When` or a `Then`;
 - an element key that is not in `elements/` after the sync, an element whose `findBy` is not `testId`, a locator with a placeholder. Supporting another `findBy` is the user's decision, not a hand-written CSS / XPath;
 - a control this project cannot operate yet (date picker, Yes / No toggle, grid cell editing): its real DOM is needed;
-- a second user who acts in the browser in the same scenario, unless the Java side does it with `<role> is logged in to the trade portal` (`flows.auth.login('<role>')` again, as the cancellation cases do for the checker: list it under "to verify", the real system may need a logout first) or purely with UI steps on defined elements; a new browser session per user cannot be expressed in a case file;
+- a second user who acts in the browser in the same scenario is never a second login in the same case: split the scenario ("A case logs in once", above);
 - a new tab or window, a download, a fixed wait.
 
 Never, whatever the reason:

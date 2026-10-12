@@ -7,8 +7,9 @@ import { givenProduct, type ProductData } from './support';
 // so the case needs apiBaseUrl in the local config.
 // One case per kind of trade, not per product (user decision): the checker's pages are the same for every product.
 // The product and its dat file are case data ("product" and "datFile" of testdata/shared/given-trade.json), so the case IDs have no product in
-// them (the feature's have) and the PO runs a case for another product or another dat file of it by changing them before the run. Scenario UI-001 (a normal trade is approved) is the
-// journey through the pages in trade-creation.spec.ts (TC-TRADE-CREATION-UI-005) and is not repeated here.
+// them (the feature's have) and the PO runs a case for another product or another dat file of it by changing them before the run.
+// A case logs in once (user decision): whatever the maker did before the checker decides is the Given and is done
+// through the API, never by a second login in the browser.
 // Not as in the feature: there the checker decides in UI-002 and UI-003 "from the trade detail page" and the result
 // is checked "in trade details"; here the decision is made from the trade portal and the result is checked in the
 // blotter, and the step lines say so. The feature's way is written as flows.tradeDetail (approve, reject,
@@ -19,6 +20,16 @@ import { givenProduct, type ProductData } from './support';
 type Data = TradeProvisioningData & StepInProvisioningData & ProductData;
 
 test.describe('Trade approval and rejection', () => {
+  test(`[TC-TRADE-APPROVAL-REJECT-UI-001] Trade is Live after Maker submits and Checker approves`, async ({ Given, When, Then, And, flows, testData }) => {
+    const { product, data } = givenProduct(flows, testData<Data>(), 'A trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
+
+    const tradeId = await Given(`a Draft Pending Approval '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingTrade(product, data));
+    await When('checker is logged in to the trade portal', () => flows.auth.login('checker'));
+    await And('approves the pending trade from trade portal', () => flows.tradeApproval.approveFromTradePortal(tradeId));
+    await Then('the trade is approved successfully', () => flows.tradeApproval.expectApproved());
+    await And('the trade is Live and marked as New', () => flows.trades.expectLiveAndNew(tradeId));
+  });
+
   test(`[TC-TRADE-APPROVAL-REJECT-UI-002] Trade reverts to Draft when Checker rejects the submission`, async ({ Given, When, Then, And, flows, testData }) => {
     const { product, data } = givenProduct(flows, testData<Data>(), 'A trade of the product in the case data is submitted through the API; checker rejects it from the trade portal and the trade is a draft again');
 
