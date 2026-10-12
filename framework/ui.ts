@@ -4,7 +4,6 @@
 import { Page, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 import { caseIdOf } from './data';
 // Shares the same execution core as the runner
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -377,7 +376,6 @@ export class UI {
       name: meta.name,
       description: meta.description ?? '',
       source: meta.source,
-      codeVersion: gitVersion(),
       exportedAt: new Date().toISOString(),
       requiredConfig: requiredConfig(this.steps, params),
       ...(hasParams ? { params } : {}),
@@ -414,14 +412,6 @@ function nested(steps: Step[]): StepEntry[] {
     (sub ? sub.actions : group.actions).push(action as Step);
   }
   return groups;
-}
-
-function gitVersion(): string {
-  try {
-    return 'git:' + execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-  } catch {
-    return 'local';
-  }
 }
 
 const isRef = (v: unknown): v is Ref => {
