@@ -29,7 +29,7 @@ const { rl, interactive, askOptional, discardTyped, printError } = require('./li
 const { QUIT, chooseCases, casesFromArgs } = require('./lib/case-tree');
 const { openFile } = require('./lib/report');
 const { viewPort, viewBase, startViewServer, serveUntilEnter } = require('./lib/view-server');
-const { setCfg } = require('./lib/settings');
+const { setCfg, FIXED_SETTINGS } = require('./lib/settings');
 const { runCase } = require('./lib/execute');
 const { runBatch } = require('./lib/batch');
 const { recordSession } = require('./lib/record');
@@ -77,6 +77,9 @@ async function main() {
   if (ignored.length) {
     console.log(`\nNote: the passwords in ${path.basename(config.__file)} are not used (${ignored.join(', ')}). You will be asked to type the password of each account a case logs in with.`);
   }
+
+  // What the runner decides itself (the risk engine is always the real one), whatever the config file says
+  for (const [key, value] of Object.entries(FIXED_SETTINGS)) setCfg(config, key, value);
 
   // One window runs as many cases as the PO wants: after a run it goes back to the case list instead of closing.
   // config is the same object for all of them, so what was typed in for one run (address, account, password) is not

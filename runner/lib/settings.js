@@ -95,10 +95,17 @@ function checkCase({ file, doc }, params) {
   for (const s of doc.steps) for (const f of dataFilesOf(s, params || paramsOf(doc))) resolveDataFile(ROOT, f);
 }
 
-// The local settings the cases need. For several cases: each setting once, the API address first as in a case file
+// Settings the runner decides itself: whatever config.local.json says, a replay runs with these values, and they are
+// neither shown nor offered for change. The risk calculation always reaches the system: a replay is an acceptance
+// run. (QA's Playwright run still reads riskEngine from its config and may mock it.)
+const FIXED_SETTINGS = { riskEngine: 'real' };
+
+// The local settings the cases need, without the fixed ones. For several cases: each setting once, the API address
+// first as in a case file
 function requiredOf(list) {
-  if (list.length === 1) return list[0].doc.requiredConfig || [];
-  const all = [...new Set(list.flatMap((c) => c.doc.requiredConfig || []))];
+  const asked = (keys) => (keys || []).filter((k) => !(k in FIXED_SETTINGS));
+  if (list.length === 1) return asked(list[0].doc.requiredConfig);
+  const all = [...new Set(list.flatMap((c) => asked(c.doc.requiredConfig)))];
   return [...all.filter((k) => k === 'apiBaseUrl'), ...all.filter((k) => k !== 'apiBaseUrl')];
 }
 
@@ -248,4 +255,4 @@ async function askSettings(list, config) {
   return { params, askConfig, stepByStep };
 }
 
-module.exports = { setCfg, paramsOf, caseDataOf, askedParamsOf, checkCase, askSettings };
+module.exports = { FIXED_SETTINGS, setCfg, paramsOf, caseDataOf, askedParamsOf, checkCase, askSettings };

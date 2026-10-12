@@ -361,7 +361,7 @@ export class UI {
     return out;
   }
 
-  exportCase(file: string, meta: { name: string; description?: string; source: string }) {
+  exportCase(file: string, meta: { name: string; description?: string }) {
     const params = usedParams(this.steps, this.paramValues);
     const hasParams = Object.keys(params).length > 0;
     // A value the PO enters is written empty: the one of this run (a trade that is used up by now) is of no use
@@ -369,13 +369,11 @@ export class UI {
     for (const name of asked) params[name] = '';
     const steps = nested(this.steps);
     const caseDoc = {
-      // Version 10: the steps are nested, one entry per step line of the scenario, and inside it one entry per
-      // substep with the actions behind it. Every case is written this way, so a runner older than version 10
-      // refuses the file and asks for the current package
-      formatVersion: 10,
+      // The steps are nested (format version 10): one entry per step line of the scenario, and inside it one entry
+      // per substep with the actions behind it. The file carries neither its format version nor the spec it came
+      // from: the PO has no use for them. A file without a version is read as the current format
       name: meta.name,
       description: meta.description ?? '',
-      source: meta.source,
       exportedAt: new Date().toISOString(),
       requiredConfig: requiredConfig(this.steps, params),
       ...(hasParams ? { params } : {}),

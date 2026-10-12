@@ -107,6 +107,7 @@ async function main() {
       if (v && typeof v === 'object') scrub(v); else if (/password|secret|token/i.test(k)) o[k] = '';
     } };
     scrub(cfg);
+    delete cfg.riskEngine; // the runner always uses the real risk engine
     if (cfg.browser) { delete cfg.browser.executablePath; delete cfg.browser.args; cfg.browser.headless = false; }
     fs.writeFileSync(path.join(OUT, 'config.local.json'), JSON.stringify(cfg, null, 2), 'utf-8');
     console.log('  Included config.local.json (passwords stripped; the PO is prompted for them at run time)');

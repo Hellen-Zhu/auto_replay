@@ -206,6 +206,8 @@ async function clickAndAwait(page, loc, step, ctx, timeout) {
   const isMatch = urlMatcher(urlPath);
   const wait = step.timeout ?? ctx.config?.timeouts?.response ?? 60000;
   const mocked = isMocked(step, ctx.config);
+  // Whether the hint to mock the request is of any use: not where the setting is fixed (ctx.fixed, the PO's runner)
+  const canMock = !mocked && !!req.setting && !!req.mock && !(ctx.fixed && req.setting in ctx.fixed);
   const answered = page.waitForResponse((r) => r.request().method() === method && isMatch(new URL(r.url())), { timeout: wait });
   answered.catch(() => {}); // reported below; without this a failed click would leave an unhandled rejection
   const route = async (r) => {
@@ -225,13 +227,13 @@ async function clickAndAwait(page, loc, step, ctx, timeout) {
   try {
     await loc.click({ timeout, button: step.button });
     try { res = await answered; }
-    catch { throw new Error(`No ${what} was answered within ${wait} ms after the click${mocked ? '' : ` (timeouts.response in config.local.json; "${req.setting || 'the request'}": "mock" answers it without the system)`}`); }
+    catch { throw new Error(`No ${what} was answered within ${wait} ms after the click${mocked ? '' : ` (timeouts.response in config.local.json${canMock ? `; "${req.setting}": "mock" answers it without the system` : ''})`}`); }
   } finally {
     if (mocked) await page.unroute(isMatch, route).catch(() => {});
   }
   if (!res.ok()) {
     const text = await res.text().catch(() => '');
-    throw new Error(`${what} returned HTTP ${res.status()}${text ? ': ' + text.slice(0, 300) : ''}${req.setting && req.mock && !mocked ? ` (set "${req.setting}": "mock" in config.local.json to run without it)` : ''}`);
+    throw new Error(`${what} returned HTTP ${res.status()}${text ? ': ' + text.slice(0, 300) : ''}${canMock ? ` (set "${req.setting}": "mock" in config.local.json to run without it)` : ''}`);
   }
 }
 

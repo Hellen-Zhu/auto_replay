@@ -10,7 +10,7 @@ const state = require('./state');
 const { interactive, askOptional, discardTyped, setQuietKeys } = require('./console');
 const { writeReport } = require('./report');
 const { reportUrl, traceUrl } = require('./view-server');
-const { paramsOf, caseDataOf, checkCase, askSettings } = require('./settings');
+const { paramsOf, caseDataOf, checkCase, askSettings, FIXED_SETTINGS } = require('./settings');
 
 // A new folder evidence/<name>_<timestamp>. The timestamp has seconds only, so two runs of one case that start in
 // the same second (cases running at the same time) would share a folder: the later one gets the next free second.
@@ -51,7 +51,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
   if (interactive) say('  Tip: press P in this window at any time to pause after the current step.');
   say('');
   const run = {
-    caseName: doc.name, description: doc.description, caseFile: path.basename(file), source: doc.source, codeVersion: doc.codeVersion,
+    caseName: doc.name, description: doc.description, caseFile: path.basename(file), source: doc.source,
     machine: require('os').hostname(), startedAt: new Date().toLocaleString(), status: 'passed', stepByStep, pausedSec: 0, steps: [],
     values: {}, // what the steps read or received during the run (name -> value), e.g. createdTradeId
     traceUrl: traceUrl(config, path.basename(dir)),
@@ -91,7 +91,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       page = await context.newPage();
     }
     await context.tracing.start({ screenshots: true, snapshots: true });
-    const ctx = { config, vars: {}, params, askConfig: quiet ? undefined : askConfig, rootDir: ROOT };
+    const ctx = { config, vars: {}, params, askConfig: quiet ? undefined : askConfig, rootDir: ROOT, fixed: FIXED_SETTINGS };
 
     // Pausing only ever happens between steps, never in the middle of an action.
     // P is picked up as a single key press (console only); the run stops once the current step has finished.

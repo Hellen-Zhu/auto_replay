@@ -68,7 +68,6 @@ export const test = base.extend<{ ui: UI; app: App; flows: Flows; testData: Test
       ui.exportCase(file, {
         name,
         description: testInfo.annotations.find((a) => a.type === 'description')?.description,
-        source: `${path.relative(ROOT, testInfo.file).replace(/\\/g, '/')} › ${testInfo.title}`,
       });
       const shown = path.relative(ROOT, file).replace(/\\/g, '/');
       testInfo.annotations.push({ type: 'exported-case', description: shown });
