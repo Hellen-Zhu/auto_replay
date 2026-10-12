@@ -139,84 +139,112 @@ async function askSettings(list, config) {
 
   // When settings are already provided, show them and let the PO switch environment or account without editing
   // any file. config is the same object for every run of this window, so a change stays for the cases run after it.
-  const editable = ['baseUrl', ...required.filter((k) => !isSecret(k))];
-  const hasSettings = editable.some((k) => !isEmpty(get(k)));
-  if (hasSettings) {
-    console.log('\nSettings for this run:');
-    // a password is listed too, masked: one typed in for an earlier case of this window is used without asking,
-    // C lets the PO type it again; one that is not set is asked for below
-    for (const k of ['baseUrl', ...required]) console.log(`  ${k}: ${isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k)}`);
-  }
-  if (paramNames.length) {
-    console.log('\nCase data:');
-    for (const k of paramNames) console.log(`  ${k}: ${params[k] === '' ? '(to be entered below)' : showData(params[k])}`);
-  }
+  const hasSettings = ['baseUrl', ...required.filter((k) => !isSecret(k))].some((k) => !isEmpty(get(k)));
+  const settingKeys = hasSettings ? ['baseUrl', ...required] : [];
+  const secrets = required.filter(isSecret);
+  const changeable = paramNames.filter((n) => params[n] !== ''); // a value that is still to be entered is asked for anyway
+  // values that name a data file, in the order of the path: what can be chosen for the file depends on the folder
+  // that was chosen before it
+  const ordered = single ? choiceOrder(single).filter((k) => changeable.includes(k)) : [];
+  // What the PO can change is numbered, the settings first and the case data after them: a number at the prompt
+  // changes that one value, and the lists are shown again
+  const numbered = [...settingKeys.map((key) => ({ key })), ...changeable.map((param) => ({ param }))];
+  const no = (i) => `${String(i + 1).padStart(numbered.length > 9 ? 2 : 1)}. `;
+  const show = () => {
+    if (hasSettings) {
+      console.log('\nSettings for this run:');
+      // a password is listed too, masked: one typed in for an earlier case of this window is used without asking,
+      // its number lets the PO type it again; one that is not set is asked for below
+      settingKeys.forEach((k, i) => console.log(`  ${no(i)}${k}: ${isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k)}`));
+    }
+    if (paramNames.length) {
+      console.log('\nCase data:');
+      for (const k of paramNames) {
+        const i = numbered.findIndex((e) => e.param === k);
+        console.log(`  ${i < 0 ? ' '.repeat(no(0).length) : no(i)}${k}: ${params[k] === '' ? '(to be entered below)' : showData(params[k])}`);
+      }
+    }
+  };
+
+  const changeSetting = async (k) => {
+    if (isSecret(k)) {
+      // A password is not shown, but it can be typed again: the one of an earlier run in this window is still in use,
+      // also when that run failed on it
+      const v = await askHidden(isEmpty(get(k)) ? `  ${k} (input is hidden): ` : `  ${k} [Enter keeps the current one; input is hidden]: `);
+      if (v !== '') set(k, v);
+      return;
+    }
+    const cur = get(k);
+    const v = await ask(`  ${k} [${isEmpty(cur) ? 'not set' : cur}] (Enter keeps it): `);
+    if (v === '' || v === cur) return;
+    set(k, v);
+    toSave[k] = v;
+    // A saved password belongs to the old environment/account: drop it so it is asked for again
+    // instead of being sent to the wrong place.
+    const scope = k === 'baseUrl' ? '' : k.slice(0, k.lastIndexOf('.') + 1);
+    for (const s of secrets) if (s.startsWith(scope)) { set(s, ''); toSave[s] = ''; }
+  };
+
+  const changeParam = async (k) => {
+    const list = ordered.includes(k) ? choicesOf(single, params)[k] : null;
+    if (!list || !list.length) {
+      const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it): `);
+      if (v !== '') params[k] = v;
+      return;
+    }
+    // a value that needs its data file: the PO picks one of those that came with the package. The current
+    // value can be kept only while it is one of them (it is not after the folder before it was changed)
+    const valid = list.includes(params[k]);
+    if (!valid && list.length === 1) {
+      console.log(`  ${k}: ${list[0]}  (the only data file of that ${ordered[ordered.indexOf(k) - 1] || 'value'})`);
+      params[k] = list[0];
+    } else {
+      console.log(`  ${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}`);
+      list.forEach((v, i) => console.log(`    ${i + 1}. ${v}${v === params[k] ? '  (current)' : ''}`));
+      for (;;) {
+        const v = (await ask(valid ? `  ${k} [${showData(params[k])}], number or name (Enter keeps it): ` : `  ${k}, number or name: `)).trim();
+        const picked = /^\d+$/.test(v) ? list[Number(v) - 1] : list.find((x) => x.toLowerCase() === v.toLowerCase());
+        if (picked) params[k] = picked;
+        if ((v === '' && valid) || picked || state.inputEnded) break;
+        console.log(v === '' ? '    Type one of the numbers or names above.'
+          : `    "${v}" has no data file: type one of the numbers or names above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
+      }
+    }
+    // what follows in the path (the file after its folder) may no longer exist for the new value: chosen again
+    for (const next of ordered.slice(ordered.indexOf(k) + 1)) {
+      const l = choicesOf(single, params)[next];
+      if (l && l.length && !l.includes(params[next])) { await changeParam(next); break; }
+    }
+  };
+
+  show();
   if (!single && list.some((c) => Object.keys(c.doc.params || {}).length)) {
     console.log('\nCase data: each case runs with the values of its own case file. To change a value, run that case on its own.');
   }
   // Step by step (the run stops before each Given / When / Then block and each substep, so the PO can look at the
   // page) is not offered on the screen: S at the prompt below turns it on
   let stepByStep = false;
-  const changeable = paramNames.filter((n) => params[n] !== ''); // a value that is still to be entered is asked for anyway
-  if (hasSettings || changeable.length) {
-    const choices = [hasSettings && 'C to change the environment or account', changeable.length && 'D to change the case data'].filter(Boolean).join(', ');
-    const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or type ${choices}: `)).toLowerCase();
-    const chose = (letter) => /^[cds\s,+]+$/.test(answer) && answer.includes(letter);
-    stepByStep = chose('s');
-    if (hasSettings && chose('c')) {
-      console.log('\nType a new value, or just press Enter to keep the current one.');
-      const secrets = required.filter(isSecret);
-      for (const k of editable) {
-        const cur = get(k);
-        const v = await ask(`  ${k} [${isEmpty(cur) ? 'not set' : cur}]: `);
-        if (v === '' || v === cur) continue;
-        set(k, v);
-        toSave[k] = v;
-        // A saved password belongs to the old environment/account: drop it so it is asked for again
-        // instead of being sent to the wrong place.
-        const scope = k === 'baseUrl' ? '' : k.slice(0, k.lastIndexOf('.') + 1);
-        for (const s of secrets) if (s.startsWith(scope)) { set(s, ''); toSave[s] = ''; }
-      }
-      // A password is not shown, but it can be typed again: the one of an earlier run in this window is still in use,
-      // also when that run failed on it. A password that was just dropped above is asked for below anyway.
-      for (const s of secrets) {
-        if (isEmpty(get(s))) continue;
-        const v = await askHidden(`  ${s} [Enter keeps the current one; input is hidden]: `);
-        if (v !== '') set(s, v);
-      }
+  for (let changed = false; numbered.length;) {
+    if (changed) show();
+    changed = false;
+    const range = numbered.length === 1 ? 'type 1 to change it' : `type a number (1-${numbered.length}) to change that value`;
+    const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or ${range}: `)).trim().toLowerCase();
+    if (answer === '') break;
+    if (answer === 's') { stepByStep = true; break; }
+    // several numbers at once are changed one after another
+    const picked = answer.split(/[\s,]+/).filter(Boolean).map((t) => (/^\d+$/.test(t) ? numbered[Number(t) - 1] : undefined));
+    if (picked.includes(undefined)) {
+      if (state.inputEnded) break;
+      console.log(`  "${answer}" is not a number of the list${numbered.length > 1 ? `: type a number from 1 to ${numbered.length}` : ''}, or press Enter to continue.`);
+      continue;
     }
-    if (changeable.length && chose('d')) {
-      console.log('\nType a new value, or just press Enter to keep the current one. Changes apply to this run only.');
-      // values that name a data file last and in the order of the path: what can be chosen for the file depends
-      // on the folder that was chosen before it
-      const ordered = choiceOrder(single).filter((k) => changeable.includes(k));
-      for (const k of [...changeable.filter((n) => !ordered.includes(n)), ...ordered]) {
-        const list = ordered.includes(k) ? choicesOf(single, params)[k] : null;
-        if (!list || !list.length) {
-          const v = await ask(`  ${k} [${showData(params[k])}]: `);
-          if (v !== '') params[k] = v;
-          continue;
-        }
-        // a value that needs its data file: the PO picks one of those that came with the package. The current
-        // value can be kept only while it is one of them (it is not after the folder before it was changed)
-        const valid = list.includes(params[k]);
-        if (!valid && list.length === 1) {
-          console.log(`  ${k}: ${list[0]}  (the only data file for the values above)`);
-          params[k] = list[0];
-          continue;
-        }
-        console.log(`  ${k}: the values that have a data file in this package${valid ? '' : ' for the values above'}`);
-        list.forEach((v, i) => console.log(`    ${i + 1}. ${v}${v === params[k] ? '  (current)' : ''}`));
-        for (;;) {
-          const v = (await ask(valid ? `  ${k} [${showData(params[k])}], number or name: ` : `  ${k}, number or name: `)).trim();
-          const picked = /^\d+$/.test(v) ? list[Number(v) - 1] : list.find((x) => x.toLowerCase() === v.toLowerCase());
-          if (picked) params[k] = picked;
-          if ((v === '' && valid) || picked || state.inputEnded) break;
-          console.log(v === '' ? '    Type one of the numbers or names above.'
-            : `    "${v}" has no data file: type one of the numbers or names above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
-        }
-      }
+    if (picked.some((e) => e.param)) console.log('\nA change of case data applies to this run only.');
+    for (const e of picked) {
+      if (e.key) await changeSetting(e.key);
+      else await changeParam(e.param);
     }
+    if (state.inputEnded) break;
+    changed = true;
   }
 
   // Case data the case file leaves empty must be entered: the case has nothing to work on without it
