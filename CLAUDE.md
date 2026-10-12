@@ -116,6 +116,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/**/*.json, calls step b
   "source": "tests/trade-creation.spec.ts › ...", "codeVersion": "git:abc123",
   "requiredConfig": ["accounts.maker.email", "accounts.maker.password"],
   "params": { "counterpartyName": "10 AM NY" },
+  "scenario": ["When maker is logged in to the trade portal", "..."],
   "steps": [
     { "title": "When maker is logged in to the trade portal", "substep": "I log in as maker", "action": "goto", "value": "/login" },
     { "action": "fill", "target": { "testId": "login-email-input", "inner": "input" }, "value": "${cfg:accounts.maker.email}" },
@@ -139,6 +140,7 @@ PO:  run-case.bat → runner/runner.js ──reads cases/**/*.json, calls step b
 - `upload`: `value` is a path relative to the root that must be inside `data/` (`resolveDataFile`; the runner checks the files exist before prompting). `click` may carry `capture: { url, method, field, saveAs }`: the response of the matching request (path ends with `url`; a query in `url` must match too, since the path alone never contains it) is read in the browser without re-sending it, and `field` of its JSON response is stored as a variable.
 - Target fields: `testId | role(+name) | label | placeholder | text | css`, plus `inner`, `hasText`, `nth`, `exact`. They are applied in the order `inner` → `hasText` → `nth`: `hasText` keeps only the elements that contain the text (a part of the text is enough, like Playwright's `filter({ hasText })`), and `inner` may be any Playwright selector, e.g. `role=row`.
 - Placeholders: `${cfg:path}` = local config; `${var:name}` = a value read by an earlier `read` or `capture`; `${param:name}` = case data from `params`. **Resolved in both value and target**; `requiredConfig` covers both as well, plus the `${cfg:...}` inside used param values and the headers, body and parts of an `api` step; a case with an `api` step also lists `apiBaseUrl`, first.
+- `scenario` (written by `exportCase`, explicit user requirement: the feature's steps listed in one place, not only spread over `steps`): the step lines of the case in order, i.e. the `title` of every step that has one, placeholders included (`And creates a new '${param:product}' trade`). It is for whoever reads the file; the runner does not read it and still takes each line from `title`, so it is no format change and a case file without it (exported earlier) runs the same.
 - `title` is attached only to the first action of each outermost `ui.step()` group, `substep` to the first action of each nested one. Titles are written BDD-style (`Given ...`, `When ...`, `Then ...`); this is plain text in the same field, not a format change.
 - When changing the format, change both `ui.ts` (writer) and `actions.js` (reader), and consider `formatVersion` compatibility.
 

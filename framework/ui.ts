@@ -384,6 +384,9 @@ export class UI {
       exportedAt: new Date().toISOString(),
       requiredConfig: requiredConfig(this.steps, params),
       ...(hasParams ? { params } : {}),
+      // The scenario at a glance: the step lines of the case in order, as the feature lists them. For the reader only:
+      // the runner takes each line from the title of the step that starts it, so no format version depends on it
+      scenario: this.steps.flatMap((s) => (s.title ? [s.title] : [])),
       steps: this.steps,
     };
     fs.mkdirSync(path.dirname(file), { recursive: true });
