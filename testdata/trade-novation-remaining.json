@@ -1,16 +1,14 @@
 {
   "use": [
-    "given-trade",
-    "novation-remaining"
+    "given-trade"
   ],
   "defaults": {
+    "novationTargetAmount": "",
+    "newCounterpartyName": "10 AM JAK",
     "tradeId": "",
     "byProduct": {
-      "FX_PSCRIPT": {
-        "novationTargetAmount": ""
-      },
-      "FX_PSCRIPT_FSKO": {
-        "novationTargetAmount": ""
+      "FX_TRF": {
+        "novationTargetAmount": "5,000"
       }
     }
   }

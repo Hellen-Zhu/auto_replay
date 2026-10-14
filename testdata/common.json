@@ -3,40 +3,6 @@
   "portfolioId": "CM_OIL_CRU_OPT",
   "direction": "Buy",
   "shared": {
-    "allocation": {
-      "portfolioId": "CM_OIL_CRU_OPT",
-      "allocationWays": "2",
-      "subTrades": [
-        {
-          "counterpartyName": "10 AM JAK"
-        },
-        {
-          "counterpartyName": "11 AM GMT"
-        },
-        {
-          "counterpartyName": "3 PM HK"
-        },
-        {
-          "counterpartyName": "1330 ATH"
-        }
-      ],
-      "allocationComments": "Allocation of the trade into sub-trades with equal shares"
-    },
-    "amendment": {
-      "amendmentField": "Counterparty",
-      "amendmentReason": "NON_ECON_CHANGE",
-      "newCounterpartyName": "10 AM JAK",
-      "newPortfolio": "PAE_CTPSHK_PB"
-    },
-    "cancellation": {
-      "cancelReason": "DEALER_ERROR",
-      "cancelComments": "cancellation for test"
-    },
-    "early-termination": {
-      "earlyTerminationDirection": "Pay",
-      "earlyTerminationAmount": "100",
-      "earlyTerminationCurrency": "USD"
-    },
     "given-trade": {
       "product": "FX_TRF",
       "datFile": "FX_TRF.dat",
@@ -48,36 +14,6 @@
       "oldCounterpartyName": "10 AM JAK",
       "oldCounterpartyFmId": "300036957",
       "novationDate": "2026-06-10"
-    },
-    "novation-remaining": {
-      "novationTargetAmount": "5,000",
-      "newCounterpartyName": "10 AM JAK"
-    },
-    "partial-novation-remaining": {
-      "remainingNotional": "1,000.00",
-      "newCounterpartyName": "1330 ATH"
-    },
-    "partial-termination": {
-      "partialTerminationNewNotional": "5000",
-      "partialTerminationUnwindFeeAmount": "100",
-      "expectedNotional": "5,000.00"
-    },
-    "portfolio-reassignment": {
-      "newPortfolio": "CM_PRC_UK",
-      "expectedPortfolio": "CM_PRC_UK"
-    },
-    "step-out-full": {
-      "stepOutDirection": "Pay",
-      "stepOutAmount": "5,000",
-      "stepOutCurrency": "USD",
-      "stepOutCounterpartyName": "10 AM NY"
-    },
-    "step-out-partial": {
-      "stepOutDirection": "Pay",
-      "stepOutAmount": "1000",
-      "stepOutCurrency": "USD",
-      "stepOutNewNotional": "2000",
-      "stepOutCounterpartyName": "10 AM NY"
     }
   }
 }

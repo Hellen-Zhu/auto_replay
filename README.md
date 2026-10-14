@@ -121,7 +121,7 @@ Not every case has been run on the real system, and some were never run at all: 
 
 (The real files are plain JSON, without comments, and may hold more values.)
 
-- A case gets `common.json` → the blocks listed under `use` (`shared.<block>` of `testdata/common.json`, values several specs share) → `defaults` → its own row; the later one wins. Everything is optional, and **a case that needs nothing different has no row**.
+- A case gets `common.json` → the blocks listed under `use` (`shared.<block>` of `testdata/common.json`, values several specs share; today only `given-trade`) → `defaults` → its own row; the later one wins. An event's own values are in `defaults` of its own file, never in `common.json`. Everything is optional, and **a case that needs nothing different has no row**.
 - **Data is matched by case ID**: a test title starts with its ID in `[ ]`, and `testData<...>()` looks that ID up in `testdata/<spec file name>.json`. A row whose `id` matches no case is simply not used. The ID is also the exported file name.
 - In the flow, `const p = this.params(data)`: `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value goes into the `params` block of the case file. Only parameters a case really uses are written.
 - What decides the scenario stays in the spec and is passed to the flow as a plain argument.

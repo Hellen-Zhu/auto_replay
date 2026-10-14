@@ -1,9 +1,10 @@
 {
   "use": [
-    "given-trade",
-    "portfolio-reassignment"
+    "given-trade"
   ],
   "defaults": {
+    "newPortfolio": "CM_PRC_UK",
+    "expectedPortfolio": "CM_PRC_UK",
     "tradeId": ""
   }
 }

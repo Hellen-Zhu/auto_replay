@@ -1,9 +1,10 @@
 {
   "use": [
-    "given-trade",
-    "partial-novation-remaining"
+    "given-trade"
   ],
   "defaults": {
+    "remainingNotional": "1,000.00",
+    "newCounterpartyName": "1330 ATH",
     "tradeId": ""
   }
 }

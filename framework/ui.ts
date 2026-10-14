@@ -200,15 +200,22 @@ export class UI {
 
   /**
    * Actions that run only while case data has a value (case format version 17), e.g. typing a field of the event's
-   * dialog that some products do not have: the test data leaves the value empty for them (byProduct), and the PO may
-   * leave it empty in the runner. Like onlyWhen they are recorded whatever the value of this run.
+   * dialog that some products do not have: the test data leaves the value empty (the default) and gives it only for
+   * the products that have the field (byProduct), and the PO may empty it in the runner. Like onlyWhen they are
+   * recorded whatever the value of this run. The case data is read here, from data by its name, because an empty
+   * value is allowed only for it (ui.params() refuses one); fn gets it as the parameter to use.
    */
-  async onlyWhenFilled<R>(param: Val, fn: () => Promise<R>): Promise<R | undefined> {
-    if (typeof param === 'string' || !('param' in param)) throw new Error('onlyWhenFilled needs a parameter of ui.params(), e.g. p.novationTargetAmount');
+  async onlyWhenFilled<T extends object, R>(data: T, name: keyof T & string, fn: (value: Val) => Promise<R>): Promise<R | undefined> {
     if (this.condition) throw new Error('onlyWhenFilled cannot be nested');
-    this.condition = { param: param.param, filled: true };
+    const raw = (data as Record<string, unknown>)[name];
+    if (raw === undefined || raw === null) throw new Error(`Test data "${name}" is not set: give it "" when the step is to be left out`);
+    if (raw === '') {
+      if (!/^[\w-]+$/.test(name)) throw new Error(`Test data name "${name}" may only contain letters, digits, _ and -`);
+      this.paramValues[name] = '';
+    } else this.useParam(name, raw);
+    this.condition = { param: name, filled: true };
     try {
-      return await fn();
+      return await fn({ param: name });
     } finally {
       this.condition = undefined;
     }

@@ -1,9 +1,25 @@
 {
   "use": [
-    "given-trade",
-    "allocation"
+    "given-trade"
   ],
   "defaults": {
+    "portfolioId": "CM_OIL_CRU_OPT",
+    "allocationWays": "2",
+    "subTrades": [
+      {
+        "counterpartyName": "10 AM JAK"
+      },
+      {
+        "counterpartyName": "11 AM GMT"
+      },
+      {
+        "counterpartyName": "3 PM HK"
+      },
+      {
+        "counterpartyName": "1330 ATH"
+      }
+    ],
+    "allocationComments": "Allocation of the trade into sub-trades with equal shares",
     "tradeId": ""
   }
 }

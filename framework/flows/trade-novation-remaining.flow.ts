@@ -7,7 +7,7 @@ import { TradesFlow } from './trades.flow';
 /** The data of a novation of the remaining trade (testdata/trade-novation-remaining.json) */
 export interface TradeNovationRemainingData {
   /**
-   * Typed when it has a value; empty for a product whose dialog has no target amount (byProduct in the test data),
+   * Typed when it has a value: empty by default, given for a product whose dialog has a target amount (byProduct in the test data: FX_TRF),
    * which replaces the E2E project's input profiles WITH_TARGET_AMOUNT / WITHOUT_TARGET_AMOUNT (user decision)
    */
   novationTargetAmount: string;
@@ -29,9 +29,9 @@ export class TradeNovationRemainingFlow extends BaseFlow {
     const { dynamicAction } = this.app;
 
     await this.lifecycleEvent.openAction(tradeId, 'novationRemaining', 'Novation Remaining');
-    // recorded for every run; it runs only while the case data has a value, which the PO may leave empty
-    await this.ui.onlyWhenFilled(p.novationTargetAmount, () =>
-      this.ui.And('I type the target amount', () => dynamicAction.typeField('novationRemainingTargetAmount', p.novationTargetAmount)));
+    // recorded for every run; it runs only while the case data has a value (FX_TRF only), which the PO may empty
+    await this.ui.onlyWhenFilled(data, 'novationTargetAmount', (targetAmount) =>
+      this.ui.And('I type the target amount', () => dynamicAction.typeField('novationRemainingTargetAmount', targetAmount)));
     await this.ui.And('I select the new counterparty', () => dynamicAction.selectCounterparty(p.newCounterpartyName));
     await this.lifecycleEvent.submit(tradeId);
   }

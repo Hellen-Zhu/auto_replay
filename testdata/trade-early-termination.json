@@ -1,9 +1,11 @@
 {
   "use": [
-    "given-trade",
-    "early-termination"
+    "given-trade"
   ],
   "defaults": {
+    "earlyTerminationDirection": "Pay",
+    "earlyTerminationAmount": "100",
+    "earlyTerminationCurrency": "USD",
     "tradeId": ""
   }
 }

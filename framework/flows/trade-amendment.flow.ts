@@ -7,7 +7,7 @@ import { TradesFlow } from './trades.flow';
 export const AMENDMENT_FIELDS = ['Counterparty', 'Risk Portfolio'] as const;
 export type AmendmentField = (typeof AMENDMENT_FIELDS)[number];
 
-/** The data of an amendment (shared.amendment of testdata/common.json) */
+/** The data of an amendment (testdata/trade-amendment.json) */
 export interface TradeAmendmentData {
   /** The field the maker changes: one of AMENDMENT_FIELDS */
   amendmentField: string;

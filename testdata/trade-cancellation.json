@@ -1,9 +1,10 @@
 {
   "use": [
-    "given-trade",
-    "cancellation"
+    "given-trade"
   ],
   "defaults": {
+    "cancelReason": "DEALER_ERROR",
+    "cancelComments": "cancellation for test",
     "tradeId": ""
   }
 }

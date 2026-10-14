@@ -1,9 +1,11 @@
 {
   "use": [
-    "given-trade",
-    "partial-termination"
+    "given-trade"
   ],
   "defaults": {
+    "partialTerminationNewNotional": "5000",
+    "partialTerminationUnwindFeeAmount": "100",
+    "expectedNotional": "5,000.00",
     "tradeId": ""
   }
 }

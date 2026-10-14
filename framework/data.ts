@@ -24,8 +24,8 @@ function readJson(file: string, label: string): unknown {
  *   { "use": ["given-trade"], "defaults": { ...shared by every case of this spec... },
  *     "cases": [ { "id": "TC-XXX-001", "use": ["cancellation"], ... }, ... ] }
  * A shared block is an entry of "shared" in testdata/common.json, a flat object of values that several specs need
- * but not all of them, e.g. the trade a lifecycle event starts from:
- *   { "counterpartyName": "...", ..., "shared": { "given-trade": { ... }, "allocation": { ... } } }
+ * but not all of them, e.g. the trade a lifecycle event starts from; the values of one event are in its own file:
+ *   { "counterpartyName": "...", ..., "shared": { "given-trade": { ... } } }
  * "shared" itself is not a value of any case. Everything is optional: a case needs a row only for values that
  * differ from the shared ones, and a spec whose cases all use the common values needs no file.
  */

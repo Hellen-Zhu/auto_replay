@@ -13,7 +13,7 @@ export interface SubTradeData {
 /** The numbers of subtrades an allocation case can be run with: case data the PO chooses in the runner */
 export const ALLOCATION_WAYS = ['2', '3', '4'] as const;
 
-/** The data of a trade allocation case (the block allocation of testdata/common.json) */
+/** The data of a trade allocation case (testdata/trade-allocation.json) */
 export interface TradeAllocationData {
   /** How many subtrades the trade is split into: one of ALLOCATION_WAYS */
   allocationWays: string;

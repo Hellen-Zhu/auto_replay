@@ -7,7 +7,7 @@ import { givenProduct, givenTrade, productTag, type GivenTradeData, type Product
 // through the API (flows.tradeProvisioning), so the cases need apiBaseUrl in the local config.
 // The feature has three cases (50/50, 30/30/30/10, 34/34/32); here they are one (explicit user requirement): the
 // number of subtrades is the case data allocationWays (2, 3 or 4), which the PO chooses in the runner, and each
-// subtrade's counterparty and percentage are case data too. Data: shared.allocation of testdata/common.json.
+// subtrade's counterparty and percentage are case data too. Data: testdata/trade-allocation.json.
 
 type Data = TradeProvisioningData & TradeAllocationData & ProductData;
 

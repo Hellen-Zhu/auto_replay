@@ -1,9 +1,12 @@
 {
   "use": [
-    "given-trade",
-    "step-out-full"
+    "given-trade"
   ],
   "defaults": {
+    "stepOutDirection": "Pay",
+    "stepOutAmount": "5,000",
+    "stepOutCurrency": "USD",
+    "stepOutCounterpartyName": "10 AM NY",
     "tradeId": ""
   }
 }
