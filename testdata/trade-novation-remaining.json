@@ -4,6 +4,14 @@
     "novation-remaining"
   ],
   "defaults": {
-    "tradeId": ""
+    "tradeId": "",
+    "byProduct": {
+      "FX_PSCRIPT": {
+        "novationTargetAmount": ""
+      },
+      "FX_PSCRIPT_FSKO": {
+        "novationTargetAmount": ""
+      }
+    }
   }
 }
