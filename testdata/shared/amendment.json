@@ -1,6 +1,6 @@
 {
+  "amendmentField": "Counterparty",
   "amendmentReason": "NON_ECON_CHANGE",
   "newCounterpartyName": "10 AM JAK",
-  "newPortfolio": "PAE_CTPSHK_PB",
-  "originalPortfolio": "ABS_EQF"
+  "newPortfolio": "PAE_CTPSHK_PB"
 }

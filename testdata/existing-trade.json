@@ -16,25 +16,7 @@
       ]
     },
     {
-      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-002",
-      "use": [
-        "amendment"
-      ]
-    },
-    {
-      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-003",
-      "use": [
-        "amendment"
-      ]
-    },
-    {
-      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-004",
-      "use": [
-        "amendment"
-      ]
-    },
-    {
-      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-005",
+      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-001",
       "use": [
         "amendment"
       ]

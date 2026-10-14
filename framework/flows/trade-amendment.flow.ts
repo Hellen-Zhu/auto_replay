@@ -3,41 +3,45 @@ import { BaseFlow, type Keyword } from './base.flow';
 import { TradeDetailFlow } from './trade-detail.flow';
 import { TradesFlow } from './trades.flow';
 
-/** The data of an amendment (testdata/trade-amendment.json) */
+/** The fields an amendment case can change: case data the PO chooses in the runner (amendmentField) */
+export const AMENDMENT_FIELDS = ['Counterparty', 'Risk Portfolio'] as const;
+export type AmendmentField = (typeof AMENDMENT_FIELDS)[number];
+
+/** The data of an amendment (testdata/shared/amendment.json) */
 export interface TradeAmendmentData {
+  /** The field the maker changes: one of AMENDMENT_FIELDS */
+  amendmentField: string;
   /** The reason chosen in the trade change confirmation */
   amendmentReason: string;
-  /** Amendment of the counterparty */
+  /** The new value when amendmentField is Counterparty */
   newCounterpartyName: string;
-  /** Amendment of the risk portfolio */
+  /** The new value when amendmentField is Risk Portfolio */
   newPortfolio: string;
-  /** The portfolio the trade was created with, which it shows again after a rejected amendment */
-  originalPortfolio: string;
 }
 
 /**
  * Amending a live trade on its trade detail page, mirroring the E2E project's trade_amendment snippet. The maker
  * changes a field and submits; the amendment then waits for the checker (flows.tradeApproval from the trade
- * portal, flows.tradeDetail from the trade detail page). The outcome is asserted by the case with the expect...
- * flows.
+ * portal). The outcome is asserted by the case with the expect... flows.
  */
 export class TradeAmendmentFlow extends BaseFlow {
   private readonly tradesFlow = new TradesFlow(this.app);
   private readonly tradeDetail = new TradeDetailFlow(this.app);
 
-  /** Maker changes the counterparty of the trade and submits the amendment */
-  async amendCounterparty(tradeId: string, data: TradeAmendmentData) {
+  /**
+   * Maker changes the field named by the case data amendmentField and submits the amendment (explicit user
+   * requirement: one case, the field is case data). The selection of every field is recorded, each run only when
+   * amendmentField names it, so the PO can choose another field in the runner; its new value is case data too
+   */
+  async amend(tradeId: string, data: TradeAmendmentData) {
     const p = this.params(data);
+    const field = p.amendmentField;
+    const { tradeDetail } = this.app;
     await this.tradeDetail.open(tradeId);
-    await this.ui.And('I select the new counterparty', () => this.app.tradeDetail.select('counterparty', p.newCounterpartyName));
-    await this.submit(tradeId, data);
-  }
-
-  /** Maker changes the risk portfolio of the trade and submits the amendment */
-  async amendRiskPortfolio(tradeId: string, data: TradeAmendmentData) {
-    const p = this.params(data);
-    await this.tradeDetail.open(tradeId);
-    await this.ui.And('I select the new risk portfolio', () => this.app.tradeDetail.select('portfolio', p.newPortfolio));
+    await this.ui.onlyWhen(field, AMENDMENT_FIELDS, ['Counterparty'], () =>
+      this.ui.And('I select the new counterparty', () => tradeDetail.select('counterparty', p.newCounterpartyName)));
+    await this.ui.onlyWhen(field, AMENDMENT_FIELDS, ['Risk Portfolio'], () =>
+      this.ui.And('I select the new risk portfolio', () => tradeDetail.select('portfolio', p.newPortfolio)));
     await this.submit(tradeId, data);
   }
 
@@ -71,21 +75,5 @@ export class TradeAmendmentFlow extends BaseFlow {
   /** In the blotter the trade is still live, with the event status Amended */
   async expectLiveAndAmended(tradeId: string, keyword: Keyword = 'Then') {
     await this.tradesFlow.expectStatusInBlotter(tradeId, TradesPage.status.live, TradesPage.eventStatus.amended, keyword);
-  }
-
-  /**
-   * The trade details show the new counterparty. The E2E project gets to the trade details with a double-click on
-   * the trade's row; here the page is opened by its address.
-   */
-  async expectAmendedCounterparty(tradeId: string, data: TradeAmendmentData, keyword: Keyword = 'Then') {
-    const p = this.params(data);
-    await this.tradeDetail.open(tradeId, keyword);
-    await this.ui.And('its counterparty is the new counterparty', () => this.app.tradeDetail.expectValue('counterparty', p.newCounterpartyName));
-  }
-
-  /** The trade detail page that is open shows the portfolio the trade had before the amendment */
-  async expectOriginalRiskPortfolio(data: TradeAmendmentData, keyword: Keyword = 'Then') {
-    const p = this.params(data);
-    await this.ui[keyword]('its risk portfolio is the original portfolio', () => this.app.tradeDetail.expectValue('portfolio', p.originalPortfolio));
   }
 }

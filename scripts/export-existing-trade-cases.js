@@ -15,16 +15,17 @@
 // --datFile takes that product's default dat file. Then the chain runs on the trade, each case leaving it in the
 // state the next one starts from:
 //
-//   pending approval: approval-reject 001 approve (LIVE) -> cancellation 001 cancel -> cancellation 002 approve it (DEAD)
-//   pending approval: approval-reject 002 reject (DRFT)
-//   live:             cancellation 001 cancel -> cancellation 003 reject it (LIVE)
+//   pending approval: approve-creation 001 (LIVE) -> cancellation 001 cancel -> approve-cancellation 001 (DEAD)
+//   pending approval: reject-creation 001 (DRFT)
+//   live:             cancellation 001 cancel -> reject-cancellation 001 (LIVE)
 //
 // Cancellation 001 runs twice; the second run only prepares the trade and exports the same case file again.
 // Every run books three real trades in the system the local config points at. It stops at the first case that
 // does not pass; nothing is rolled back.
 // With --events it goes on with the case on an existing trade of each other lifecycle event
 // (TC-TRADE-<EVENT>-EXISTING-UI-..., in the same spec): one more Live trade per chain, then the event (for the
-// amendment the maker's case and then the checker's on the same trade). That books ten more real trades. The values
+// amendment the maker's case and then the checker's on the same trade: approve-amendment 001 on one trade,
+// reject-amendment 001 on another; amendment 001 runs twice). That books ten more real trades. The values
 // those cases check come from testdata/ and may depend on the dat file (the notionals of the partial novation).
 // Any other argument is passed on to Playwright (--headed, --trace ...).
 
@@ -53,14 +54,15 @@ for (const a of args) {
 const withEvents = args.includes('--events');
 const passOn = args.filter((a) => !ours.has(a));
 
-const id = (event, n) => `TC-TRADE-${event.toUpperCase()}-EXISTING-UI-00${n}`;
+/** The ID of a case on an existing trade: the action it performs (an event, or approve-creation ...) and its number */
+const id = (action, n = 1) => `TC-TRADE-${action.toUpperCase()}-EXISTING-UI-00${n}`;
 /** A trade in the state the first case starts from, and the cases that run on it one after another */
 const chain = (state, ...cases) => ({ state, cases });
-const event = (name, ...numbers) => chain('live', ...(numbers.length ? numbers : [1]).map((n) => id(name, n)));
+const event = (name, ...then) => chain('live', id(name), ...then.map((action) => id(action)));
 const PLAN = [
-  chain('pendingApproval', id('approval-reject', 1), id('cancellation', 1), id('cancellation', 2)),
-  chain('pendingApproval', id('approval-reject', 2)),
-  chain('live', id('cancellation', 1), id('cancellation', 3)),
+  chain('pendingApproval', id('approve-creation'), id('cancellation'), id('approve-cancellation')),
+  chain('pendingApproval', id('reject-creation')),
+  chain('live', id('cancellation'), id('reject-cancellation')),
   ...(withEvents ? [
     event('allocation'),
     event('early-termination'),
@@ -70,8 +72,8 @@ const PLAN = [
     event('step-out-partial'),
     event('portfolio-reassignment'),
     // the maker amends, then the checker decides: two cases, each with its own login
-    event('amendment', 2, 4),
-    event('amendment', 3, 5),
+    event('amendment', 'approve-amendment'),
+    event('amendment', 'reject-amendment'),
     event('partial-novation-remaining'),
   ] : []),
 ];

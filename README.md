@@ -74,12 +74,12 @@ npx tsc -p .                      # type check
 |---|---|---|
 | `trade-creation` | `TC-TRADE-CREATION-<PRODUCT>-UI-001` to `-003` | Maker creates a normal / StepIn full / StepIn partial trade, per product that supports it |
 | | `TC-TRADE-CREATION-UI-004` | The same for a product and dat file chosen as case data |
-| `trade-approval-reject` | `TC-TRADE-APPROVAL-REJECT-UI-001` to `-004` | Checker approves or rejects a pending new trade (normal, StepIn full, StepIn partial) |
+| `trade-approval-reject` | `TC-TRADE-APPROVE-CREATION-UI-001` / `-002`, `TC-TRADE-REJECT-CREATION-UI-001` / `-002` | Checker approves or rejects a pending new trade (normal, StepIn full, StepIn partial) |
 | `trade-cancellation` | `TC-TRADE-CANCELLATION-UI-001` | Maker cancels a live trade; pending checker approval |
 | `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` | Maker allocates to 2, 3 or 4 subtrades: the case data `allocationWays`, chosen in the runner |
 | `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-UI-001` | Maker triggers the event from the trade's action menu |
-| `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002`, `-003` | Maker amends the counterparty / the risk portfolio; pending checker approval |
-| `existing-trade` | `TC-TRADE-APPROVAL-REJECT-EXISTING-UI-001` / `-002`, `TC-TRADE-CANCELLATION-EXISTING-UI-001` to `-003`, `TC-TRADE-<EVENT>-EXISTING-UI-...` | On an existing trade: checker decides on a new trade, maker cancels, checker decides on the cancellation; every lifecycle event on a given trade |
+| `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002` | Maker amends the field named by the case data `amendmentField` (`Counterparty` or `Risk Portfolio`, chosen in the runner); pending checker approval |
+| `existing-trade` | `TC-TRADE-<EVENT>-EXISTING-UI-001`, `TC-TRADE-APPROVE-<WHAT>-EXISTING-UI-001`, `TC-TRADE-REJECT-<WHAT>-EXISTING-UI-001` (`<WHAT>` = `CREATION`, `CANCELLATION`, `AMENDMENT`) | On an existing trade: the maker's event (cancellation, amendment, every other lifecycle event), and the checker's approval or rejection of what is pending on the trade, whatever was changed |
 
 How the cases are cut:
 
