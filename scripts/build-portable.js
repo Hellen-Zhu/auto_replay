@@ -41,6 +41,44 @@ function copyDir(src, dst, filter = () => true) {
   }
 }
 
+/** Every case file under a folder */
+function caseFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = path.join(dir, e.name);
+    return e.isDirectory() ? caseFiles(p) : p.endsWith('.json') ? [p] : [];
+  });
+}
+
+/** The ref of every api step in a case file, at any depth of its steps */
+function refsOf(node, refs = new Set()) {
+  if (Array.isArray(node)) node.forEach((n) => refsOf(n, refs));
+  else if (node && typeof node === 'object') {
+    if (node.action === 'api' && typeof node.ref === 'string') refs.add(node.ref);
+    Object.values(node).forEach((v) => refsOf(v, refs));
+  }
+  return refs;
+}
+
+/** Copies the request files the packaged cases name; fails when one is missing, since that case could not run */
+function copyRequests() {
+  const used = new Map(); // ref -> the case files that name it
+  for (const file of caseFiles(path.join(ROOT, 'cases'))) {
+    const doc = JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^﻿/, ''));
+    for (const ref of refsOf(doc.steps)) used.set(ref, [...(used.get(ref) || []), path.relative(ROOT, file)]);
+  }
+  const src = path.join(ROOT, REQUESTS_DIR);
+  const missing = [...used].filter(([ref]) => !fs.existsSync(path.join(src, `${ref}.json`)));
+  if (missing.length) {
+    throw new Error(`Request files named by a case are missing from ${REQUESTS_DIR}/ (export the case again):\n`
+      + missing.map(([ref, files]) => `  ${ref}.json, named by ${files.join(', ')}`).join('\n'));
+  }
+  fs.mkdirSync(path.join(OUT, REQUESTS_DIR), { recursive: true });
+  for (const ref of used.keys()) fs.copyFileSync(path.join(src, `${ref}.json`), path.join(OUT, REQUESTS_DIR, `${ref}.json`));
+  const all = fs.existsSync(src) ? fs.readdirSync(src).filter((f) => f.endsWith('.json')).length : 0;
+  console.log(`  ${used.size} request file(s) named by the cases; ${all - used.size} other file(s) in ${REQUESTS_DIR}/ left out`);
+}
+
 async function getNodeZip() {
   const local = opt('--node-zip');
   if (local) return path.resolve(local);
@@ -91,8 +129,9 @@ async function main() {
   copyDir(path.join(ROOT, 'runner'), path.join(OUT, 'runner'));
   copyDir(path.join(ROOT, 'core'), path.join(OUT, 'core'));
   copyDir(path.join(ROOT, 'cases'), path.join(OUT, 'cases'), (p) => fs.statSync(p).isDirectory() || p.endsWith('.json'));
-  // The API requests the cases name (a case file holds only the name of each request)
-  if (fs.existsSync(path.join(ROOT, REQUESTS_DIR))) copyDir(path.join(ROOT, REQUESTS_DIR), path.join(OUT, REQUESTS_DIR), (p) => fs.statSync(p).isDirectory() || p.endsWith('.json'));
+  // The API requests the cases name (a case file holds only the name of each request). Only those: requests/ also
+  // keeps the earlier versions of a changed request, which no packaged case names any more
+  copyRequests();
   // Files the cases upload (e.g. the product .dat files)
   // Only the dat folder of testdata/: the JSON test data stays with QA, a case file carries the values it uses
   if (fs.existsSync(path.join(ROOT, DATA_DIR))) copyDir(path.join(ROOT, DATA_DIR), path.join(OUT, DATA_DIR));

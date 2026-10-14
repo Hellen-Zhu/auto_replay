@@ -33,7 +33,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `testdata/dat/<PRODUCT>/` | The dat files cases upload or send; shipped to the PO |
 | `elements/` | Element locators, a copy of the E2E project's; never edited here |
 | `cases/<spec name>/` | Exported case files |
-| `requests/` | The API requests the case files name (a case file holds only `"ref"` for each); written by the export, packaged next to `cases/` |
+| `requests/` | The API requests the case files name (a case file holds only `"ref"` for each); written by the export. The package gets only the files its cases name: earlier versions of a changed request stay out |
 | `runner/`, `portable/*.bat` | The PO's runner and its launchers |
 | `scripts/` | `build-portable`, `sync-elements`, `export-existing-trade-cases` |
 | `mock-oreo/` | Mock OREO, for local tries only |
@@ -57,7 +57,7 @@ Fill in `config.local.json` (it is in `.gitignore`):
 npx playwright test               # run every case; passing ones are exported to cases/<spec name>/
 npx playwright test --headed      # watch the browser
 npx playwright test -g FX_TRF     # only the cases whose title matches
-npx playwright test --workers=4   # 4 cases at a time (default: one at a time)
+npx playwright test --workers=4   # 4 cases at a time (default: half the CPU cores; --workers=1 for one at a time)
 npm run replay                    # replay with the runner, as the PO sees it
 npm run record                    # record a manual session
 npm run mock                      # the mock OREO on http://localhost:4173

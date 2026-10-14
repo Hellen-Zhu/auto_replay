@@ -11,9 +11,9 @@ export default defineConfig({
   // The cases do not depend on each other: each creates its own trade and exports its own case file. So they can
   // run side by side, also inside one spec: npx playwright test --workers=4
   fullyParallel: true,
-  // One at a time unless --workers says otherwise: the UAT environment is shared, and how it takes several sessions
-  // of the same account at once is not known yet
-  workers: 1,
+  // Playwright's default (half the CPU cores) unless --workers says otherwise; --workers=1 runs one at a time. On the
+  // real system every case logs in with the same account: how it takes several sessions at once is not known yet
+  workers: undefined,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: cfg.baseUrl || undefined,
