@@ -1,5 +1,5 @@
 import { NewTradePage, TradeDetailPage, type NewTradeField, type NewTradeFieldDef } from '../pages';
-import { datFile } from '../products';
+import { datFile, defaultDatFile } from '../products';
 import type { Val } from '../ui';
 import { BaseFlow, type Keyword } from './base.flow';
 
@@ -11,8 +11,8 @@ type RequiredField = { [K in DataField]: Fields[K] extends { required: true } ? 
 /**
  * The data of one trade creation case (common values, defaults and its row of testdata/trade-creation.json):
  * one optional value per data field of NewTradePage.fields; the required ones must be there. "datFile" is not a
- * field of the form: it names the dat file to upload, one of the product's folder in testdata/dat/, for a case that lets
- * the PO choose among the variants of the product's structure; without it the product's default file is uploaded.
+ * field of the form: it names the dat file to upload, one of the product's folder in testdata/dat/; without it the
+ * product's default file is uploaded. Either way the file is case data: the PO can choose another one for a run.
  */
 export type TradeCreationData = { [K in RequiredField]: string } & { [K in Exclude<DataField, RequiredField>]?: string } & { datFile?: string };
 
@@ -27,8 +27,8 @@ const OPTIONAL_FIELDS = DATA_FIELDS.filter((name) => !fieldDef(name).required &&
 /**
  * Booking a new trade through the New Trade form, mirroring the E2E project's trade_creation snippets.
  * The product type is what is typed as the Product ID and it names the folder of its dat files; the data is
- * recorded as case data (${param:name}), which the PO can change for a run, the dat file included when the data
- * names one ("datFile"). Each create flow ends when the booking is confirmed
+ * recorded as case data (${param:name}), which the PO can change for a run, the dat file ("datFile") included.
+ * Each create flow ends when the booking is confirmed
  * and returns the new trade ID (recorded as ${var:createdTradeId}); the outcome is asserted by the case, e.g.
  * with expectPendingApproval(tradeId).
  */
@@ -106,10 +106,13 @@ export class TradeCreationFlow extends BaseFlow {
     });
   }
 
-  /** The product's default dat file, or the one the data names, which is then case data the PO can change */
+  /**
+   * The dat file the data names, else the product's default one. Either way it is case data, so the PO can choose
+   * another file of the product's folder (or drop one into the runner's window) for a run
+   */
   private async uploadDat(product: string, data: TradeCreationData) {
-    const file = data.datFile ? this.caseData('datFile', data.datFile) : undefined;
-    await this.ui.And(`I upload the ${product} dat file${file ? ` ${file}` : ''}`, () => this.app.newTrade.uploadDat(datFile(product, file)));
+    const file = this.caseData('datFile', data.datFile || defaultDatFile(product));
+    await this.ui.And(`I upload the ${product} dat file ${file}`, () => this.app.newTrade.uploadDat(datFile(product, file)));
   }
 
   private async bookAndConfirm(): Promise<string> {

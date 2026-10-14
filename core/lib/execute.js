@@ -113,12 +113,12 @@ async function executeStep(page, step, ctx) {
  * The values a step produced, by variable name: what a read step read, what a click captured from a response,
  * what an api step saved from its response. result is what executeStep returned. Empty for any other step.
  * A run shows them (a new trade's ID above all) so that the data it created can be found in the system afterwards.
+ * A set step takes a value that an earlier step saved (the new trade's ID as tradeId): it is not shown a second time.
  */
 function savedValues(step, result) {
   if (step.action === 'read') return { [step.saveAs]: result };
   if (step.capture) return { [step.capture.saveAs]: result };
   if (step.action === 'api') return result || {};
-  if (step.action === 'set') return { [step.param]: result };
   return {};
 }
 

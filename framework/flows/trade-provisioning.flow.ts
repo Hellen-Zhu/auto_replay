@@ -1,6 +1,6 @@
 import type { TradeUdf } from '../api';
 import { byParam, type Switch } from '../ui';
-import { datFile } from '../products';
+import { datFile, defaultDatFile } from '../products';
 import { BaseFlow, type Keyword } from './base.flow';
 
 /** The value of the udf "stepInType" */
@@ -21,7 +21,7 @@ export interface StepInProvisioningData {
  * The data of a trade that is created through the API: the "basic" block of the request, without the product.
  * Text values are case data the PO can change for a run; premiumAmount is a number in the request and is recorded as it is.
  * datFile is not part of the request's "basic" block: it names the dat file that is sent, one of the product's
- * folder in testdata/dat/, and is case data too; without it the product's default file is sent.
+ * folder in testdata/dat/, and is case data too; without it the product's default file is sent, also as case data.
  * tradeType is the kind of trade a lifecycle event starts from (without it: Normal) and is case data too: the
  * request is recorded with the "udf" list of both StepIn types, and the type of the run decides which one is sent
  * (none for Normal). So the StepIn values are needed whatever the type is.
@@ -69,7 +69,7 @@ export class TradeProvisioningFlow extends BaseFlow {
   /** kind is how the step line names the trade; udf is the list of a StepIn trade, fixed or depending on the trade type */
   private submit(product: string, kind: string, udf: TradeUdf[] | Switch<TradeUdf[]> | undefined, data: TradeProvisioningData, keyword: Keyword) {
     const p = this.params(data);
-    const file = data.datFile ? this.caseData('datFile', data.datFile) : undefined;
+    const file = this.caseData('datFile', data.datFile || defaultDatFile(product));
     return this.ui[keyword](`I submit a new ${product} ${kind} through the API as maker`, () =>
       this.app.tradesApi.submitTrade(
         'maker',
