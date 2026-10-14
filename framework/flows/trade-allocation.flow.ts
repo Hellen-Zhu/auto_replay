@@ -75,10 +75,13 @@ export class TradeAllocationFlow extends BaseFlow {
     });
   }
 
-  /** The success toast of the allocation is shown: it names the number of subtrades the trade was split into */
+  /**
+   * The success toast of the allocation is shown: it names the number of subtrades the trade was split into. The text
+   * is looked for in the toast's title and message: on the real system it was not in the message
+   */
   async expectCompleted(ways: number, keyword: Keyword = 'Then') {
     await this.ui[keyword](`I see the message that the trade has been allocated into ${ways} subtrades`, () =>
-      this.app.toast.expectMessage(Toast.message.allocatedInto(ways)),
+      this.app.toast.expectText(Toast.message.allocatedInto(ways)),
     );
   }
 

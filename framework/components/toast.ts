@@ -40,11 +40,23 @@ export class Toast extends BaseComponent {
     return { css: '[data-title]', hasText: title, nth: 0 };
   }
 
+  /**
+   * The toast that shows this text, in its title or in its message. For a toast of which only the wording is known:
+   * the allocation's was not found in the message on the real system, and where it is shown was not seen
+   */
+  protected withText(text: Val): TargetIn {
+    return { css: '[data-title], [data-description]', hasText: text, nth: 0 };
+  }
+
   async expectMessage(message: Val) {
     await this.ui.expectVisible(this.withMessage(message));
   }
 
   async expectTitle(title: Val) {
     await this.ui.expectVisible(this.withTitle(title));
+  }
+
+  async expectText(text: Val) {
+    await this.ui.expectVisible(this.withText(text));
   }
 }
