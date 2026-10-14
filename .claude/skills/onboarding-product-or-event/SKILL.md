@@ -54,7 +54,7 @@ Ask for everything missing in one message, as a checklist in the user's language
 1. **Registry.** One line in `PRODUCTS` of `framework/products.ts`. All capabilities: `['create', 'stepInFull', 'stepInPartial', ...LIFECYCLE_EVENTS]`. Some not supported: filter them out of the list as in the commented example there, so the line stays readable as "all events except ...".
 2. **Dat file** at `testdata/dat/<PRODUCT>/<PRODUCT>.dat` (variants next to it). Never edit or invent one: copy what QA gives. The mock accepts only a file whose name starts with the product.
 3. **Optional fields.** For each field of item 4 the product has, its value under `byProduct.<PRODUCT>` of the event's file; a field it does not have needs nothing (empty by default). A field that every product had so far and the new one lacks: move its value from `defaults` into `byProduct` of the products that have it, set `defaults` to `""` and put the step under `ui.onlyWhenFilled` (in the flow).
-4. **Test data.** `byProduct.<PRODUCT>` for each dat-dependent value given, in the `defaults` of the spec's own `testdata/<spec>.json`, as one `byProduct` object for all products of that spec. The merge of common -> shared blocks -> defaults -> row is **shallow** (`framework/data.ts`): a `byProduct` at a later level replaces an earlier one entirely, so never split one spec's `byProduct` across levels. `byProduct` is applied by `givenProduct` only (the event specs and creation `-UI-004`), not by the per-product creation tests `-UI-001..003`, which take `testData()` as it is. Nothing else changes: the product's own values come from the same shared blocks.
+4. **Test data.** `byProduct.<PRODUCT>` for each dat-dependent value given, in the `defaults` of the spec's own `testdata/<spec>.json`, as one `byProduct` object for all products of that spec. The merge of common -> shared blocks -> defaults -> row is **shallow** (`framework/data.ts`): a `byProduct` at a later level replaces an earlier one entirely, so never split one spec's `byProduct` across levels. `byProduct` is applied by `givenProduct` only (the event specs), not by the per-product creation tests `-UI-001..003`, which take `testData()` as it is. Nothing else changes: the product's own values come from the same shared blocks.
 5. **Page tables** keyed by product (item 6) only with element keys that exist.
 6. Nothing in `tests/` loops by hand, no copy of a spec per product, no table of products and no product literal in a spec.
 
@@ -83,7 +83,7 @@ In this order; stop at the first failure and report it.
 
 In the conversation, in the user's language. Use `report-template.md` next to this file. It has, in this order:
 
-1. **Coverage matrix**: one row per capability of the product (mode A) or per product (mode B): case ID, status `passed on real` / `passed on mock` / `listed, not run (why)` / `skipped (the missing value)` / `not supported (left out of the registry)`. Mode A also lists the cases that are not per product (approval / reject, creation `-UI-004`): the PO runs them for the new product by changing the case data `product` (and `datFile`).
+1. **Coverage matrix**: one row per capability of the product (mode A) or per product (mode B): case ID, status `passed on real` / `passed on mock` / `listed, not run (why)` / `skipped (the missing value)` / `not supported (left out of the registry)`. Mode A also lists the cases that are not per product (approval / reject): the PO runs them for the new product by changing the case data `product` (and `datFile`).
 2. **Files** created and changed.
 3. **QA has to provide**: every gap from "Before writing anything", each with where it goes (file and key) and what it unblocks.
 4. **QA checklist before go-live**: the items below that are not done yet.
@@ -95,7 +95,7 @@ In the conversation, in the user's language. Use `report-template.md` next to th
 What a QA lead checks beyond "the cases are written"; the report lists the open ones.
 
 - Every capability the product supports has a run, and every one it does not support is left out of the registry on purpose (confirmed by the BA), not forgotten.
-- Creation: normal, StepIn full and partial where supported, the default dat file and each variant the business uses (the PO runs variants through `[TC-TRADE-CREATION-UI-004]` by changing `product` and `datFile`; its committed data row is FX_TRF).
+- Creation: normal, StepIn full and partial where supported, the default dat file and each variant the business uses (the PO runs a variant by changing the case data `datFile` of the product's creation case).
 - Each event: passed once on the real system with `"riskEngine": "real"`, not only on the mock.
 - Events that need a checker: the maker's case ends at pending; the checker's decision is covered by the approval / reject cases (one product), so check that the event's pending item appears for the checker.
 - A run on an existing trade (`OREO_TRADE_ID` with `--grep @product:<PRODUCT>`) for at least one event, since that is how the PO replays on their own trades.

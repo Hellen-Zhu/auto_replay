@@ -14,7 +14,7 @@ Mode A (product `<PRODUCT>`): one row per capability. Mode B (event `<event>`): 
 | cancellation | `TC-TRADE-CANCELLATION-UI-001 @product:<PRODUCT>` | ... | |
 | novationRemaining | `TC-TRADE-NOVATION-REMAINING-UI-001 @product:<PRODUCT>` | ... | target amount: typed / left out (`byProduct`) |
 | stepOutFull | - | not supported | left out of the registry (confirmed by ...) |
-| approval / reject, creation UI-004 | `TC-TRADE-APPROVE-CREATION-UI-001` ... | not per product | PO changes `product` / `datFile` |
+| approval / reject | `TC-TRADE-APPROVE-CREATION-UI-001` ... | not per product | PO changes `product` / `datFile` |
 
 Status is one of: `passed on real`, `passed on mock`, `listed, not run (why)`, `skipped (the missing value)`, `not supported (left out of the registry)`, `failing (the error)`.
 

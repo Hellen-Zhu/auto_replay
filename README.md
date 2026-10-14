@@ -74,7 +74,6 @@ npx tsc -p .                      # type check
 | Spec (`tests/<name>.spec.ts`) | Case IDs | What |
 |---|---|---|
 | `trade-creation` | `TC-TRADE-CREATION-<PRODUCT>-UI-001` to `-003` | Maker creates a normal / StepIn full / StepIn partial trade, per product that supports it |
-| | `TC-TRADE-CREATION-UI-004` | The same for a product and dat file chosen as case data |
 | `trade-approval-reject` | `TC-TRADE-APPROVE-CREATION-UI-001` / `-002`, `TC-TRADE-REJECT-CREATION-UI-001` / `-002` | Checker approves or rejects a pending new trade (normal, StepIn full, StepIn partial) |
 | `trade-cancellation` | `TC-TRADE-CANCELLATION-UI-001` | Maker cancels a live trade; pending checker approval |
 | `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` | Maker allocates to 2, 3 or 4 subtrades: the case data `allocationWays`, chosen in the runner |
@@ -109,7 +108,7 @@ Not every case has been run on the real system, and some were never run at all: 
 // testdata/trade-creation.json: values of this spec, and a row only for a case that differs
 {
   "defaults": { "counterpartyName": "10 AM NY", "portfolioId": "CM_OIL_CRU_OPT", "direction": "Buy", "oldCounterpartyName": "10 AM JAK" },
-  "cases": [ { "id": "TC-TRADE-CREATION-UI-004", "product": "FX_TRF", "datFile": "FX_TRF.dat" } ]
+  "cases": [ { "id": "TC-...", "...": "only the values this case changes" } ]
 }
 
 // testdata/trade-cancellation.json: "use" takes a block several specs share (shared.given-trade of testdata/common.json)

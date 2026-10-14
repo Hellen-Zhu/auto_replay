@@ -4,12 +4,5 @@
     "portfolioId": "CM_OIL_CRU_OPT",
     "direction": "Buy",
     "oldCounterpartyName": "10 AM JAK"
-  },
-  "cases": [
-    {
-      "id": "TC-TRADE-CREATION-UI-004",
-      "product": "FX_TRF",
-      "datFile": "FX_TRF.dat"
-    }
-  ]
+  }
 }
