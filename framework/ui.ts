@@ -89,9 +89,16 @@ export type ApiCall = {
   timeout?: number;
 };
 
+/**
+ * A group of actions that runs only for some values of a case data (case format version 13): choices are the values
+ * the case data may have, in those for which the group runs
+ */
+export type Condition = { param: string; choices: string[]; in: string[] };
+
 type Step = {
   title?: string;
   substep?: string;
+  when?: Condition;
   action: string;
   target?: Target;
   value?: string;
@@ -124,6 +131,7 @@ export class UI {
   private pendingTitle?: string;
   private pendingSubstep?: string;
   private depth = 0;
+  private condition?: Condition;
 
   constructor(readonly page: Page, readonly config: any, readonly rootDir?: string) {}
 
@@ -155,6 +163,28 @@ export class UI {
   Then<R>(text: string, fn: () => Promise<R>) { return this.step(`Then ${text}`, fn); }
   And<R>(text: string, fn: () => Promise<R>) { return this.step(`And ${text}`, fn); }
   But<R>(text: string, fn: () => Promise<R>) { return this.step(`But ${text}`, fn); }
+
+  /**
+   * Actions that run only for some values of a case data, e.g. the third subtrade of an allocation: only when
+   * p.allocationWays is 3 or 4. They are recorded whatever the value of this run, so the PO can change the case
+   * data for a run: the runner then runs them or reports them as not needed. Put a whole substep inside, so the case
+   * file holds the condition once, on the substep. The value of the case data must be one of choices, which the
+   * runner offers; actions that are not run return undefined.
+   */
+  async onlyWhen<R>(param: Val, choices: readonly string[], values: readonly string[], fn: () => Promise<R>): Promise<R | undefined> {
+    if (typeof param === 'string' || !('param' in param)) throw new Error('onlyWhen needs a parameter of ui.params(), e.g. p.allocationWays');
+    if (this.condition) throw new Error('onlyWhen cannot be nested');
+    const bad = values.filter((v) => !choices.includes(v));
+    if (bad.length) throw new Error(`onlyWhen: ${bad.join(', ')} is not one of the choices ${choices.join(', ')}`);
+    const value = this.paramValues[param.param];
+    if (!choices.includes(value)) throw new Error(`Test data "${param.param}" is "${value}": it must be one of ${choices.join(', ')}`);
+    this.condition = { param: param.param, choices: [...choices], in: [...values] };
+    try {
+      return await fn();
+    } finally {
+      this.condition = undefined;
+    }
+  }
 
   // ---------- Case data ----------
   /**
@@ -319,6 +349,12 @@ export class UI {
     const group = { ...(this.pendingTitle ? { title: line(this.pendingTitle) } : {}), ...(this.pendingSubstep ? { substep: line(this.pendingSubstep) } : {}) };
     this.pendingTitle = undefined;
     this.pendingSubstep = undefined;
+    if (this.condition) recorded.when = this.condition;
+    // An action this run's case data does not need is recorded only, for a replay with other data
+    if (this.condition && !core.conditionHolds(this.condition, this.paramValues)) {
+      this.steps.push({ ...group, ...recorded });
+      return undefined;
+    }
     const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, params: this.paramValues, rootDir: this.rootDir });
     this.steps.push({ ...group, ...recorded });
     // Show what the step read or received, e.g. the ID of the trade it created: in the console and in Playwright's report.
@@ -386,7 +422,8 @@ export class UI {
     const steps = nested(this.steps);
     const caseDoc = {
       // The steps are nested (format version 10): one entry per step line of the scenario, and inside it one entry
-      // per substep with the actions behind it. The file carries neither its format version nor the spec it came
+      // per substep with the actions behind it; a substep that runs only for some values of case data carries them as
+      // its condition (when, format version 13). The file carries neither its format version nor the spec it came
       // from: the PO has no use for them. A file without a version is read as the current format
       name: meta.name,
       description: meta.description ?? '',
@@ -410,8 +447,9 @@ export class UI {
  * Inside an entry the substeps are nested in the same way: a substep runs up to the next one or to the end of its
  * step line, and the actions before the first substep stay directly in the entry.
  */
-type SubstepEntry = { substep: string; actions: Step[] };
+type SubstepEntry = { substep: string; when?: Condition; actions: Step[] };
 type StepEntry = { step?: string; actions: (Step | SubstepEntry)[] };
+const isSubstepEntry = (e: Step | SubstepEntry): e is SubstepEntry => Array.isArray((e as SubstepEntry).actions);
 
 function nested(steps: Step[]): StepEntry[] {
   const groups: StepEntry[] = [];
@@ -425,7 +463,17 @@ function nested(steps: Step[]): StepEntry[] {
     if (substep) group.actions.push((sub = { substep, actions: [] }));
     (sub ? sub.actions : group.actions).push(action as Step);
   }
-  return groups;
+  // A condition that every action of a substep has is written once, on the substep (format version 13)
+  for (const group of groups) {
+    for (const entry of group.actions) {
+      if (!isSubstepEntry(entry) || !entry.actions.length) continue;
+      const first = JSON.stringify(entry.actions[0].when);
+      if (first === undefined || !entry.actions.every((a) => JSON.stringify(a.when) === first)) continue;
+      entry.when = entry.actions[0].when;
+      entry.actions = entry.actions.map(({ when: _when, ...a }) => a as Step);
+    }
+  }
+  return groups.map((g) => ({ ...g, actions: g.actions.map((e) => (isSubstepEntry(e) && e.when ? { substep: e.substep, when: e.when, actions: e.actions } : e)) }));
 }
 
 const isRef = (v: unknown): v is Ref => {

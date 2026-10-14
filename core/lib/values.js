@@ -104,7 +104,25 @@ function paramChoicesOf(steps) {
     } else Object.values(v).forEach(walk);
   };
   for (const s of steps || []) if (s && s.action === 'api') [s.headers, s.body, s.multipart].forEach(walk);
+  // and the case data a group of actions depends on (format version 13)
+  for (const s of steps || []) if (s && isCondition(s.when) && !out[s.when.param]) out[s.when.param] = s.when.choices.map(String);
   return out;
+}
+
+/**
+ * A group of actions that runs only for some values of a case data (format version 13), e.g. the third subtrade of
+ * an allocation: { "param": "allocationWays", "choices": ["2", "3", "4"], "in": ["3", "4"] }. choices are the values
+ * the case data may have (what the runner offers), in those for which the group runs.
+ */
+const isCondition = (w) => !!w && typeof w === 'object' && typeof w.param === 'string' && Array.isArray(w.choices) && Array.isArray(w.in);
+
+/** Whether a group with this condition runs with this case data; a value outside its choices is an error */
+function conditionHolds(when, params) {
+  if (!isCondition(when)) throw new Error(`A condition must be { param, choices, in }; the case file has ${JSON.stringify(when)}`);
+  const v = params ? params[when.param] : undefined;
+  if (v === undefined) throw new Error(`Case data ${when.param} is not defined (the case file has no "${when.param}" in its params)`);
+  if (!when.choices.map(String).includes(String(v))) throw new Error(`Case data ${when.param} is "${v}": it must be one of ${when.choices.join(', ')}`);
+  return when.in.map(String).includes(String(v));
 }
 
 /**
@@ -138,4 +156,4 @@ function resolveUrl(baseUrl, path, key = 'baseUrl') {
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
-module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, fillParams, showPlaceholders, resolveUrl };
+module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, isCondition, conditionHolds, fillParams, showPlaceholders, resolveUrl };

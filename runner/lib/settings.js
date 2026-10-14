@@ -221,14 +221,18 @@ async function askSettings(list, config) {
       console.log(`  ${k}: ${params[k]}`);
     } else {
       console.log(`  ${heading(valid)}`);
-      list.forEach((v, i) => console.log(`    ${i + 1}. ${v}${v === params[k] ? '  (current)' : ''}`));
+      // values that are numbers themselves (allocationWays 2, 3, 4) are not numbered: a number is then the value
+      const byName = list.some((x) => /^\d+$/.test(x));
+      const what = byName ? 'value' : 'number or name';
+      list.forEach((v, i) => console.log(`    ${byName ? '-' : `${i + 1}.`} ${v}${v === params[k] ? '  (current)' : ''}`));
       for (;;) {
-        const v = (await ask(valid ? `  ${k} [${showData(params[k])}], number or name (Enter keeps it): ` : `  ${k}, number or name: `)).trim();
-        const picked = /^\d+$/.test(v) ? list[Number(v) - 1] : list.find((x) => x.toLowerCase() === v.toLowerCase());
+        const v = (await ask(valid ? `  ${k} [${showData(params[k])}], ${what} (Enter keeps it): ` : `  ${k}, ${what}: `)).trim();
+        const picked = /^\d+$/.test(v) && !byName ? list[Number(v) - 1] : list.find((x) => x.toLowerCase() === v.toLowerCase());
         if (picked) params[k] = picked;
         if ((v === '' && valid) || picked || state.inputEnded) break;
-        console.log(v === '' ? '    Type one of the numbers or names above.'
-          : `    "${v}" ${inPath ? 'has no data file' : 'is not one of them'}: type one of the numbers or names above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
+        const above = byName ? 'values' : 'numbers or names';
+        console.log(v === '' ? `    Type one of the ${above} above.`
+          : `    "${v}" ${inPath ? 'has no data file' : 'is not one of them'}: type one of the ${above} above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
       }
     }
     // what follows in the path (the file after its folder) may no longer exist for the new value: chosen again

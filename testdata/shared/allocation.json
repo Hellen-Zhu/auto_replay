@@ -1,12 +1,19 @@
 {
   "portfolioId": "CM_OIL_CRU_OPT",
+  "allocationWays": "2",
   "subTrades": [
     {
       "counterpartyName": "10 AM JAK"
     },
     {
       "counterpartyName": "10 AM JAK"
+    },
+    {
+      "counterpartyName": "11 AM GMT"
+    },
+    {
+      "counterpartyName": "11 AM GMT"
     }
   ],
-  "allocationComments": "Allocation of 2 sub-trades for FX_TRF trade with 50% each"
+  "allocationComments": "Allocation of the trade into sub-trades with equal shares"
 }

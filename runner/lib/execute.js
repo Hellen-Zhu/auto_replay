@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('@playwright/test');
-const { executeStep, savedValues, describeStep, fillParams, isMocked } = require('../../core/actions');
+const { executeStep, savedValues, describeStep, fillParams, isMocked, conditionHolds } = require('../../core/actions');
 const { launchOptions } = require('../../core/config');
 const { ROOT, EVIDENCE_DIR } = require('./paths');
 const state = require('./state');
@@ -123,6 +123,9 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       pausing = false;
     };
 
+    // An action of a group that runs only for some values of a case data (format version 13), e.g. the third subtrade
+    // of an allocation into two: with this run's data it is not needed. A wrong value is left to the step, which fails on it
+    const notNeeded = (s) => { try { return !!s && !!s.when && !conditionHolds(s.when, ctx.params); } catch { return false; } };
     let failed = false;
     for (let i = 0; i < doc.steps.length; i++) {
       const step = doc.steps[i];
@@ -135,10 +138,18 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       run.steps.push(rec);
       if (failed) continue;
 
+      if (notNeeded(step)) {
+        rec.status = 'notNeeded';
+        rec.note = `not needed: ${step.when.param} is ${ctx.params[step.when.param]}`;
+        if (title) say(`  ■ ${title}`);
+        if (substep) say(`    - ${substep} (${rec.note})`);
+        continue;
+      }
       if (title) say(`  ■ ${title}`);
       if (substep) say(`    - ${substep}`);
       if (!quiet) process.stdout.write(`    [${i + 1}/${doc.steps.length}] ${desc} ... `);
       try {
+        if (step.when) conditionHolds(step.when, ctx.params); // fails the step for a value that is not one of its choices
         const r = await executeStep(page, step, ctx);
         rec.status = 'passed';
         if (step.action === 'read') rec.desc += ` (read: ${r})`;
@@ -170,7 +181,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       }
 
       const next = doc.steps[i + 1];
-      if (!quiet && !failed && next && (pauseRequested || (stepByStep && (next.title || next.substep)))) await pause(rec, i + 1);
+      if (!quiet && !failed && next && !notNeeded(next) && (pauseRequested || (stepByStep && (next.title || next.substep)))) await pause(rec, i + 1);
     }
 
     await context.tracing.stop({ path: path.join(dir, 'trace.zip') });

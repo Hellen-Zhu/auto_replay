@@ -2,49 +2,5 @@
   "use": [
     "given-trade",
     "allocation"
-  ],
-  "cases": [
-    {
-      "id": "TC-TRADE-ALLOCATION-UI-002",
-      "subTrades": [
-        {
-          "counterpartyName": "10 AM JAK",
-          "percentage": "30"
-        },
-        {
-          "counterpartyName": "10 AM JAK",
-          "percentage": "30"
-        },
-        {
-          "counterpartyName": "11 AM GMT",
-          "percentage": "30"
-        },
-        {
-          "counterpartyName": "11 AM GMT",
-          "percentage": "10"
-        }
-      ],
-      "allocationComments": "Allocation of 4 sub-trades for FX_TRF trade with 30%/30%/30%/10%"
-    },
-    {
-      "id": "TC-TRADE-ALLOCATION-UI-003",
-      "product": "FX_PSCRIPT",
-      "datFile": "FX_PSCRIPT.dat",
-      "subTrades": [
-        {
-          "counterpartyName": "10 AM JAK",
-          "percentage": "34"
-        },
-        {
-          "counterpartyName": "10 AM JAK",
-          "percentage": "34"
-        },
-        {
-          "counterpartyName": "10 AM JAK",
-          "percentage": "32"
-        }
-      ],
-      "allocationComments": "Allocation of 3 sub-trades for FX_PSCRIPT trade with 34%/34%/32%"
-    }
   ]
 }

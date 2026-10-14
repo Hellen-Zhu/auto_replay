@@ -75,7 +75,7 @@ npx tsc -p .                      # type check
 | | `TC-TRADE-CREATION-UI-004` | The same for a product and dat file chosen as case data |
 | `trade-approval-reject` | `TC-TRADE-APPROVAL-REJECT-UI-001` to `-004` | Checker approves or rejects a pending new trade (normal, StepIn full, StepIn partial) |
 | `trade-cancellation` | `TC-TRADE-CANCELLATION-UI-001` | Maker cancels a live trade; pending checker approval |
-| `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` to `-003` | Maker allocates to 2, 4 or 3 subtrades |
+| `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` | Maker allocates to 2, 3 or 4 subtrades: the case data `allocationWays`, chosen in the runner |
 | `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-UI-001` | Maker triggers the event from the trade's action menu |
 | `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002`, `-003` | Maker amends the counterparty / the risk portfolio; pending checker approval |
 | `existing-trade` | `TC-EXISTING-TRADE-UI-001` to `-005`, `TC-TRADE-<EVENT>-EXISTING-UI-...` | On an existing trade: checker decides on a new trade, maker cancels, checker decides on the cancellation; every lifecycle event on a given trade |

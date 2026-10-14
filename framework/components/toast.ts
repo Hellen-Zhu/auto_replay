@@ -18,9 +18,10 @@ export class Toast extends BaseComponent {
     partialTerminationCompleted: 'updated with new notional',
     /**
      * The fixed part of "Trade <ID> has been allocated into <n> sub-trade(s): <ID>-ALLOC-1, <ID>-ALLOC-2.", as the
-     * real system shows it (title "Allocation Complete"): the IDs of the subtrades follow the number
+     * real system shows it (title "Allocation Complete"): the IDs of the subtrades follow the number, which may be a
+     * placeholder of case data
      */
-    allocatedInto: (subTrades: number) => `has been allocated into ${subTrades} sub-trade(s)`,
+    allocatedInto: (subTrades: number | string) => `has been allocated into ${subTrades} sub-trade(s)`,
   };
   /** The titles the cases check */
   static readonly title = {

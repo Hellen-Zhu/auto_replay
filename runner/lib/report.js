@@ -9,7 +9,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 // Step titles written as Given / When / Then get the keyword emphasized, so the report reads like a BDD scenario
 const bdd = (title) => esc(title).replace(/^(Given|When|Then|And|But)\b/, '<b class="kw">$1</b>');
 
-const STATUS_TEXT = { passed: 'Passed', failed: 'Failed', skipped: 'Not run' };
+// notNeeded: an action of a group that this run's case data does not need (format version 13), e.g. a third subtrade
+const STATUS_TEXT = { passed: 'Passed', failed: 'Failed', skipped: 'Not run', notNeeded: 'Not needed' };
 
 // Group the recorded actions by BDD step: a titled action starts a new group and the untitled ones after it belong to it.
 // A substep (a step of the flow behind the case's step) is a heading inside the group's action list
@@ -21,7 +22,10 @@ function groupSteps(steps) {
   });
   for (const g of groups) {
     const failed = g.actions.find((a) => a.status === 'failed');
-    g.status = failed ? 'failed' : g.actions.every((a) => a.status === 'passed') ? 'passed' : g.actions.some((a) => a.status === 'passed') ? 'failed' : 'skipped';
+    const done = (a) => a.status === 'passed' || a.status === 'notNeeded';
+    g.status = failed ? 'failed'
+      : g.actions.every((a) => a.status === 'notNeeded') ? 'notNeeded'
+        : g.actions.every(done) ? 'passed' : g.actions.some((a) => a.status === 'passed') ? 'failed' : 'skipped';
     g.error = failed && failed.error;
     // The screenshot that represents the step: where it failed, otherwise how the page looked when it finished
     g.screenshot = (failed || [...g.actions].reverse().find((a) => a.screenshot) || {}).screenshot;
@@ -39,7 +43,7 @@ function writeReport(dir, run) {
   const groups = groupSteps(run.steps);
   const rows = groups.map((g, i) => {
     const actions = g.actions.map((a) => `
-          ${a.substep ? `<li class="sub">${bdd(a.substep)}</li>` : ''}<li class="${a.status}"><span class="no">${a.no}.</span> ${esc(a.desc)} <span class="st">${STATUS_TEXT[a.status]}</span>${a.screenshot ? ` <a href="${esc(a.screenshot)}" target="_blank">screenshot</a>` : ''}${a.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(a.pausedSec)} after this action</div>` : ''}</li>`).join('');
+          ${a.substep ? `<li class="sub">${bdd(a.substep)}${a.note ? ` <span class="note">(${esc(a.note)})</span>` : ''}</li>` : ''}<li class="${a.status}"><span class="no">${a.no}.</span> ${esc(a.desc)} <span class="st">${STATUS_TEXT[a.status]}</span>${a.screenshot ? ` <a href="${esc(a.screenshot)}" target="_blank">screenshot</a>` : ''}${a.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(a.pausedSec)} after this action</div>` : ''}</li>`).join('');
     return `
     <tr class="${g.status}">
       <td>${i + 1}</td>
@@ -50,7 +54,7 @@ function writeReport(dir, run) {
     </tr>`;
   }).join('');
   const count = (st) => groups.filter((g) => g.status === st).length;
-  const summary = `${groups.length} step${groups.length === 1 ? '' : 's'}: ${count('passed')} passed${count('failed') ? `, ${count('failed')} failed` : ''}${count('skipped') ? `, ${count('skipped')} not run` : ''}`;
+  const summary = `${groups.length} step${groups.length === 1 ? '' : 's'}: ${count('passed')} passed${count('failed') ? `, ${count('failed')} failed` : ''}${count('skipped') ? `, ${count('skipped')} not run` : ''}${count('notNeeded') ? `, ${count('notNeeded')} not needed` : ''}`;
   // The data the case ran with; a value the PO changed for this run is flagged, with the value of the case file
   const caseData = run.caseData && run.caseData.length ? `<table class="data"><caption>Case data</caption><tbody>${run.caseData.map((d) => `
     <tr><td>${esc(d.name)}</td><td>${esc(d.value)}${d.changedFrom !== undefined ? ` <span class="changed">changed for this run (case file: ${esc(d.changedFrom)})</span>` : ''}</td></tr>`).join('')}
@@ -71,11 +75,11 @@ function writeReport(dir, run) {
   .badge.passed{background:#16a34a} .badge.failed{background:#dc2626}
   table{border-collapse:collapse;width:100%;font-size:13px}
   th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}
-  tr.failed td{background:#fef2f2} tr.skipped td{color:#9ca3af}
+  tr.failed td{background:#fef2f2} tr.skipped td,tr.notNeeded td{color:#9ca3af}
   .step{font-size:14px} li.sub{list-style:none;margin:6px 0 2px -14px;font-weight:600;color:#374151}
   details{margin-top:6px;color:#4b5563;font-size:12px} summary{cursor:pointer;color:#6b7280}
-  ul{list-style:none;margin:6px 0 0;padding:0} li{padding:2px 0} li.skipped{color:#9ca3af}
-  .no{color:#9ca3af} .st{color:#16a34a} li.failed .st{color:#dc2626} li.skipped .st{color:#9ca3af}
+  ul{list-style:none;margin:6px 0 0;padding:0} li{padding:2px 0} li.skipped,li.notNeeded{color:#9ca3af} .note{color:#9ca3af;font-weight:normal}
+  .no{color:#9ca3af} .st{color:#16a34a} li.failed .st{color:#dc2626} li.skipped .st,li.notNeeded .st{color:#9ca3af}
   img{max-width:240px;border:1px solid #e5e7eb;border-radius:4px}
   pre{white-space:pre-wrap;color:#b91c1c;font-size:12px;margin:6px 0 0}
   .paused{color:#b45309;font-size:12px;margin-top:6px} .saved{font-size:12px;margin-top:4px;color:#374151}

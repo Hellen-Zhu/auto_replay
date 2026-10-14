@@ -12,19 +12,24 @@
 // of the first action of its group
 // 11 = adds a part of an api step's JSON that depends on case data: { byParam, choices, values } (values.js)
 // 12 = adds base "origin" on an api step: its path is joined to the server of apiBaseUrl, without the prefix
-const FORMAT_VERSION = 12;
+// 13 = adds a condition on a substep entry: { substep, when: { param, choices, in }, actions } runs only for those
+// values of that case data (values.js); in the flat list every action of the substep carries it
+const FORMAT_VERSION = 13;
 
 /**
  * The actions of a case file as one flat list, which is what runs: a nested entry (version 9) gives its actions, the
  * first one carrying the step line as its title, as a file up to version 8 has it. A flat list is returned as it is.
- * A substep entry among those actions (version 10) gives its actions in the same way, the first one carrying the substep.
+ * A substep entry among those actions (version 10) gives its actions in the same way, the first one carrying the substep;
+ * the condition of a substep entry (version 13) is carried by each of its actions.
  */
 function flatSteps(steps) {
   if (!Array.isArray(steps) || !steps.some((s) => s && Array.isArray(s.actions))) return steps;
   return steps.flatMap((group) => {
     if (!group || !Array.isArray(group.actions)) throw new Error('A case file cannot mix nested steps ({ step, actions }) with plain actions');
     const actions = group.actions.flatMap((entry) =>
-      entry && Array.isArray(entry.actions) ? entry.actions.map((action, i) => (i === 0 && entry.substep ? { substep: entry.substep, ...action } : action)) : [entry]);
+      entry && Array.isArray(entry.actions)
+        ? entry.actions.map((action, i) => ({ ...(i === 0 && entry.substep ? { substep: entry.substep } : {}), ...(entry.when ? { when: entry.when } : {}), ...action }))
+        : [entry]);
     return actions.map((action, i) => (i === 0 && group.step ? { title: group.step, ...action } : action));
   });
 }

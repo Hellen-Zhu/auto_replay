@@ -88,13 +88,13 @@ test.describe('Existing trade', () => {
     await And('the trade is Live and marked as New', () => flows.trades.expectLiveAndNew(tradeId));
   });
 
-  test('[TC-TRADE-ALLOCATION-EXISTING-UI-001] Given Live trade splits into two equal sub-trades after 50/50 allocation', async ({ Given, When, Then, And, flows, testData }) => {
-    const given = givenTrade(flows, testData<TradeAllocationData & GivenTradeData>(), 'live', 'Maker allocates the live trade with the given ID 50/50 to two subtrades from the trade portal and the trade is Dead');
+  test('[TC-TRADE-ALLOCATION-EXISTING-UI-001] Given Live trade splits into sub-trades after allocation', async ({ Given, When, Then, And, flows, testData }) => {
+    const given = givenTrade(flows, testData<TradeAllocationData & GivenTradeData>(), 'live', 'Maker allocates the live trade with the given ID to the number of subtrades in the case data (2, 3 or 4) from the trade portal and the trade is Dead');
 
     await Given('maker is logged in to the trade portal', () => loggedIn(flows, 'maker'));
     const tradeId = await And('the given trade is Live', () => given.ready());
-    await When("perform equal '2' way allocation for the trade", () => flows.tradeAllocation.allocate(tradeId, 2, given.data));
-    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted(2));
+    await When("perform '${param:allocationWays}' way allocation for the trade", () => flows.tradeAllocation.allocate(tradeId, given.data));
+    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted(given.data));
     await And('the trade is allocated to Dead in the trade details', () => flows.tradeAllocation.expectAllocatedToDead(tradeId));
   });
 
