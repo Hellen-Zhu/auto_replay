@@ -1,12 +1,11 @@
 {
-  "counterpartyName": "10 AM NY",
-  "portfolioId": "CM_OIL_CRU_OPT",
-  "direction": "Buy",
   "shared": {
     "given-trade": {
       "product": "FX_TRF",
       "datFile": "FX_TRF.dat",
       "tradeType": "Normal",
+      "counterpartyName": "10 AM NY",
+      "direction": "Buy",
       "portfolioId": "ABS_EQF",
       "counterpartyFmId": "300036958",
       "premiumAmount": 10000,

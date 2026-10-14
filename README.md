@@ -29,7 +29,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `framework/ui.ts` | Executes each action and records it; `fixtures.ts` exports the case after a pass |
 | `framework/products.ts` | Product registry: which product supports which kind of creation |
 | `core/actions.js`, `core/lib/` | Execution core, shared by QA's run and the PO's replay. `actions.js` is the entry; the code is in the modules of `core/lib/` |
-| `testdata/` | Case data: `common.json` (values every spec shares, plus a `shared` section with the blocks several specs share), one `<spec name>.json` per spec |
+| `testdata/` | Case data: `common.json` (the `shared` blocks several specs take with `use`, today `given-trade`; top-level values every spec shares, none today), one `<spec name>.json` per spec with its own values |
 | `testdata/dat/<PRODUCT>/` | The dat files cases upload or send; shipped to the PO |
 | `elements/` | Element locators, a copy of the E2E project's; never edited here |
 | `cases/<spec name>/` | Exported case files |
@@ -103,12 +103,12 @@ Not every case has been run on the real system, and some were never run at all: 
 ## QA: test data
 
 ```jsonc
-// testdata/common.json: values shared by every case
-{ "counterpartyName": "10 AM NY", "portfolioId": "CM_OIL_CRU_OPT", "direction": "Buy" }
+// testdata/common.json: only what several specs share, as blocks that a spec takes with "use"
+{ "shared": { "given-trade": { "product": "FX_TRF", "counterpartyName": "10 AM NY", "direction": "Buy", "portfolioId": "ABS_EQF", ... } } }
 
 // testdata/trade-creation.json: values of this spec, and a row only for a case that differs
 {
-  "defaults": { "oldCounterpartyName": "10 AM JAK" },
+  "defaults": { "counterpartyName": "10 AM NY", "portfolioId": "CM_OIL_CRU_OPT", "direction": "Buy", "oldCounterpartyName": "10 AM JAK" },
   "cases": [ { "id": "TC-TRADE-CREATION-UI-004", "product": "FX_TRF", "datFile": "FX_TRF.dat" } ]
 }
 

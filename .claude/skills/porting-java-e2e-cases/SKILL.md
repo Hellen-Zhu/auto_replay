@@ -183,8 +183,8 @@ export class TradesApi extends BaseApi {
 - **Set at run time** (`createdTradeId`, by a capture, a store step or `ctx.set` after a request): the flow that produces it returns it, the case passes it to the later flows. Use the same name as `saveAs` / the key of `save`; it is recorded as `${var:<name>}` by itself.
 - **Test data** (`basic.counterpartyName`, `stepIn.oldCounterpartyName`, the values of a request template): find the key in the E2E project (search `src/test/resources/`) and take its value into `testdata/`.
   - Name: flat camelCase without the group (`counterpartyName`, `oldCounterpartyName`); when the last part alone says too little, join them (`cancel.reason` -> `cancelReason`).
-  - Place: already there with the same value: reuse it. Otherwise `defaults` of `testdata/<spec>.json`; `common.json` only for a value every spec shares; a row only for a case whose value differs.
-  - Already there with another value: leave the existing one as it is, put this spec's value into its own `defaults` (as `portfolioId` in `testdata/trade-cancellation.json`, which differs from `common.json`) and report both values.
+  - Place: already there with the same value: reuse it. Otherwise `defaults` of `testdata/<spec>.json`; a `shared` block of `common.json` only for values several specs share (taken with `use`); a row only for a case whose value differs.
+  - Already there with another value: leave the existing one as it is, put this spec's value into its own `defaults` (as `portfolioId` `ABS_EQF` of `shared.given-trade`, which differs from the `CM_OIL_CRU_OPT` of `testdata/trade-creation.json`) and report both values.
   - A literal in a snippet line (`selects reason option 'DEALER_ERROR'`, `types comments as '...'`) is test data too, not a literal in the flow.
   - An account, a password or an address is never test data: `cfg(...)`, which `flows.auth.login(role)` and `this.as(role)` already do.
 - **The product** (`basic.productId`, the Examples value) is not data: it is the flow's plain argument, typed as the Product ID and sent as the request's `productId`.
