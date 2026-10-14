@@ -6,7 +6,10 @@
 //   npm run build:portable -- --with-config     # include your config.local.json (passwords are stripped)
 //   npm run build:portable -- --node-zip D:\soft\node-v22.22.0-win-x64.zip   # to pin a different Node version
 //   npm run build:portable -- --download-node   # download from nodejs.org (needs internet access)
-//   npm run build:portable -- --with-ffmpeg     # only when video recording is needed
+//   npm run build:portable -- --fresh-node      # replace the node.exe an earlier build left in the output folder
+//
+// A node.exe that an earlier build left in the output folder is kept and reused when it is the version of the Node
+// running the build (unless --node-zip, --download-node or --fresh-node is given); everything else is built anew.
 //
 // Output layout:
 //   UAT-Runner/
@@ -92,20 +95,38 @@ async function getNodeZip() {
   return zip;
 }
 
+const NODE_EXE = path.join(OUT, 'node', isWin ? 'node.exe' : 'node');
+
+/** The version of the node an earlier build left in the output folder, or undefined when there is none that runs */
+function existingNode() {
+  if (!fs.existsSync(NODE_EXE)) return undefined;
+  try { return execSync(`"${NODE_EXE}" -v`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return undefined; }
+}
+
 async function main() {
   console.log(`\nBuilding portable runner -> ${OUT}\n`);
-  fs.rmSync(OUT, { recursive: true, force: true });
+  // An earlier build's node is kept unless another one is asked for, or it is not the version of the node running this
+  // build (the local Node was upgraded since)
+  const found = !flag('--skip-node') && !flag('--fresh-node') && !opt('--node-zip') && !flag('--download-node') && existingNode();
+  const keepNode = found === process.version && found;
+  if (keepNode) {
+    for (const e of fs.readdirSync(OUT)) if (e !== 'node') fs.rmSync(path.join(OUT, e), { recursive: true, force: true });
+  } else {
+    fs.rmSync(OUT, { recursive: true, force: true });
+  }
   fs.mkdirSync(OUT, { recursive: true });
 
   // 1. Portable Node (only node.exe is needed)
   if (flag('--skip-node')) {
     console.log('1/5 Skipping Node (--skip-node)');
+  } else if (keepNode) {
+    console.log(`1/5 Keeping the Node already in the output folder (${keepNode}); --fresh-node replaces it`);
   } else if (!opt('--node-zip') && !flag('--download-node')) {
     // Default: copy the node.exe that is currently running (your locally installed Node); no internet needed
     console.log('1/5 Copying local Node: ' + process.execPath + ' (v' + process.versions.node + ')');
     if (!isWin) console.log('  ⚠ Not running on Windows: the copied node will not run on the PO\'s Windows machine. Build on Windows instead.');
     fs.mkdirSync(path.join(OUT, 'node'));
-    fs.copyFileSync(process.execPath, path.join(OUT, 'node', isWin ? 'node.exe' : 'node'));
+    fs.copyFileSync(process.execPath, NODE_EXE);
   } else {
     console.log('1/5 Preparing portable Node (from zip)');
     const zip = await getNodeZip();
@@ -161,18 +182,6 @@ async function main() {
     name: 'oreo-uat-runner', private: true, dependencies: { '@playwright/test': pwVersion },
   }, null, 2));
   sh('npm install --omit=dev --no-audit --no-fund', OUT);
-
-  // ffmpeg for video (small, about 1-2MB), installed into the runner's own folder; a failure does not block execution, there is just no video
-  if (flag('--with-ffmpeg')) {
-    try {
-      console.log('  Installing the ffmpeg video component');
-      const env = { ...process.env, PLAYWRIGHT_BROWSERS_PATH: path.join(OUT, 'ms-playwright') };
-      delete env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD;
-      execSync('npx playwright install ffmpeg', { cwd: OUT, stdio: 'inherit', env });
-    } catch {
-      console.log('  ⚠ ffmpeg install failed: the runner still works but produces no video (screenshots and trace are unaffected)');
-    }
-  }
 
   // 5. Zip
   if (flag('--no-zip')) {

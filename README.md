@@ -216,7 +216,10 @@ The skill translates level by level (feature step â†’ case step, FLOW snippet â†
 npm run build:portable                    # copies your local node.exe, no internet needed
 npm run build:portable -- --with-config   # include your baseUrl and accounts (passwords are stripped)
 npm run build:portable -- --no-zip        # the folder only
+npm run build:portable -- --fresh-node    # copy node.exe again although the last build left one
 ```
+
+A rebuild keeps the `node/node.exe` that the last build left in `dist/UAT-Runner/` when it is the version of the Node you run the build with; everything else is built anew.
 
 This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files have to be sent: the PO drops them into the package's `cases` folder (plus any new file under `testdata/dat/` and `requests/`).
 
