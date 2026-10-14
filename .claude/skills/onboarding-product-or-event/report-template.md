@@ -28,7 +28,7 @@ Status is one of: `passed on real`, `passed on mock`, `listed, not run (why)`, `
 | What | Where it goes | Unblocks |
 |---|---|---|
 | Default dat file | `testdata/dat/<PRODUCT>/<PRODUCT>.dat` | every run of the product |
-| Whether the novation remaining dialog has a target amount | `defaults.byProduct.<PRODUCT>.novationTargetAmount = ""` in `testdata/trade-novation-remaining.json` if not | that run |
+| Whether the novation remaining dialog has a target amount, and its value | `defaults.byProduct.<PRODUCT>.novationTargetAmount` in `testdata/trade-novation-remaining.json` if it has (default `""`: the step is left out) | that run |
 | New and expected notional of partial termination | `defaults.byProduct.<PRODUCT>` in `testdata/trade-partial-termination.json` | that run |
 
 ## 4. QA checklist before go-live (open items)
