@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf } = require('../../core/actions');
+const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf, onlyWhenEmptyOf, conditionHolds } = require('../../core/actions');
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
@@ -34,9 +34,21 @@ function setCfg(config, key, v) {
 
 // Case data (version 2 case files): the values the case types or selects
 const paramsOf = (doc) => Object.fromEntries(Object.entries(doc.params || {}).map(([k, v]) => [k, String(v)]));
+// What a run with this case data does not need: the case data and settings that only the actions creating what an
+// optional case data names use, once it has a value (a trade ID given: the API data of a new trade, the checker's
+// account that would approve it). They are neither shown, asked for nor reported for that run.
+function notNeededOf(doc, params) {
+  const out = { params: new Set(), config: new Set() };
+  for (const [name, only] of Object.entries(onlyWhenEmptyOf(doc.steps))) {
+    if (!params || params[name] === undefined || String(params[name]) === '') continue;
+    only.params.forEach((x) => out.params.add(x));
+    only.config.forEach((x) => out.config.add(x));
+  }
+  return out;
+}
 // The data a run used, for the report: a value that points at local config is shown by its name, and a value the PO
 // changed for the run comes with the one of the case file
-const caseDataOf = (doc, params) => Object.keys(params).map((name) => {
+const caseDataOf = (doc, params) => Object.keys(params).filter((name) => !notNeededOf(doc, params).params.has(name)).map((name) => {
   const original = String(doc.params[name]);
   // a value that was entered for the run (empty in the case file) is not a change
   return { name, value: showPlaceholders(params[name]), ...(params[name] !== original && original !== '' ? { changedFrom: showPlaceholders(original) } : {}) };
@@ -97,7 +109,9 @@ function checkCase({ file, doc }, params) {
   }
   // A file the case uploads or sends to the API that did not come with the package. Its name may hold case data
   // (testdata/dat/${param:product}/${param:datFile}), so the check is repeated with the data of the run once the PO has changed it
-  for (const s of doc.steps) for (const f of dataFilesOf(s, params || paramsOf(doc))) resolveDataFile(ROOT, f);
+  // A step that does not run with this data needs no file (the dat file of a trade that is given, not created)
+  const runs = (s) => { try { return !s.when || conditionHolds(s.when, params || paramsOf(doc)); } catch { return true; } };
+  for (const s of doc.steps.filter(runs)) for (const f of dataFilesOf(s, params || paramsOf(doc))) resolveDataFile(ROOT, f);
 }
 
 // Settings the runner decides itself: whatever config.local.json says, a replay runs with these values, and they are
@@ -121,7 +135,7 @@ function requiredOf(list) {
  */
 async function askSettings(list, config) {
   const single = list.length === 1 ? list[0].doc : null;
-  const required = requiredOf(list);
+  const allRequired = requiredOf(list);
   const toSave = {}; // non-secret values typed in during this run, offered for saving afterwards
   const get = (key) => getCfg(config, key);
   const set = (key, v) => setCfg(config, key, v);
@@ -139,24 +153,32 @@ async function askSettings(list, config) {
   // The PO can change the case data of a single case for this run; the case file itself is never modified.
   // Several cases run with the data of their own files: the same name can mean another value in each of them.
   const params = single ? paramsOf(single) : {};
-  const paramNames = Object.keys(params);
   const showData = (v) => showPlaceholders(v); // a value that points at local config is shown by its name
 
   // When settings are already provided, show them and let the PO switch environment or account without editing
   // any file. config is the same object for every run of this window, so a change stays for the cases run after it.
-  const hasSettings = ['baseUrl', ...required.filter((k) => !isSecret(k))].some((k) => !isEmpty(get(k)));
-  const settingKeys = hasSettings ? ['baseUrl', ...required] : [];
-  const secrets = required.filter(isSecret);
+  const hasSettings = ['baseUrl', ...allRequired.filter((k) => !isSecret(k))].some((k) => !isEmpty(get(k)));
+  const secrets = allRequired.filter(isSecret);
   // case data the case may give a value itself (the ID of a trade it otherwise creates): the PO may enter one or not
   const optional = single ? optionalParamsOf(single.steps) : [];
+  // With such a value given, what only creating it needs is left out (notNeededOf); the lists below follow the
+  // current case data, so they change when the PO enters or removes a trade ID
+  const notNeeded = () => (single ? notNeededOf(single, params) : { params: new Set(), config: new Set() });
+  const required = () => allRequired.filter((k) => !notNeeded().config.has(k));
+  const settingKeys = () => (hasSettings ? ['baseUrl', ...required()] : []);
+  // the optional case data first: whether the case creates its trade decides what else it needs
+  const paramNames = () => [...optional.filter((n) => n in params), ...Object.keys(params).filter((n) => !optional.includes(n))]
+    .filter((n) => !notNeeded().params.has(n));
   // a value that is still to be entered is asked for anyway
-  const changeable = paramNames.filter((n) => params[n] !== '' || optional.includes(n));
+  const changeable = () => paramNames().filter((n) => params[n] !== '' || optional.includes(n));
   // values that name a data file, in the order of the path: what can be chosen for the file depends on the folder
   // that was chosen before it
-  const ordered = single ? choiceOrder(single).filter((k) => changeable.includes(k)) : [];
+  const ordered = single ? choiceOrder(single) : [];
   // What the PO can change is numbered, the settings first and the case data after them: a number at the prompt
   // changes that one value, and the lists are shown again
-  const numbered = [...settingKeys.map((key) => ({ key })), ...changeable.map((param) => ({ param }))];
+  const numbered = [];
+  const renumber = () => numbered.splice(0, numbered.length, ...settingKeys().map((key) => ({ key })), ...changeable().map((param) => ({ param })));
+  renumber();
   // On a console that can show a list operated with the keyboard, the value is picked with the arrow keys instead
   const keys = useKeys();
   const no = (i) => (keys ? '' : `${String(i + 1).padStart(numbered.length > 9 ? 2 : 1)}. `);
@@ -168,11 +190,11 @@ async function askSettings(list, config) {
       console.log('\nSettings for this run:');
       // a password is listed too, masked: one typed in for an earlier case of this window is used without asking,
       // its number lets the PO type it again; one that is not set is asked for below
-      settingKeys.forEach((k, i) => console.log(`  ${no(i)}${k}: ${settingText(k)}`));
+      settingKeys().forEach((k, i) => console.log(`  ${no(i)}${k}: ${settingText(k)}`));
     }
-    if (paramNames.length) {
+    if (paramNames().length) {
       console.log('\nCase data:');
-      for (const k of paramNames) {
+      for (const k of paramNames()) {
         const i = numbered.findIndex((e) => e.param === k);
         console.log(`  ${i < 0 ? ' '.repeat(no(0).length) : no(i)}${k}: ${paramText(k)}`);
       }
@@ -201,19 +223,13 @@ async function askSettings(list, config) {
   // case data that decides a part of a request (the trade type): the case file lists the values it can have
   const fixed = single ? paramChoicesOf(single.steps) : {};
   const changeParam = async (k) => {
+    if (optional.includes(k)) return chooseGiven(k);
     const inPath = ordered.includes(k);
     const list = inPath ? choicesOf(single, params)[k] : fixed[k] || null;
     const heading = (valid) => (inPath
       ? `${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}`
       : `${k}: the values this case can be run with`);
     if (!list || !list.length) {
-      if (optional.includes(k)) {
-        // it can also be made empty again: the case then creates a new one
-        const v = (await ask(`  ${k} [${params[k] === '' ? 'empty' : params[k]}] (Enter keeps it; type - to leave it empty and create a new one): `)).trim();
-        if (v === '-') params[k] = '';
-        else if (v !== '') params[k] = v;
-        return;
-      }
       const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it): `);
       if (v !== '') params[k] = v;
       return;
@@ -257,6 +273,47 @@ async function askSettings(list, config) {
     }
   };
 
+  // Case data the case gives a value itself when it is empty (tradeId): the PO first chooses whether the case creates
+  // a new one or runs on an existing one, whose ID is then typed in. Only for a new one is the data it is created
+  // with (and the account that approves it) listed.
+  const noun = (k) => k.replace(/Id$/, '') || k;
+  const chooseGiven = async (k) => {
+    const NEW = 'new';
+    const OLD = 'existing';
+    const options = [
+      { value: NEW, text: `Create a new ${noun(k)} (the case creates it through the API)` },
+      { value: OLD, text: `Use an existing ${noun(k)} (type its ${k})` },
+    ];
+    const current = params[k] === '' ? NEW : OLD;
+    let pick;
+    if (keys) {
+      const r = await pickRow({ rows: [{ text: `Which ${noun(k)} does the case run on?` }, ...options.map((o) => ({ text: `  ${o.text}${o.value === current ? '  (current)' : ''}`, value: o.value }))],
+        start: current, hint: 'Up/Down: move   Enter: choose   Esc: keep the current choice' });
+      pick = r.value || current;
+    } else {
+      console.log(`\nWhich ${noun(k)} does the case run on?`);
+      options.forEach((o, i) => console.log(`  ${i + 1}. ${o.text}${o.value === current ? '  (current)' : ''}`));
+      for (;;) {
+        const v = (await ask(`Type 1 or 2 (Enter keeps ${options.findIndex((o) => o.value === current) + 1}): `)).trim();
+        pick = v === '' ? current : v === '1' ? NEW : v === '2' ? OLD : null;
+        if (pick || state.inputEnded) break;
+        console.log('  Type 1 or 2.');
+      }
+      pick = pick || current;
+    }
+    if (pick === NEW) { params[k] = ''; console.log(`  ${k}: a new one is created`); return; }
+    for (;;) {
+      const v = (await ask(params[k] === '' ? `  Enter ${k}: ` : `  ${k} [${params[k]}] (Enter keeps it): `)).trim();
+      if (v !== '') params[k] = v;
+      if (params[k] !== '') { console.log(`  ${k}: ${params[k]} (the data to create a new one is not needed)`); return; }
+      if (state.inputEnded) { console.log(`  No ${k} was entered: a new one is created`); return; }
+    }
+  };
+  for (const k of optional.filter((n) => n in params)) {
+    await chooseGiven(k);
+    renumber();
+  }
+
   if (!keys || !numbered.length) show();
   if (!single && list.some((c) => Object.keys(c.doc.params || {}).length)) {
     console.log('\nCase data: each case runs with the values of its own case file. To change a value, run that case on its own.');
@@ -273,9 +330,10 @@ async function askSettings(list, config) {
     console.log('');
     for (;;) {
       const rows = [];
-      if (hasSettings) rows.push({ text: 'Settings for this run:' }, ...settingKeys.map((k, i) => ({ text: `  ${k}: ${settingText(k)}`, value: numbered[i] })), { text: '' });
-      if (paramNames.length) {
-        rows.push({ text: 'Case data:' }, ...paramNames.map((k) => {
+      renumber();
+      if (hasSettings) rows.push({ text: 'Settings for this run:' }, ...settingKeys().map((k, i) => ({ text: `  ${k}: ${settingText(k)}`, value: numbered[i] })), { text: '' });
+      if (paramNames().length) {
+        rows.push({ text: 'Case data:' }, ...paramNames().map((k) => {
           const e = numbered.find((x) => x.param === k);
           return e ? { text: `  ${k}: ${paramText(k)}`, value: e } : { text: `    ${k}: ${paramText(k)}` };
         }), { text: '' });
@@ -295,7 +353,7 @@ async function askSettings(list, config) {
     console.log('');
   }
   for (let changed = false; numbered.length && !keys;) {
-    if (changed) show();
+    if (changed) { renumber(); show(); }
     changed = false;
     const range = numbered.length === 1 ? 'type 1 to change it' : `type a number (1-${numbered.length}) to change that value`;
     const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or ${range}: `)).trim().toLowerCase();
@@ -318,7 +376,7 @@ async function askSettings(list, config) {
   }
 
   // Case data the case file leaves empty must be entered: the case has nothing to work on without it
-  for (const k of paramNames.filter((n) => params[n] === '' && !optional.includes(n))) {
+  for (const k of paramNames().filter((n) => params[n] === '' && !optional.includes(n))) {
     while (params[k] === '') {
       params[k] = (await ask(`Enter ${k}: `)).trim();
       if (params[k] === '' && state.inputEnded) throw new Error(`Case data ${k} was not entered`);
@@ -330,7 +388,7 @@ async function askSettings(list, config) {
     config.baseUrl = await ask('Enter the system address (e.g. https://xxx:8088): ');
     if (config.baseUrl) toSave.baseUrl = config.baseUrl;
   }
-  for (const key of required) {
+  for (const key of required()) {
     if (isEmpty(get(key))) await askConfig(key);
   }
 

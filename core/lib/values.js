@@ -122,6 +122,48 @@ const isCondition = (w) => !!w && typeof w === 'object' && typeof w.param === 's
 /** Case data that may stay empty: a group of the steps runs only while it is empty and gives it its value */
 const optionalParamsOf = (steps) => [...new Set((steps || []).filter((s) => s && isCondition(s.when) && s.when.empty).map((s) => s.when.param))];
 
+/**
+ * What only the groups that run while an optional case data is empty need: optional name -> { params, config },
+ * the case data and the config entries no other action uses. When the PO gives a trade ID, the data of the trade
+ * the case would otherwise create through the API is not needed, nor the account that would approve it.
+ * The step lines (title, substep) do not count as a use: they are text for the reader.
+ */
+function onlyWhenEmptyOf(steps) {
+  const refsOf = (action) => {
+    const params = new Set();
+    const config = new Set();
+    const walk = (v) => {
+      if (typeof v === 'string') {
+        for (const m of v.matchAll(/\$\{param:([^}]+)\}/g)) params.add(m[1]);
+        for (const m of v.matchAll(/\$\{cfg:([^}]+)\}/g)) config.add(m[1]);
+      } else if (v && typeof v === 'object') {
+        if (isSwitch(v)) params.add(v.byParam);
+        Object.values(v).forEach(walk);
+      }
+    };
+    for (const [k, v] of Object.entries(action)) {
+      if (k === 'title' || k === 'substep') continue;
+      if (k === 'when') { if (isCondition(v)) params.add(v.param); continue; }
+      if (k === 'request' && v && v.setting) config.add(v.setting);
+      walk(v);
+    }
+    return { params, config };
+  };
+  const inside = {};
+  const outside = { params: new Set(), config: new Set() };
+  for (const s of steps || []) {
+    if (!s) continue;
+    const r = refsOf(s);
+    const to = isCondition(s.when) && s.when.empty ? (inside[s.when.param] = inside[s.when.param] || { params: new Set(), config: new Set() }) : outside;
+    r.params.forEach((x) => to.params.add(x));
+    r.config.forEach((x) => to.config.add(x));
+  }
+  return Object.fromEntries(Object.entries(inside).map(([name, r]) => [name, {
+    params: [...r.params].filter((x) => x !== name && !outside.params.has(x)),
+    config: [...r.config].filter((x) => !outside.config.has(x)),
+  }]));
+}
+
 /** Whether a group with this condition runs with this case data; a value outside its choices is an error */
 function conditionHolds(when, params) {
   if (!isCondition(when)) throw new Error(`A condition must be { param, choices, in } or { param, empty: true }; the case file has ${JSON.stringify(when)}`);
@@ -163,4 +205,4 @@ function resolveUrl(baseUrl, path, key = 'baseUrl') {
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
-module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, isCondition, conditionHolds, optionalParamsOf, fillParams, showPlaceholders, resolveUrl };
+module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, isCondition, conditionHolds, optionalParamsOf, onlyWhenEmptyOf, fillParams, showPlaceholders, resolveUrl };
