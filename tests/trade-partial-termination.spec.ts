@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradePartialTerminationData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, type ProductData } from './support';
+import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from './support';
 
 // Mirrors trade_partial_termination.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -13,9 +13,10 @@ type Data = TradeProvisioningData & TradePartialTerminationData & ProductData;
 
 test.describe('Trade partial termination', () => {
   test('[TC-TRADE-PARTIAL-TERMINATION-UI-001] Updated trade position is reflected accurately for a trade after maker triggers Partial Termination', async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker reduces its notional with a partial termination from the trade portal and the trade details show the new notional, the trade still Live');
+    const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker reduces its notional with a partial termination from the trade portal and the trade details show the new notional, the trade still Live');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
+    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionLiveTrade(product, data)));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When(`perform Partial Termination event on the '${product}' trade`, () => flows.tradePartialTermination.terminatePartially(tradeId, data));
     await Then('the partial termination is completed successfully', () => flows.tradePartialTermination.expectCompleted());

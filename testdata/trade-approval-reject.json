@@ -1,3 +1,23 @@
 {
-  "use": ["given-trade"]
+  "use": [
+    "given-trade"
+  ],
+  "cases": [
+    {
+      "id": "TC-TRADE-APPROVE-CREATION-UI-001",
+      "tradeId": ""
+    },
+    {
+      "id": "TC-TRADE-REJECT-CREATION-UI-001",
+      "tradeId": ""
+    },
+    {
+      "id": "TC-TRADE-APPROVE-CREATION-UI-002",
+      "tradeId": ""
+    },
+    {
+      "id": "TC-TRADE-REJECT-CREATION-UI-002",
+      "tradeId": ""
+    }
+  ]
 }

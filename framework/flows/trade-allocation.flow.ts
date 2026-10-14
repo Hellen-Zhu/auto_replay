@@ -71,6 +71,8 @@ export class TradeAllocationFlow extends BaseFlow {
       const fill = () => this.ui.And(`I fill in subtrade ${i + 1}`, async () => {
         if (subTrade.counterpartyName) {
           await allocationDialog.openSubTradeCounterparty(i);
+          // the dropdown lists only a part of its entries: the one to pick is searched for first
+          await allocationDialog.searchOption(row[`subTrade${i + 1}CounterpartyName`]);
           await allocationDialog.chooseOption(row[`subTrade${i + 1}CounterpartyName`]);
         }
         if (subTrade.percentage) await allocationDialog.typeSubTradePercentage(i, row[`subTrade${i + 1}Percentage`]);

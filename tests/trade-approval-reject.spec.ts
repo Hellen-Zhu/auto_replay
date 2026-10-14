@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { StepInProvisioningData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, type ProductData } from './support';
+import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from './support';
 
 // The checker's decision on a new trade; mirrors the E2E project's approval / reject feature (its case IDs
 // are TC-TRADE-APPROVAL-REJECT-...; here every ID names the checker's decision: TC-TRADE-APPROVE-CREATION-... and
@@ -23,9 +23,10 @@ type Data = TradeProvisioningData & StepInProvisioningData & ProductData;
 
 test.describe('Trade approval and rejection', () => {
   test(`[TC-TRADE-APPROVE-CREATION-UI-001] Trade is Live when Checker approves the submission`, async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
+    const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Draft Pending Approval '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingTrade(product, data));
+    const tradeId = await Given(`a Draft Pending Approval '${product}' trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionPendingTrade(product, data)));
     await When('checker is logged in to the trade portal', () => flows.auth.login('checker'));
     await And('approves the pending trade from trade portal', () => flows.tradeApproval.approveFromTradePortal(tradeId));
     await Then('the trade is approved successfully', () => flows.tradeApproval.expectApproved());
@@ -33,9 +34,10 @@ test.describe('Trade approval and rejection', () => {
   });
 
   test(`[TC-TRADE-REJECT-CREATION-UI-001] Trade reverts to Draft when Checker rejects the submission`, async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A trade of the product in the case data is submitted through the API; checker rejects it from the trade portal and the trade is a draft again');
+    const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A trade of the product in the case data is submitted through the API; checker rejects it from the trade portal and the trade is a draft again');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Draft Pending Approval '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingTrade(product, data));
+    const tradeId = await Given(`a Draft Pending Approval '${product}' trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionPendingTrade(product, data)));
     await When('checker is logged in to the trade portal', () => flows.auth.login('checker'));
     await And('rejects the pending trade from trade portal', () => flows.tradeApproval.rejectFromTradePortal(tradeId));
     await Then('the trade is rejected successfully', () => flows.tradeApproval.expectRejected());
@@ -43,9 +45,10 @@ test.describe('Trade approval and rejection', () => {
   });
 
   test(`[TC-TRADE-APPROVE-CREATION-UI-002] StepIn Full trade is Live when Checker approves the submission`, async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A StepIn full trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
+    const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A StepIn full trade of the product in the case data is submitted through the API; checker approves it from the trade portal and the trade is live');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Draft Pending Approval '${product}' StepIn Full trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingStepInTrade(product, 'StepInFull', data));
+    const tradeId = await Given(`a Draft Pending Approval '${product}' StepIn Full trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionPendingStepInTrade(product, 'StepInFull', data)));
     await When('checker is logged in to the trade portal', () => flows.auth.login('checker'));
     await And('approves the pending trade from trade portal', () => flows.tradeApproval.approveFromTradePortal(tradeId));
     await Then('the trade is approved successfully', () => flows.tradeApproval.expectApproved());
@@ -53,9 +56,10 @@ test.describe('Trade approval and rejection', () => {
   });
 
   test(`[TC-TRADE-REJECT-CREATION-UI-002] StepIn Partial trade reverts to Draft when Checker rejects the submission`, async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A StepIn partial trade of the product in the case data is submitted through the API; checker rejects it from the trade portal and the trade is a draft again');
+    const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A StepIn partial trade of the product in the case data is submitted through the API; checker rejects it from the trade portal and the trade is a draft again');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Draft Pending Approval '${product}' StepIn Partial trade exists in the blotter`, () => flows.tradeProvisioning.provisionPendingStepInTrade(product, 'StepInPartial', data));
+    const tradeId = await Given(`a Draft Pending Approval '${product}' StepIn Partial trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionPendingStepInTrade(product, 'StepInPartial', data)));
     await When('checker is logged in to the trade portal', () => flows.auth.login('checker'));
     await And('rejects the pending trade from trade portal', () => flows.tradeApproval.rejectFromTradePortal(tradeId));
     await Then('the trade is rejected successfully', () => flows.tradeApproval.expectRejected());

@@ -35,7 +35,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `cases/<spec name>/` | Exported case files |
 | `requests/` | The API requests the case files name (a case file holds only `"ref"` for each); written by the export. The package gets only the files its cases name: earlier versions of a changed request stay out |
 | `runner/`, `portable/*.bat` | The PO's runner and its launchers |
-| `scripts/` | `build-portable`, `sync-elements`, `export-existing-trade-cases` |
+| `scripts/` | `build-portable`, `sync-elements` |
 | `mock-oreo/` | Mock OREO, for local tries only |
 | `.claude/skills/porting-java-e2e-cases/` | Claude Code skill that ports a case of the E2E project |
 
@@ -79,26 +79,22 @@ npx tsc -p .                      # type check
 | `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` | Maker allocates to 2, 3 or 4 subtrades: the case data `allocationWays`, chosen in the runner |
 | `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-UI-001` | Maker triggers the event from the trade's action menu |
 | `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002` | Maker amends the field named by the case data `amendmentField` (`Counterparty` or `Risk Portfolio`, chosen in the runner); pending checker approval |
-| `existing-trade` | `TC-TRADE-<EVENT>-EXISTING-UI-001`, `TC-TRADE-APPROVE-<WHAT>-EXISTING-UI-001`, `TC-TRADE-REJECT-<WHAT>-EXISTING-UI-001` (`<WHAT>` = `CREATION`, `CANCELLATION`, `AMENDMENT`) | On an existing trade: the maker's event (cancellation, amendment, every other lifecycle event), and the checker's approval or rejection of what is pending on the trade, whatever was changed |
 
 How the cases are cut:
 
 - **Minimal coverage.** A case is repeated per product only where the product changes what is tested (creation). Everything else runs for one product, with one case per kind of trade or outcome.
 - **The product and its dat file are case data** (`product`, `datFile`) in every case that is not repeated per product, so the PO runs it for another product by changing them before the run. A variation in data only (direction Sell, another counterparty, another dat file) is never a case of its own.
-- **A case logs in once.** What the other role did before is the `Given`, prepared through the API: a lifecycle event starts from a live trade that the maker submits and the checker approves through the API. Where no such request is known (a pending cancellation, a pending amendment), the maker's case ends at "pending checker approval" and the checker's decision is a case on an existing trade.
-- **Cases on an existing trade** are all in `tests/existing-trade.spec.ts`. After the login the case checks that the trade is in the state it starts from. The trade ID comes from, in this order:
-  1. the environment variable `OREO_TRADE_ID` (always wins);
-  2. `tradeId` of the case data (every case has its own row in `testdata/existing-trade.json` with its own `"tradeId": ""`, since an event changes its trade and the next event may not be able to run on it; never commit a real trade ID). `OREO_TRADE_ID` applies to every case of the run: set it for one case at a time;
-  3. when it is empty, the case creates the trade through the API, where the state it starts from can be created (pending approval, Live); a case that starts from a pending cancellation or amendment is skipped.
+- **A case logs in once.** What the other role did before is the `Given`, prepared through the API: a lifecycle event starts from a live trade that the maker submits and the checker approves through the API. Where no such request is known (a pending cancellation, a pending amendment), the maker's case ends at "pending checker approval".
+- **Every case whose `Given` creates its trade can also run on a trade that already exists** (there are no separate existing-trade cases). Each such case has its own `"tradeId": ""` in its test data (an event changes its trade, so the next event may not be able to run on it; never commit a real trade ID). The trade ID comes from, in this order:
+  1. the environment variable `OREO_TRADE_ID` (applies to every case of the run: set it for one case at a time);
+  2. `tradeId` of the case data;
+  3. when both are empty, the case creates the trade through the API, as before.
 
-  Where the trade can be created, the exported case file is the same whichever source the run took: it holds the API steps that create the trade, run only while `tradeId` is empty, and `tradeId` is empty. In the runner the PO leaves `tradeId` empty (the case creates its trade, also in a batch) or changes it by its number to an existing trade's ID (the creating steps are then "not needed"; `-` empties it again). A case that starts from a pending cancellation or amendment always asks for the ID and cannot be part of a batch. `npm run export:existing-trade` runs the cases one after another on trades it creates, so that those cases are exported too: it creates each trade through the API with the case data of the case it is for (product, dat file, trade type of `testdata/existing-trade.json` and `testdata/shared/given-trade.json`). A case changes its trade, so it cannot be repeated on the same one:
+  The exported case file is the same whichever source the run took: it holds the API steps that create the trade, run only while `tradeId` is empty, and `tradeId` is empty. In the runner the PO leaves `tradeId` empty (the case creates its trade, also in a batch) or changes it by its number to an existing trade's ID (the creating steps are then "not needed"; `-` empties it again). Nothing checks that a given trade is in the state the case starts from: a wrong trade fails at the first step that needs that state.
 
   ```bash
-  # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-TRADE-CANCELLATION-EXISTING-UI-001"
-  OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-TRADE-CANCELLATION-EXISTING-UI-001"
-  npm run export:existing-trade                # creates three trades through the API and runs the approval and cancellation cases on them
-  npm run export:existing-trade -- --product=FX_PSCRIPT --datFile=FX_PSCRIPT.dat --tradeType=StepInFull   # the same for another product, dat file or trade type
-  npm run export:existing-trade -- --events    # also the cases of the event specs; one more real trade per case
+  # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-TRADE-CANCELLATION-UI-001"
+  OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-TRADE-CANCELLATION-UI-001"
   ```
 
 Not every case has been run on the real system, and some were never run at all: the status per event and what still has to be checked are in `CLAUDE.md`, section 10.
@@ -251,7 +247,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
 3. The runner lists the settings (address, account) and the **case data** of the case, with `Run the case` highlighted below them. **Enter** starts the run; **Up / Down** move to a value and **Enter** changes it: a product or dat file is picked from a list in the same way, any other value is typed. In the plain numbered list (step 2) every line has a number instead: type it to change that value (several at once also work: `2 5`).
    - **Passwords are always typed in** (hidden), once per account and window. A password in `config.local.json` is not used, and none is ever saved.
    - A change of case data applies to this run only; the case file is not modified. A product or a dat file is chosen from the ones in the package.
-   - A case on an existing trade asks `Enter tradeId:`.
+   - `tradeId` (in the case data of a case that creates its trade): leave it empty to create a new trade, or enter the ID of an existing one.
    - A typed-in address or account can be saved to `config.local.json` for next time.
 4. Edge opens and runs the steps. Press `P` in the console window to pause after the current step, Enter to resume; Ctrl+C stops the run.
 5. The report opens: one row per Given / When / Then step with its result and screenshot, and the values the run produced (e.g. the ID of the trade it created). The console and the report also give two links: **Report** and **Full replay** (Playwright's trace viewer). They work on this computer only, while the runner window is open.

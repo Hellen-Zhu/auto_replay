@@ -2,5 +2,8 @@
   "use": [
     "given-trade",
     "early-termination"
-  ]
+  ],
+  "defaults": {
+    "tradeId": ""
+  }
 }

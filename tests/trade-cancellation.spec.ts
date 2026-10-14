@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradeCancellationData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, type ProductData } from './support';
+import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from './support';
 
 // Mirrors trade_cancellation.feature of the E2E project, steps included. The live trade of the Given is created
 // through the API (flows.tradeProvisioning), so the case needs apiBaseUrl in the local config.
@@ -13,9 +13,10 @@ import { givenProduct, type ProductData } from './support';
 
 test.describe('Trade cancellation', () => {
   test('[TC-TRADE-CANCELLATION-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it', async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<TradeProvisioningData & TradeCancellationData & ProductData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker cancels it from the trade portal and the cancellation is pending checker approval');
+    const { product, data } = givenProduct(flows, testData<TradeProvisioningData & TradeCancellationData & ProductData & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker cancels it from the trade portal and the cancellation is pending checker approval');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
+    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionLiveTrade(product, data)));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When('perform cancellation for the trade from trade portal', () => flows.tradeCancellation.cancelFromTradePortal(tradeId, data));
     await Then('the cancellation is submitted successfully', () => flows.tradeCancellation.expectSubmitted());

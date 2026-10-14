@@ -2,5 +2,8 @@
   "use": [
     "given-trade",
     "step-out-full"
-  ]
+  ],
+  "defaults": {
+    "tradeId": ""
+  }
 }

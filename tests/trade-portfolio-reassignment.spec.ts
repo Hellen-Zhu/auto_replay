@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradePortfolioReassignmentData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, type ProductData } from './support';
+import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from './support';
 
 // Mirrors trade_portfolio_reassignment.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -15,9 +15,10 @@ type Data = TradeProvisioningData & TradePortfolioReassignmentData & ProductData
 
 test.describe('Trade portfolio reassignment', () => {
   test('[TC-TRADE-PORTFOLIO-REASSIGNMENT-UI-001] Updated portfolio is displayed for a trade after maker triggers Portfolio Reassignment', async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker moves it to another portfolio from the trade portal; the trade is still Live with the event status Amended and its trade details show the new portfolio');
+    const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker moves it to another portfolio from the trade portal; the trade is still Live with the event status Amended and its trade details show the new portfolio');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
+    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionLiveTrade(product, data)));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When(`perform Portfolio Reassignment event on the '${product}' trade`, () => flows.tradePortfolioReassignment.reassignPortfolio(tradeId, data));
     await Then('the portfolio reassignment is completed successfully', () => flows.tradePortfolioReassignment.expectCompleted());

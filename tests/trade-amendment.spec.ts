@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradeAmendmentData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, type ProductData } from './support';
+import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from './support';
 
 // Mirrors trade_amendment.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -21,9 +21,10 @@ type Data = TradeProvisioningData & TradeAmendmentData & ProductData;
 
 test.describe('Trade amendment', () => {
   test('[TC-TRADE-AMENDMENT-UI-002] Amendment of a Live trade is pending checker approval after Maker submits it', async ({ Given, When, Then, And, flows, testData }) => {
-    const { product, data } = givenProduct(flows, testData<Data>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker changes the field named by the case data amendmentField (Counterparty or Risk Portfolio) in the trade details and the amendment is pending checker approval');
+    const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker changes the field named by the case data amendmentField (Counterparty or Risk Portfolio) in the trade details and the amendment is pending checker approval');
+    givenTrade(flows, data);
 
-    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
+    const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.trades.orCreate(() => flows.tradeProvisioning.provisionLiveTrade(product, data)));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When("perform amendment for '${param:amendmentField}' on the trade", () => flows.tradeAmendment.amend(tradeId, data));
     await Then('the amendment is pending checker approval', () => flows.tradeAmendment.expectPendingCheckerApproval(tradeId));

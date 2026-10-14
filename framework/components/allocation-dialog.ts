@@ -14,6 +14,13 @@ export class AllocationDialog extends BaseComponent {
 
   protected static readonly subTradeCounterparty = "[data-testid='allocation-sub-trade-counterparty-select']";
   protected static readonly subTradePercentage = "[data-testid='allocation-sub-trade-percentage-input']";
+  /**
+   * The search box at the top of an open counterparty dropdown. The dropdown renders only a part of its entries,
+   * so an entry further down is not there to click until its name is typed in. Inferred from a screenshot of the
+   * real system (placeholder "Search counterparties..."); it has no element or testid yet. Only the dropdown that is
+   * open is visible, hence ":visible"
+   */
+  protected static readonly openDropdownSearch = { css: "input[placeholder^='Search counterpart' i]:visible" } as const;
 
   // Text fields are web components: the real control is in their shadow root
   protected readonly numberSplitInput = element('allocation_dialog.number_split_input', { inner: INNER_INPUT });
@@ -35,9 +42,14 @@ export class AllocationDialog extends BaseComponent {
     return { role: 'menuitem', name, exact: true };
   }
 
-  /** Opens the counterparty dropdown of a subtrade; the counterparty is then picked with chooseOption */
+  /** Opens the counterparty dropdown of a subtrade; the counterparty is then searched and picked with chooseOption */
   async openSubTradeCounterparty(index: number) {
     await this.ui.click(this.inSubTrade(index, AllocationDialog.subTradeCounterparty));
+  }
+
+  /** Types into the search box of the open counterparty dropdown, so that the entry is listed */
+  async searchOption(value: Val) {
+    await this.ui.fill(AllocationDialog.openDropdownSearch, value);
   }
 
   async chooseOption(value: Val) {
