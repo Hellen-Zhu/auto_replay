@@ -34,6 +34,14 @@ export abstract class BaseFlow {
   }
 
   /**
+   * Like input(), but the value may be empty: the PO may enter one or leave it empty, and the case then gives it a
+   * value itself (orCreate of TradesFlow). Returns the value, '' when there is none.
+   */
+  protected optionalInput(name: string, value: string): string {
+    return this.ui.optionalInput(name, value);
+  }
+
+  /**
    * A value that decides what the case works on (the product) as case data the PO can change: it is recorded as
    * ${param:name} wherever a step uses it, and the case file keeps the value given here. Returns the value.
    */

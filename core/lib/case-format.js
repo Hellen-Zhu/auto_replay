@@ -16,7 +16,10 @@
 // values of that case data (values.js); in the flat list every action of the substep carries it
 // 14 = an api step may name its request instead of holding it: { action: 'api', ref: '<id>' }, the request being the
 // file requests/<id>.json of the package (expandRequests below)
-const FORMAT_VERSION = 14;
+// 15 = adds the condition { param, empty: true } (the group runs while that case data is empty) and the action set,
+// { action: 'set', param, value }, which gives case data its value at run time: a case on an existing trade
+// creates its trade when no trade ID was entered (values.js, execute.js)
+const FORMAT_VERSION = 15;
 
 const fs = require('fs');
 const path = require('path');

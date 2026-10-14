@@ -140,7 +140,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
 
       if (notNeeded(step)) {
         rec.status = 'notNeeded';
-        rec.note = `not needed: ${step.when.param} is ${ctx.params[step.when.param]}`;
+        rec.note = step.when.empty ? `not needed: ${step.when.param} is given (${ctx.params[step.when.param]})` : `not needed: ${step.when.param} is ${ctx.params[step.when.param]}`;
         if (title) say(`  ■ ${title}`);
         if (substep) say(`    - ${substep} (${rec.note})`);
         continue;

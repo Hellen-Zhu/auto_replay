@@ -2,6 +2,9 @@
   "use": [
     "given-trade"
   ],
+  "defaults": {
+    "tradeId": ""
+  },
   "cases": [
     {
       "id": "TC-TRADE-CANCELLATION-EXISTING-UI-001",

@@ -53,15 +53,16 @@ const CHECK: Record<TradeState, (flows: Flows, tradeId: string) => Promise<void>
 };
 
 /**
- * The trade a case on an existing trade works on. Where it comes from, the first that is there:
+ * The trade a case on an existing trade works on: case data "tradeId". Its value, the first that is there:
  *   1. the environment variable OREO_TRADE_ID: the ID of a trade in the system, for this run;
- *   2. "tradeId" in the case's row of the test data: the same, kept with the case;
- *   3. neither: a new trade is created through the API in the state the case starts from, like the Given of the
- *      event's own case (product, dat file and trade type of the shared block "given-trade").
- * With 1 and 2 the ID is case data that is entered for every run: the exported case file holds no ID and the PO
- * types one in the runner. With 3 the exported file creates its own trade on every replay instead.
- * A state no API request is known for (a pending cancellation, a pending amendment) cannot be created: without an
- * ID the case is skipped. So is a case that would create its trade while the dat file is missing.
+ *   2. "tradeId" in the case's test data ("" in the committed files: never commit a real trade ID);
+ *   3. neither: empty, and the case creates a new trade through the API in the state it starts from, like the
+ *      Given of the event's own case (product, dat file and trade type of the shared block "given-trade").
+ * The exported case file always has "tradeId" empty and holds the steps that create the trade, which run only while
+ * it is empty: the PO enters an ID in the runner to work on that trade, or leaves it empty to get a new one.
+ * A state no API request is known for (a pending cancellation, a pending amendment) cannot be created: there the ID
+ * is needed, the case is skipped without one and its case file asks the PO for it on every run. A case that may
+ * create its trade is skipped while the dat file is missing, also with an ID, since its case file names that file.
  * Sets the description shown to the PO. Returns the rest of the data for the flows, and "ready", which the case
  * calls in its step after the login: it creates the trade when there is none, checks that the trade is in the
  * state the case starts from (a wrong trade fails there and nothing is done to it) and returns the trade ID.
@@ -75,16 +76,19 @@ export function givenTrade<T extends GivenTradeData>(flows: Flows, row: T, state
     return id;
   };
 
-  if (given) {
+  const provision = PROVISION[state];
+  if (!provision) {
+    // the ID is needed for every run: the case file asks the PO for it
+    test.skip(!given, 'No trade ID is given (OREO_TRADE_ID, or "tradeId" in the test data) and a trade in the state this case starts from cannot be created through the API');
     test.info().annotations.push({ type: 'description', description });
     return { data, ready: ready(flows.trades.existingTrade(given)) };
   }
-  const provision = PROVISION[state];
-  test.skip(!provision, 'No trade ID is given (OREO_TRADE_ID, or "tradeId" in the test data) and a trade in the state this case starts from cannot be created through the API');
   if (!data.product) throw new Error('A case that creates its trade needs "product" in its test data: list the shared block "given-trade" under "use"');
+  // the case file holds the steps that create the trade too: its dat file is needed whether this run creates one or not
   prepare(data.product, description, data.datFile);
+  flows.trades.givenTrade(given);
   const product = flows.tradeCreation.productAsCaseData(data.product);
-  return { data, ready: ready(() => provision!(flows, product, data as unknown as TradeProvisioningData)) };
+  return { data, ready: ready(() => flows.trades.orCreate(() => provision(flows, product, data as unknown as TradeProvisioningData))) };
 }
 
 /**

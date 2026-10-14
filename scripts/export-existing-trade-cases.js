@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-// Runs the cases of tests/existing-trade.spec.ts on trades it creates, so that their case files are exported in the
-// form the PO needs: the trade ID is entered in the runner.
+// Runs the cases of tests/existing-trade.spec.ts on trades it creates, one after another on the same trade, so that
+// every case of a chain is run and exported, also those whose start state cannot be created through the API.
 //
 //   npm run export:existing-trade
 //   npm run export:existing-trade -- --events          (also the TC-TRADE-<EVENT>-EXISTING-UI-... cases of that spec)
 //   npm run export:existing-trade -- --product=FX_DCD --datFile=FX_DCD.dat --tradeType=StepInFull --headed
 //
-// Without a trade ID those cases create their own trade (and their exported case file would do the same), or are
-// skipped when the state they start from cannot be created. This script gives each the ID of a trade in
-// OREO_TRADE_ID. Each trade is created through the API (scripts/provision/given-trade.spec.ts) in the state the
+// The exported file of a case whose start state can be created (pending approval, live) is the same with or without
+// an ID: it holds the API steps that create the trade, run only while the case data tradeId is empty, and tradeId
+// empty, so the PO either enters an ID or lets the case create its trade. A case whose start state cannot be created
+// (a pending cancellation or amendment) is skipped without an ID; its file always asks for the ID. This script gives
+// each case the ID of a trade in OREO_TRADE_ID. Each trade is created through the API (scripts/provision/given-trade.spec.ts) in the state the
 // first case of its chain starts from, with the data of that case: product, dat file, trade type and values of
 // testdata/existing-trade.json and its shared blocks ("given-trade"), as when the case creates its own trade.
 // --product, --datFile and --tradeType replace those values for every trade of the run; another product without

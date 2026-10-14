@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf } = require('../../core/actions');
+const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf } = require('../../core/actions');
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
@@ -42,7 +42,11 @@ const caseDataOf = (doc, params) => Object.keys(params).map((name) => {
   return { name, value: showPlaceholders(params[name]), ...(params[name] !== original && original !== '' ? { changedFrom: showPlaceholders(original) } : {}) };
 });
 // Case data without a value in the case file (version 6): what only the PO knows, e.g. the ID of an existing trade
-const askedParamsOf = (doc) => Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '');
+// case data that may stay empty (the case then gives it its value itself, e.g. creates the trade) is not asked for
+const askedParamsOf = (doc) => {
+  const optional = optionalParamsOf(doc.steps);
+  return Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '' && !optional.includes(k));
+};
 
 // Case data that names a data file, or the folder it is in (testdata/dat/${param:product}/${param:datFile}), can only be
 // what the package has: name -> the values to choose from, in alphabetical order, for the case data as it is now.
@@ -143,7 +147,10 @@ async function askSettings(list, config) {
   const hasSettings = ['baseUrl', ...required.filter((k) => !isSecret(k))].some((k) => !isEmpty(get(k)));
   const settingKeys = hasSettings ? ['baseUrl', ...required] : [];
   const secrets = required.filter(isSecret);
-  const changeable = paramNames.filter((n) => params[n] !== ''); // a value that is still to be entered is asked for anyway
+  // case data the case may give a value itself (the ID of a trade it otherwise creates): the PO may enter one or not
+  const optional = single ? optionalParamsOf(single.steps) : [];
+  // a value that is still to be entered is asked for anyway
+  const changeable = paramNames.filter((n) => params[n] !== '' || optional.includes(n));
   // values that name a data file, in the order of the path: what can be chosen for the file depends on the folder
   // that was chosen before it
   const ordered = single ? choiceOrder(single).filter((k) => changeable.includes(k)) : [];
@@ -154,7 +161,8 @@ async function askSettings(list, config) {
   const keys = useKeys();
   const no = (i) => (keys ? '' : `${String(i + 1).padStart(numbered.length > 9 ? 2 : 1)}. `);
   const settingText = (k) => (isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k));
-  const paramText = (k) => (params[k] === '' ? '(to be entered below)' : showData(params[k]));
+  const paramText = (k) => (params[k] !== '' ? showData(params[k])
+    : optional.includes(k) ? '(empty: the case creates a new one)' : '(to be entered below)');
   const show = () => {
     if (hasSettings) {
       console.log('\nSettings for this run:');
@@ -199,6 +207,13 @@ async function askSettings(list, config) {
       ? `${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}`
       : `${k}: the values this case can be run with`);
     if (!list || !list.length) {
+      if (optional.includes(k)) {
+        // it can also be made empty again: the case then creates a new one
+        const v = (await ask(`  ${k} [${params[k] === '' ? 'empty' : params[k]}] (Enter keeps it; type - to leave it empty and create a new one): `)).trim();
+        if (v === '-') params[k] = '';
+        else if (v !== '') params[k] = v;
+        return;
+      }
       const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it): `);
       if (v !== '') params[k] = v;
       return;
@@ -303,7 +318,7 @@ async function askSettings(list, config) {
   }
 
   // Case data the case file leaves empty must be entered: the case has nothing to work on without it
-  for (const k of paramNames.filter((n) => params[n] === '')) {
+  for (const k of paramNames.filter((n) => params[n] === '' && !optional.includes(n))) {
     while (params[k] === '') {
       params[k] = (await ask(`Enter ${k}: `)).trim();
       if (params[k] === '' && state.inputEnded) throw new Error(`Case data ${k} was not entered`);

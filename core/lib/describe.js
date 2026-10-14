@@ -35,6 +35,7 @@ function describeStep(step, vars, params, config) {
     case 'expectText': return `Verify ${t} ${step.exact ? 'equals' : 'contains'} ${v}`;
     case 'expectUrl': return `Verify current page is ${v}`;
     case 'wait': return `Wait ${v} ms`;
+    case 'set': return `Take ${v} as ${step.param}`;
     case 'api': {
       // Header values are shown like any other text: a config reference by its name, never by its value
       const headers = Object.entries(step.headers || {}).map(([k, h]) => `${k}: ${showPlaceholders(h, vars, params)}`);

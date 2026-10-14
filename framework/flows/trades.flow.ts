@@ -18,6 +18,27 @@ export class TradesFlow extends BaseFlow {
     return this.input('tradeId', tradeId);
   }
 
+  /**
+   * The trade a case works on when it may also create one (case data "tradeId", which may stay empty): the PO enters
+   * the ID of a trade before the run, or leaves it empty. Returns the ID, '' when there is none: orCreate then
+   * creates the trade.
+   */
+  givenTrade(tradeId: string): string {
+    return this.optionalInput('tradeId', tradeId);
+  }
+
+  /**
+   * The given trade, or a new one: the steps of create run only while the case data "tradeId" is empty, and the
+   * trade they create becomes its value. The case file holds them either way, so a replay with an entered ID works on
+   * that trade and one without creates its own. Returns the ID of the trade the case works on.
+   */
+  async orCreate(create: () => Promise<string>): Promise<string> {
+    return this.ui.onlyWhenEmpty('tradeId', async () => {
+      const created = await create();
+      return this.ui.And('I take the new trade as the given trade', () => this.ui.setParam('tradeId', created));
+    });
+  }
+
   /** Where every action on an existing trade starts: its row in the blotter, with the action menu open */
   async openActionMenu(tradeId: string, keyword: Keyword = 'When') {
     const { trades } = this.app;

@@ -96,13 +96,15 @@ export type ApiCall = {
  * A group of actions that runs only for some values of a case data (case format version 13): choices are the values
  * the case data may have, in those for which the group runs
  */
-export type Condition = { param: string; choices: string[]; in: string[] };
+export type Condition = { param: string; choices: string[]; in: string[] } | { param: string; empty: true };
 
 type Step = {
   title?: string;
   substep?: string;
   when?: Condition;
   action: string;
+  // set steps only: the case data the step gives its value (format version 15)
+  param?: string;
   target?: Target;
   value?: string;
   saveAs?: string;
@@ -189,6 +191,39 @@ export class UI {
     }
   }
 
+  /**
+   * Actions that run only while case data has no value (case format version 15), e.g. creating the given trade when
+   * no trade ID was entered; end the group with setParam() to give the case data its value. Like onlyWhen they are
+   * recorded whatever the value of this run, so the case file holds both ways and the runner takes the one the data
+   * of its run needs. Steps that are not run return placeholders of what they would save (${var:name}), so that the
+   * steps after them are recorded as they would run.
+   */
+  async onlyWhenEmpty<R>(name: string, fn: () => Promise<R>): Promise<R> {
+    if (this.condition) throw new Error('onlyWhenEmpty cannot be nested in onlyWhen or onlyWhenEmpty');
+    if (this.paramValues[name] === undefined) throw new Error(`onlyWhenEmpty: case data "${name}" is not known yet: register it with optionalInput() first`);
+    this.condition = { param: name, empty: true };
+    try {
+      return await fn();
+    } finally {
+      this.condition = undefined;
+    }
+  }
+
+  /**
+   * Gives case data its value for the rest of the run (a set step, case format version 15), e.g. the ID of the trade
+   * an onlyWhenEmpty group created: value is a variable an earlier step saved and is recorded as ${var:name}. From
+   * here on a use of the value is recorded as ${param:name}, as for input().
+   */
+  async setParam(name: string, value: string): Promise<string> {
+    if (!(name in this.inputs)) throw new Error(`setParam: "${name}" is not case data of optionalInput()`);
+    const set = await this.run({ action: 'set', param: name, value });
+    if (set === undefined) return this.paramValues[name]; // not run: this run has a value already
+    this.literals[name] = set;
+    // the variable that holds the same value would win over the case data when the later steps are recorded
+    for (const [k, v] of Object.entries(this.vars)) if (v === set) delete this.vars[k];
+    return set;
+  }
+
   // ---------- Case data ----------
   /**
    * Case data as parameters: with p = ui.params(data), p.counterpartyName is recorded as ${param:counterpartyName}
@@ -231,6 +266,21 @@ export class UI {
     this.param(name, value);
     this.inputs[name] = value;
     return value;
+  }
+
+  /**
+   * Case data the person who runs the case may enter or leave empty (case format version 15), e.g. the ID of the trade
+   * a case works on: empty, an onlyWhenEmpty group of the case gives it its value. Like input() the case file gets the
+   * name with an empty value; the runner shows it and the PO may enter a value or leave it empty.
+   */
+  optionalInput(name: string, value: string): string {
+    if (value === '') {
+      if (!/^[\w-]+$/.test(name)) throw new Error(`Test data name "${name}" may only contain letters, digits, _ and -`);
+      this.paramValues[name] = '';
+      this.inputs[name] = '';
+      return '';
+    }
+    return this.input(name, value);
   }
 
   /**
@@ -356,6 +406,11 @@ export class UI {
     // An action this run's case data does not need is recorded only, for a replay with other data
     if (this.condition && !core.conditionHolds(this.condition, this.paramValues)) {
       this.steps.push({ ...group, ...recorded });
+      // what it would have saved, as placeholders: the steps after it are recorded as in a run that needs it
+      const v = (name: string) => '${var:' + name + '}';
+      if (recorded.save) return Object.fromEntries(Object.keys(recorded.save).map((k) => [k, v(k)]));
+      if (recorded.saveAs) return v(recorded.saveAs);
+      if (recorded.capture) return v(recorded.capture.saveAs);
       return undefined;
     }
     const result = await core.executeStep(this.page, recorded, { config: this.config, vars: this.vars, params: this.paramValues, rootDir: this.rootDir });
@@ -534,6 +589,8 @@ function stepTexts(steps: Step[]): string[] {
 /** The case data the steps really use, in the order of first use; this becomes the params block of the case file */
 function usedParams(steps: Step[], values: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
+  // case data that may stay empty comes first: the steps that give it its value are the first of the case
+  for (const s of steps) if (s.when && 'empty' in s.when) out[s.when.param] = values[s.when.param];
   for (const t of stepTexts(steps)) for (const m of t.matchAll(/\$\{param:([^}]+)\}/g)) out[m[1]] = values[m[1]];
   // case data that decides a part of a request is used too, although no text holds it
   for (const name of Object.keys(core.paramChoicesOf(steps))) out[name] = values[name];

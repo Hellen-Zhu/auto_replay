@@ -95,6 +95,13 @@ async function executeStep(page, step, ctx) {
       return;
     case 'api':
       return callApi(page, step, value, ctx, timeout);
+    case 'set':
+      // Gives case data its value for the rest of the run (format version 15): the ID of the trade a group created
+      // when none was entered. The case file itself is never changed
+      if (typeof step.param !== 'string' || !step.param) throw new Error('A set step needs the name of its case data (param)');
+      if (value === undefined || String(value) === '') throw new Error(`Nothing to set ${step.param} to: ${step.value} has no value`);
+      ctx.params[step.param] = String(value);
+      return String(value);
     default:
       throw new Error(`Unsupported action: ${step.action}`);
   }
@@ -109,6 +116,7 @@ function savedValues(step, result) {
   if (step.action === 'read') return { [step.saveAs]: result };
   if (step.capture) return { [step.capture.saveAs]: result };
   if (step.action === 'api') return result || {};
+  if (step.action === 'set') return { [step.param]: result };
   return {};
 }
 
