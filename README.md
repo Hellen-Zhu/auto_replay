@@ -253,6 +253,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
    - A change of case data applies to this run only; the case file is not modified. A product or a dat file is chosen from the ones in the package.
    - A case that creates its trade first asks **which trade it runs on**: create a new one (through the API), or use an existing one (type its `tradeId`). With an existing trade the data and the account needed only to create a trade are not shown or asked for. The trade must be in the state the case starts from, and the run changes it.
    - A typed-in address or account can be saved to `config.local.json` for next time.
+   - **Chose the wrong case?** Press **Esc** (in the plain numbered list: type `B`) at the trade question or in this list to go back to the case list. Nothing has run then.
 4. Edge opens and runs the steps. Press `P` in the console window to pause after the current step, Enter to resume; Ctrl+C stops the run.
 5. The report opens: one row per Given / When / Then step with its result and screenshot, and the values the run produced (e.g. the ID of the trade it created). The console and the report also give two links: **Report** and **Full replay** (Playwright's trace viewer). They work on this computer only, while the runner window is open. **Play the screenshots** at the top of the report (or a click on any screenshot) plays the step screenshots one after another at full size, with the step each belongs to; it works from the evidence folder alone. In the trace viewer, click an action to see the page sharply in the large view: its playback strip is recorded small by Playwright and looks blurred.
 6. After a single case the browser stays open, so you can look at the result or go on by hand (that is not in the report). Press Enter to close it and choose the next case, or type `Q` to close the window.
@@ -262,7 +263,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
 
 - Tick cases with Space and press Enter, or drag a folder or several case files onto run-case.bat. A folder of cases can also be dropped into the open window (one file or one folder per drop), then Enter.
 - The settings are asked for once; case data cannot be changed (run a case on its own for that).
-- Then choose: **Enter** = one after another; **a number** (2 to 8) = that many at the same time, each in its own Edge window. Running at the same time logs the same account in from several browsers: start with 2.
+- Then choose: **Enter** = one after another; **a number** (2 to 8) = that many at the same time, each in its own Edge window. `B` (or Esc in the settings list before it) goes back to the case list. Running at the same time logs the same account in from several browsers: start with 2.
 - A case that cannot be run (it needs a newer runner, a data file is missing, it needs a trade ID) is left out and listed.
 - At the end a summary opens (`evidence/batch_<time>/report.html`): one row per case with its result, values and links.
 

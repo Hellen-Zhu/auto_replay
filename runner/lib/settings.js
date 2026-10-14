@@ -129,6 +129,11 @@ function checkCase({ file, doc }, params) {
 // run. (QA's Playwright run still reads riskEngine from its config and may mock it.)
 const FIXED_SETTINGS = { riskEngine: 'real' };
 
+// What askSettings (and runCase / runBatch after it) returns when the PO goes back to the case list instead of
+// running: Esc in a list, B at a typed prompt. Nothing has been started then, and no evidence folder written
+const BACK = Symbol('back');
+const isBack = (answer) => /^b(ack)?$/i.test(String(answer).trim());
+
 // The local settings the cases need, without the fixed ones. For several cases: each setting once, the API address
 // first as in a case file
 function requiredOf(list) {
@@ -141,7 +146,8 @@ function requiredOf(list) {
 /**
  * Everything that is asked before a run: shows the settings (and, for a single case, its case data), lets the PO
  * change them and asks for what is missing. Several cases are asked once, for the settings they need together.
- * Returns the case data to run with and the function that asks for a setting a step turns out to need.
+ * Returns the case data to run with and the function that asks for a setting a step turns out to need, or BACK
+ * when the PO goes back to the case list.
  */
 async function askSettings(list, config) {
   const single = list.length === 1 ? list[0].doc : null;
@@ -287,7 +293,9 @@ async function askSettings(list, config) {
   // a new one or runs on an existing one, whose ID is then typed in. Only for a new one is the data it is created
   // with (and the account that approves it) listed.
   const noun = (k) => k.replace(/Id$/, '') || k;
-  const chooseGiven = async (k) => {
+  // first: the question that opens the settings, where Esc (or B) goes back to the case list; asked again from the
+  // list of case data, Esc keeps the current choice
+  const chooseGiven = async (k, first = false) => {
     const NEW = 'new';
     const OLD = 'existing';
     const options = [
@@ -298,16 +306,18 @@ async function askSettings(list, config) {
     let pick;
     if (keys) {
       const r = await pickRow({ rows: [{ text: `Which ${noun(k)} does the case run on?` }, ...options.map((o) => ({ text: `  ${o.text}${o.value === current ? '  (current)' : ''}`, value: o.value }))],
-        start: current, hint: 'Up/Down: move   Enter: choose   Esc: keep the current choice' });
+        start: current, hint: `Up/Down: move   Enter: choose   Esc: ${first ? 'back to the case list' : 'keep the current choice'}` });
+      if (r.esc && first) return BACK;
       pick = r.value || current;
     } else {
       console.log(`\nWhich ${noun(k)} does the case run on?`);
       options.forEach((o, i) => console.log(`  ${i + 1}. ${o.text}${o.value === current ? '  (current)' : ''}`));
       for (;;) {
-        const v = (await ask(`Type 1 or 2 (Enter keeps ${options.findIndex((o) => o.value === current) + 1}): `)).trim();
+        const v = (await ask(`Type 1 or 2 (Enter keeps ${options.findIndex((o) => o.value === current) + 1}${first ? ', B goes back to the case list' : ''}): `)).trim();
+        if (first && isBack(v)) return BACK;
         pick = v === '' ? current : v === '1' ? NEW : v === '2' ? OLD : null;
         if (pick || state.inputEnded) break;
-        console.log('  Type 1 or 2.');
+        console.log(first ? '  Type 1 or 2, or B to go back to the case list.' : '  Type 1 or 2.');
       }
       pick = pick || current;
     }
@@ -320,7 +330,7 @@ async function askSettings(list, config) {
     }
   };
   for (const k of optional.filter((n) => n in params)) {
-    await chooseGiven(k);
+    if (await chooseGiven(k, true) === BACK) return BACK;
     renumber();
   }
 
@@ -335,7 +345,7 @@ async function askSettings(list, config) {
   // goes on. The row that is highlighted first is the last one, so that plain Enter still starts the run.
   if (keys && numbered.length) {
     const RUN = {};
-    const hint = 'Up/Down: move   Enter: change the highlighted value, or continue   Ctrl+C: close';
+    const hint = 'Up/Down: move   Enter: change the highlighted value, or continue   Esc: back to the case list   Ctrl+C: close';
     let told = false;
     console.log('');
     for (;;) {
@@ -350,7 +360,7 @@ async function askSettings(list, config) {
       }
       rows.push({ text: single ? 'Run the case' : `Run the ${list.length} cases`, value: RUN });
       const r = await pickRow({ rows, start: RUN, hint, keys: ['s'] });
-      if (r.esc) continue;
+      if (r.esc) return BACK;
       if ((r.key === 's' || r.value === RUN) && single && distinctProblem(single, params)) {
         console.log(`${distinctProblem(single, params)}. Change one of them.\n`);
         continue;
@@ -370,7 +380,8 @@ async function askSettings(list, config) {
     if (changed) { renumber(); show(); }
     changed = false;
     const range = numbered.length === 1 ? 'type 1 to change it' : `type a number (1-${numbered.length}) to change that value`;
-    const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or ${range}: `)).trim().toLowerCase();
+    const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, ${range}, or B to go back to the case list: `)).trim().toLowerCase();
+    if (isBack(answer)) return BACK;
     if ((answer === '' || answer === 's') && single && distinctProblem(single, params)) {
       if (state.inputEnded) throw new Error(distinctProblem(single, params));
       console.log(`  ${distinctProblem(single, params)}. Type the number of one of them to change it.`);
@@ -430,4 +441,4 @@ async function askSettings(list, config) {
   return { params, askConfig, stepByStep };
 }
 
-module.exports = { FIXED_SETTINGS, setCfg, paramsOf, caseDataOf, askedParamsOf, checkCase, askSettings };
+module.exports = { BACK, isBack, FIXED_SETTINGS, setCfg, paramsOf, caseDataOf, askedParamsOf, checkCase, askSettings };

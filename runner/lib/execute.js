@@ -10,7 +10,7 @@ const state = require('./state');
 const { interactive, askOptional, discardTyped, setQuietKeys } = require('./console');
 const { writeReport } = require('./report');
 const { reportUrl, traceUrl } = require('./view-server');
-const { paramsOf, caseDataOf, checkCase, askSettings, FIXED_SETTINGS } = require('./settings');
+const { BACK, paramsOf, caseDataOf, checkCase, askSettings, FIXED_SETTINGS } = require('./settings');
 
 // A new folder evidence/<name>_<timestamp>. The timestamp has seconds only, so two runs of one case that start in
 // the same second (cases running at the same time) would share a folder: the later one gets the next free second.
@@ -298,10 +298,12 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
   return { run, dir, browser: kept ? browser : null };
 }
 
-/** One case: its settings and case data are asked, then it runs with every step shown */
+/** One case: its settings and case data are asked, then it runs with every step shown. BACK: the PO went back */
 async function runCase(chosen, config) {
   checkCase(chosen);
-  const { params, askConfig, stepByStep } = await askSettings([chosen], config);
+  const asked = await askSettings([chosen], config);
+  if (asked === BACK) return BACK;
+  const { params, askConfig, stepByStep } = asked;
   checkCase(chosen, params);
   // On a console the browser stays open after the run, so that the PO can look at the page the case ended on
   return executeCase(chosen, config, { params, stepByStep, askConfig, keepOpen: interactive });

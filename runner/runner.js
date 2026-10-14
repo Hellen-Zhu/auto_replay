@@ -31,7 +31,7 @@ const { rl, interactive, askOptional, discardTyped, printError } = require('./li
 const { QUIT, chooseCases, casesFromArgs } = require('./lib/case-tree');
 const { openFile } = require('./lib/report');
 const { viewPort, viewBase, startViewServer, serveUntilEnter } = require('./lib/view-server');
-const { setCfg, FIXED_SETTINGS } = require('./lib/settings');
+const { BACK, setCfg, FIXED_SETTINGS } = require('./lib/settings');
 const { runCase } = require('./lib/execute');
 const { runBatch } = require('./lib/batch');
 const { recordSession } = require('./lib/record');
@@ -97,13 +97,18 @@ async function main() {
       if (!chosen) { if (first) return 2; break; }
       // One case runs with every step on the screen; several run as a batch that ends with a summary
       let status, dir;
+      // Back to the case list: nothing ran, so there is nothing to report and nothing to ask
+      const back = () => { console.log(interactive ? '\nBack to the case list.' : '\nNothing was run.'); };
       if (chosen.length === 1) {
         const one = await runCase(chosen[0], config);
+        if (one === BACK) { back(); if (!interactive) break; continue; }
         status = one.run.status;
         dir = one.dir;
         kept = one.browser;
       } else {
-        ({ status, dir } = await runBatch(chosen, config));
+        const batch = await runBatch(chosen, config);
+        if (batch === BACK) { back(); if (!interactive) break; continue; }
+        ({ status, dir } = batch);
       }
       ran = true;
       if (status !== 'passed') state.sessionFailed = true;

@@ -6,7 +6,7 @@ const state = require('./state');
 const { askOptional, setQuietKeys, fmtSec, plural, printError } = require('./console');
 const { esc } = require('./report');
 const { reportUrl, traceUrl } = require('./view-server');
-const { askedParamsOf, checkCase, askSettings } = require('./settings');
+const { BACK, isBack, askedParamsOf, checkCase, askSettings } = require('./settings');
 const { evidenceDir, executeCase } = require('./execute');
 
 // ---------------- Running several cases ----------------
@@ -36,7 +36,9 @@ async function runBatch(list, config) {
   }
   if (!ready.length) throw new Error('None of the selected cases can be run');
   const total = ready.length;
-  const { params, askConfig, stepByStep } = await askSettings(ready.map((it) => it.chosen), config);
+  const asked = await askSettings(ready.map((it) => it.chosen), config);
+  if (asked === BACK) return BACK;
+  const { params, askConfig, stepByStep } = asked;
 
   // One after another unless the PO asks for more: whether the system takes the same account working in several
   // browsers at once is for the PO to decide
@@ -45,10 +47,11 @@ async function runBatch(list, config) {
   if (most >= 2 && !stepByStep) {
     const together = most === 2 ? 'type 2 to run both at the same time' : `type a number (2-${most}) to run that many at the same time`;
     for (;;) {
-      const answer = await askOptional(`\nPress Enter to run the ${total} cases one after another, or ${together}: `);
+      const answer = await askOptional(`\nPress Enter to run the ${total} cases one after another, ${together}, or B to go back to the case list: `);
       if (answer === '') break;
+      if (isBack(answer)) return BACK;
       if (/^\d+$/.test(answer) && Number(answer) >= 1 && Number(answer) <= most) { parallel = Number(answer); break; }
-      console.log(`  Please type ${most === 2 ? '2' : `a number from 2 to ${most}`}, or just press Enter.`);
+      console.log(`  Please type ${most === 2 ? '2' : `a number from 2 to ${most}`}, B to go back, or just press Enter.`);
     }
   }
 
