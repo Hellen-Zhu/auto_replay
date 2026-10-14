@@ -127,12 +127,15 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
     // of an allocation into two: with this run's data it is not needed. A wrong value is left to the step, which fails on it
     const notNeeded = (s) => { try { return !!s && !!s.when && !conditionHolds(s.when, ctx.params); } catch { return false; } };
     // Actions that run only while a case data is empty (creating the given trade, format version 15): when the PO gave
-    // its value they are not shown at all, the step line says which value is used instead. Their number is left out of
-    // the count, so the actions shown are numbered 1 to n
+    // its value they are not shown at all, the step line says which value is used instead. The actions of any other
+    // group this run does not need (the third subtrade of an allocation into two) are not shown either. Their number
+    // is left out of the count, so the actions shown are numbered 1 to n
     const given = (s) => !!s && !!s.when && s.when.empty === true && notNeeded(s);
-    const shown = doc.steps.filter((s) => !given(s)).length;
+    const shown = doc.steps.filter((s) => !notNeeded(s)).length;
     let shownNo = 0;
     const givenSaid = new Set();
+    // the step line of a group whose first actions are not shown: printed with the first action that is
+    let titleDue = null;
     let failed = false;
     for (let i = 0; i < doc.steps.length; i++) {
       const step = doc.steps[i];
@@ -148,19 +151,21 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       if (given(step)) {
         rec.status = 'notNeeded';
         rec.given = { [step.when.param]: ctx.params[step.when.param] };
-        if (title) say(`  ■ ${title}`);
+        if (title || titleDue) say(`  ■ ${title || titleDue}`);
+        titleDue = null;
         if (!givenSaid.has(step.when.param)) say(`    - uses the given ${step.when.param} ${ctx.params[step.when.param]}`);
         givenSaid.add(step.when.param);
         continue;
       }
       if (notNeeded(step)) {
         rec.status = 'notNeeded';
-        rec.note = step.when.empty ? `not needed: ${step.when.param} is given (${ctx.params[step.when.param]})` : `not needed: ${step.when.param} is ${ctx.params[step.when.param]}`;
-        if (title) say(`  ■ ${title}`);
-        if (substep) say(`    - ${substep} (${rec.note})`);
+        rec.hidden = true;
+        if (title) titleDue = title;
         continue;
       }
-      if (title) say(`  ■ ${title}`);
+      if (title) titleDue = title;
+      if (titleDue) say(`  ■ ${titleDue}`);
+      titleDue = null;
       if (substep) say(`    - ${substep}`);
       if (!quiet) process.stdout.write(`    [${++shownNo}/${shown}] ${desc} ... `);
       try {

@@ -172,7 +172,7 @@ export class UI {
   /**
    * Actions that run only for some values of a case data, e.g. the third subtrade of an allocation: only when
    * p.allocationWays is 3 or 4. They are recorded whatever the value of this run, so the PO can change the case
-   * data for a run: the runner then runs them or reports them as not needed. Put a whole substep inside, so the case
+   * data for a run: the runner then runs them or leaves them out without showing them. Put a whole substep inside, so the case
    * file holds the condition once, on the substep. The value of the case data must be one of choices, which the
    * runner offers; actions that are not run return undefined.
    */

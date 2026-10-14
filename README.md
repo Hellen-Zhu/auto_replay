@@ -90,7 +90,7 @@ How the cases are cut:
   2. `tradeId` of the case data;
   3. when both are empty, the case creates the trade through the API, as before.
 
-  The exported case file is the same whichever source the run took: it holds the API steps that create the trade, run only while `tradeId` is empty, and `tradeId` is empty. In the runner the PO leaves `tradeId` empty (the case creates its trade, also in a batch) or changes it by its number to an existing trade's ID (the creating steps are then "not needed"; `-` empties it again). Nothing checks that a given trade is in the state the case starts from: a wrong trade fails at the first step that needs that state.
+  The exported case file is the same whichever source the run took: it holds the API steps that create the trade, run only while `tradeId` is empty, and `tradeId` is empty. In the runner the PO leaves `tradeId` empty (the case creates its trade, also in a batch) or changes it by its number to an existing trade's ID (the creating steps are then not run and not shown; `-` empties it again). Nothing checks that a given trade is in the state the case starts from: a wrong trade fails at the first step that needs that state.
 
   ```bash
   # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-TRADE-CANCELLATION-UI-001"
