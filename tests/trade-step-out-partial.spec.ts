@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradeStepOutPartialData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, givenTradeId, loggedIn, type ProductData } from './support';
+import { givenProduct, type ProductData } from './support';
 
 // Mirrors trade_step_out_partial.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -17,17 +17,6 @@ test.describe('Trade step out partial', () => {
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When(`perform the Step Out Partial event on the '${product}' trade`, () => flows.tradeStepOut.stepOutPartial(tradeId, data));
-    await Then('the step out partial is completed successfully', () => flows.tradeStepOut.expectPartialCompleted());
-    await And('the trade remains Live and is marked as Novated', () => flows.tradeStepOut.expectLiveAndNovated(tradeId));
-  });
-
-  test('[TC-TRADE-STEP-OUT-PARTIAL-EXISTING-UI-001] should able to perform Step Out Partial event for a given Live trade successfully', async ({ Given, When, Then, And, flows, testData }) => {
-    const tradeId = flows.trades.existingTrade(givenTradeId('Maker steps out of a part of the live trade with the given ID from the trade portal and the trade is still Live, with the event status Novated'));
-    const data = testData<TradeStepOutPartialData>();
-
-    await Given('maker is logged in to the trade portal', () => loggedIn(flows, 'maker'));
-    await And('the given trade is Live', () => flows.trades.expectLive(tradeId));
-    await When('perform the Step Out Partial event on the trade', () => flows.tradeStepOut.stepOutPartial(tradeId, data));
     await Then('the step out partial is completed successfully', () => flows.tradeStepOut.expectPartialCompleted());
     await And('the trade remains Live and is marked as Novated', () => flows.tradeStepOut.expectLiveAndNovated(tradeId));
   });

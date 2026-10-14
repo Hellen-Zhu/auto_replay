@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-// Runs the five cases of tests/existing-trade.spec.ts once each, so that their case files are exported.
+// Runs the cases of tests/existing-trade.spec.ts on trades it creates, so that their case files are exported in the
+// form the PO needs: the trade ID is entered in the runner.
 //
 //   npm run export:existing-trade                      (product FX_TRF)
 //   npm run export:existing-trade -- --product=FX_DCD --headed
-//   npm run export:existing-trade -- --events          (also the cases on an existing trade of the other events)
+//   npm run export:existing-trade -- --events          (also the TC-TRADE-<EVENT>-EXISTING-UI-... cases of that spec)
 //
-// Those cases work on a trade that already exists and are skipped without OREO_TRADE_ID. This script gets the
-// trades by running the trade creation case of the product, which leaves its trade pending approval, and then
+// Without a trade ID those cases create their own trade (and their exported case file would do the same), or are
+// skipped when the state they start from cannot be created. This script gives each the ID of a trade in
+// OREO_TRADE_ID. It gets the trades by running the trade creation case of the product, which leaves its trade pending approval, and then
 // runs each case with the ID of a trade that is in the state the case starts from:
 //
 //   trade 1: 001 approve (LIVE) -> 003 cancel (pending cancellation) -> 004 approve the cancellation (DEAD)
@@ -16,10 +18,10 @@
 // 001 and 003 run twice; the second run only prepares the trade and exports the same case file again.
 // Every run books three real trades in the system the local config points at. It stops at the first case that
 // does not pass; nothing is rolled back.
-// With --events it goes on with the case on an existing trade that each other lifecycle event has in its own spec
-// (TC-TRADE-<EVENT>-EXISTING-UI-...): one more trade per case, made Live by 001, then the event (for the amendment the
+// With --events it goes on with the case on an existing trade of each other lifecycle event
+// (TC-TRADE-<EVENT>-EXISTING-UI-..., in the same spec): one more trade per case, made Live by 001, then the event (for the amendment the
 // maker's case and then the checker's on the same trade). That books ten
-// more real trades. The values those cases check come from testdata/ and are those of data/<PRODUCT>/<PRODUCT>.dat
+// more real trades. The values those cases check come from testdata/ and are those of testdata/dat/<PRODUCT>/<PRODUCT>.dat
 // of FX_TRF (the notionals of the partial novation, for one).
 // Any other argument is passed on to Playwright (--headed, --trace ...).
 
@@ -40,8 +42,8 @@ const passOn = args.filter((a) => a !== productArg && a !== '--events');
 
 const existing = (n) => `TC-EXISTING-TRADE-UI-00${n}`;
 const own = (...numbers) => numbers.map((n) => ({ spec: SPEC, caseId: existing(n) }));
-// An event's case on an existing trade is in the event's spec: the trade is made Live first
-const event = (name, ...numbers) => [...own(1), ...(numbers.length ? numbers : [1]).map((n) => ({ spec: `tests/trade-${name}.spec.ts`, caseId: `TC-TRADE-${name.toUpperCase()}-EXISTING-UI-00${n}` }))];
+// An event's case on an existing trade starts from a Live trade: the trade is made Live first
+const event = (name, ...numbers) => [...own(1), ...(numbers.length ? numbers : [1]).map((n) => ({ spec: SPEC, caseId: `TC-TRADE-${name.toUpperCase()}-EXISTING-UI-00${n}` }))];
 const PLAN = [
   own(1, 3, 4),
   own(2),
@@ -110,7 +112,7 @@ async function main() {
   } finally {
     if (trades.length) console.log(`\nTrades created by this run: ${trades.join(', ')}`);
   }
-  console.log(`The five case files are in cases/existing-trade/${withEvents ? ', those of the events in the folder of each event' : ''}`);
+  console.log('The case files are in cases/existing-trade/');
 }
 
 main().catch((e) => {

@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { PartialNovationStart, TradePartialNovationRemainingData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, givenTradeId, loggedIn, type ProductData } from './support';
+import { givenProduct, type ProductData } from './support';
 
 // Mirrors trade_partial_novation_remaining.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -24,15 +24,5 @@ test.describe('Trade partial novation remaining', () => {
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     const newTradeId = await When(`perform the Partial Novation Remaining event on the '${product}' trade from ${from} page`, () => flows.tradePartialNovationRemaining.novatePartially(tradeId, from, data));
     await Then(`trade is partially novated with remaining notional retained and counterparty transferred for '${product}'`, () => flows.tradePartialNovationRemaining.expectPartiallyNovated(tradeId, newTradeId, data));
-  });
-
-  test('[TC-TRADE-PARTIAL-NOVATION-REMAINING-EXISTING-UI-001] should able to perform Partial Novation event for a given Live trade successfully', async ({ Given, When, Then, And, flows, testData }) => {
-    const tradeId = flows.trades.existingTrade(givenTradeId('Maker novates a part of the live trade with the given ID to another counterparty from the trade portal; the original trade is Live with the remaining notional and a new Live trade holds the rest for the new counterparty. The notionals, the equation line and the original counterparty in the case data are those of the given trade'));
-    const data = testData<TradePartialNovationRemainingData>();
-
-    await Given('maker is logged in to the trade portal', () => loggedIn(flows, 'maker'));
-    await And('the given trade is Live', () => flows.trades.expectLive(tradeId));
-    const newTradeId = await When(`perform the Partial Novation Remaining event on the trade from ${from} page`, () => flows.tradePartialNovationRemaining.novatePartially(tradeId, from, data));
-    await Then('trade is partially novated with remaining notional retained and counterparty transferred', () => flows.tradePartialNovationRemaining.expectPartiallyNovated(tradeId, newTradeId, data));
   });
 });

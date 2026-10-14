@@ -1,0 +1,7 @@
+{
+  "stepOutDirection": "Pay",
+  "stepOutAmount": "1000",
+  "stepOutCurrency": "USD",
+  "stepOutNewNotional": "2000",
+  "stepOutCounterpartyName": "10 AM NY"
+}

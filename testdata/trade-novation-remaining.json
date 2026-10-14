@@ -1,7 +1,6 @@
 {
-  "use": ["given-trade"],
-  "defaults": {
-    "novationTargetAmount": "5,000",
-    "newCounterpartyName": "10 AM JAK"
-  }
+  "use": [
+    "given-trade",
+    "novation-remaining"
+  ]
 }

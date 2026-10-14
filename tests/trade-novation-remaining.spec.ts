@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { NovationInputProfile, TradeNovationRemainingData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, givenTradeId, loggedIn, type ProductData } from './support';
+import { givenProduct, type ProductData } from './support';
 
 // Mirrors trade_novation_remaining.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -22,17 +22,6 @@ test.describe('Trade novation remaining', () => {
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When(`perform the Novation Remaining event on the '${product}' trade with '${profile}' input profile`, () => flows.tradeNovationRemaining.novateRemaining(tradeId, profile, data));
-    await Then('the novation remaining is completed successfully', () => flows.tradeNovationRemaining.expectCompleted());
-    await And('the original trade is closed as Novated', () => flows.tradeNovationRemaining.expectOriginalClosedAsNovated(tradeId));
-  });
-
-  test('[TC-TRADE-NOVATION-REMAINING-EXISTING-UI-001] should able to perform Novation Remaining event for a given Live trade successfully', async ({ Given, When, Then, And, flows, testData }) => {
-    const tradeId = flows.trades.existingTrade(givenTradeId('Maker novates the remaining live trade with the given ID to another counterparty from the trade portal (input profile with a target amount, as for FX_TRF) and the original trade is Dead with the event status Novated'));
-    const data = testData<TradeNovationRemainingData>();
-
-    await Given('maker is logged in to the trade portal', () => loggedIn(flows, 'maker'));
-    await And('the given trade is Live', () => flows.trades.expectLive(tradeId));
-    await When(`perform the Novation Remaining event on the trade with '${profile}' input profile`, () => flows.tradeNovationRemaining.novateRemaining(tradeId, profile, data));
     await Then('the novation remaining is completed successfully', () => flows.tradeNovationRemaining.expectCompleted());
     await And('the original trade is closed as Novated', () => flows.tradeNovationRemaining.expectOriginalClosedAsNovated(tradeId));
   });

@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradeAllocationData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, givenTradeId, loggedIn, type ProductData } from './support';
+import { givenProduct, type ProductData } from './support';
 
 // Mirrors trade_allocation.feature of the E2E project, steps included. The live trade of the Given is created
 // through the API (flows.tradeProvisioning), so the cases need apiBaseUrl in the local config.
@@ -39,17 +39,6 @@ test.describe('Trade allocation', () => {
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When("perform unequal '3' way allocation for the trade", () => flows.tradeAllocation.allocate(tradeId, 3, data));
     await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted(3));
-    await And('the trade is allocated to Dead in the trade details', () => flows.tradeAllocation.expectAllocatedToDead(tradeId));
-  });
-
-  test('[TC-TRADE-ALLOCATION-EXISTING-UI-001] Given Live trade splits into two equal sub-trades after 50/50 allocation', async ({ Given, When, Then, And, flows, testData }) => {
-    const tradeId = flows.trades.existingTrade(givenTradeId('Maker allocates the live trade with the given ID 50/50 to two subtrades from the trade portal and the trade is Dead'));
-    const data = testData<TradeAllocationData>();
-
-    await Given('maker is logged in to the trade portal', () => loggedIn(flows, 'maker'));
-    await And('the given trade is Live', () => flows.trades.expectLive(tradeId));
-    await When("perform equal '2' way allocation for the trade", () => flows.tradeAllocation.allocate(tradeId, 2, data));
-    await Then('the allocation is completed successfully', () => flows.tradeAllocation.expectCompleted(2));
     await And('the trade is allocated to Dead in the trade details', () => flows.tradeAllocation.expectAllocatedToDead(tradeId));
   });
 });

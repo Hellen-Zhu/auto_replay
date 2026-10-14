@@ -1,6 +1,6 @@
 import { test } from '../framework/fixtures';
 import type { TradeStepOutData, TradeProvisioningData } from '../framework/flows';
-import { givenProduct, givenTradeId, loggedIn, type ProductData } from './support';
+import { givenProduct, type ProductData } from './support';
 
 // Mirrors trade_step_out_full.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -17,17 +17,6 @@ test.describe('Trade step out full', () => {
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When(`perform the Step Out Full event on the '${product}' trade`, () => flows.tradeStepOut.stepOutFull(tradeId, data));
-    await Then('the step out full is completed successfully', () => flows.tradeStepOut.expectFullCompleted());
-    await And('the original trade is closed as Novated', () => flows.tradeStepOut.expectClosedAsNovated(tradeId));
-  });
-
-  test('[TC-TRADE-STEP-OUT-FULL-EXISTING-UI-001] should able to perform Step Out Full event for a given Live trade successfully', async ({ Given, When, Then, And, flows, testData }) => {
-    const tradeId = flows.trades.existingTrade(givenTradeId('Maker steps out fully of the live trade with the given ID from the trade portal and the trade is Dead with the event status Novated'));
-    const data = testData<TradeStepOutData>();
-
-    await Given('maker is logged in to the trade portal', () => loggedIn(flows, 'maker'));
-    await And('the given trade is Live', () => flows.trades.expectLive(tradeId));
-    await When('perform the Step Out Full event on the trade', () => flows.tradeStepOut.stepOutFull(tradeId, data));
     await Then('the step out full is completed successfully', () => flows.tradeStepOut.expectFullCompleted());
     await And('the original trade is closed as Novated', () => flows.tradeStepOut.expectClosedAsNovated(tradeId));
   });

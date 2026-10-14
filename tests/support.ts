@@ -3,7 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import { test } from '../framework/fixtures';
-import type { Flows } from '../framework/flows';
+import type { Flows, TradeProvisioningData } from '../framework/flows';
 import { datFile } from '../framework/products';
 
 /**
@@ -32,15 +32,59 @@ export function givenProduct<T extends ProductData>(flows: Flows, row: T, descri
   return { product: flows.tradeCreation.productAsCaseData(product), data };
 }
 
+/** The state a case on an existing trade starts from */
+export type TradeState = 'pendingApproval' | 'live' | 'pendingCancellation' | 'pendingAmendment';
+
+/** What the test data of a case on an existing trade may hold on top of the event's values */
+export type GivenTradeData = Partial<ProductData> & { tradeId?: string };
+
+/** How a new trade in that state is created through the API; a state without an entry needs the ID of a trade */
+const PROVISION: Partial<Record<TradeState, (flows: Flows, product: string, data: TradeProvisioningData) => Promise<string>>> = {
+  pendingApproval: (flows, product, data) => flows.tradeProvisioning.provisionPendingTrade(product, data),
+  live: (flows, product, data) => flows.tradeProvisioning.provisionLiveTrade(product, data),
+};
+
+/** The check that the trade is in that state, in the trade portal */
+const CHECK: Record<TradeState, (flows: Flows, tradeId: string) => Promise<void>> = {
+  pendingApproval: (flows, tradeId) => flows.trades.expectPendingApproval(tradeId),
+  live: (flows, tradeId) => flows.trades.expectLive(tradeId),
+  pendingCancellation: (flows, tradeId) => flows.tradeCancellation.expectPendingCheckerApproval(tradeId),
+  pendingAmendment: (flows, tradeId) => flows.tradeAmendment.expectPendingCheckerApproval(tradeId),
+};
+
 /**
- * The ID of the existing trade a case works on. It is not test data of the repo: QA gives it for a run in the
- * environment variable OREO_TRADE_ID, and the PO types it in the runner. Without it the case is skipped.
+ * The trade a case on an existing trade works on. Where it comes from, the first that is there:
+ *   1. the environment variable OREO_TRADE_ID: the ID of a trade in the system, for this run;
+ *   2. "tradeId" in the case's row of the test data: the same, kept with the case;
+ *   3. neither: a new trade is created through the API in the state the case starts from, like the Given of the
+ *      event's own case (product, dat file and trade type of the shared block "given-trade").
+ * With 1 and 2 the ID is case data that is entered for every run: the exported case file holds no ID and the PO
+ * types one in the runner. With 3 the exported file creates its own trade on every replay instead.
+ * A state no API request is known for (a pending cancellation, a pending amendment) cannot be created: without an
+ * ID the case is skipped. So is a case that would create its trade while the dat file is missing.
+ * Sets the description shown to the PO. Returns the rest of the data for the flows, and "ready", which the case
+ * calls in its step after the login: it creates the trade when there is none, checks that the trade is in the
+ * state the case starts from (a wrong trade fails there and nothing is done to it) and returns the trade ID.
  */
-export function givenTradeId(description: string): string {
-  const tradeId = (process.env.OREO_TRADE_ID || '').trim();
-  test.skip(!tradeId, 'OREO_TRADE_ID is not set: the ID of an existing trade in the state the case starts from');
-  test.info().annotations.push({ type: 'description', description });
-  return tradeId;
+export function givenTrade<T extends GivenTradeData>(flows: Flows, row: T, state: TradeState, description: string) {
+  const { tradeId: fromData, ...data } = row;
+  const given = (process.env.OREO_TRADE_ID || '').trim() || (fromData || '').trim();
+  const ready = (tradeId: string | (() => Promise<string>)) => async () => {
+    const id = typeof tradeId === 'string' ? tradeId : await tradeId();
+    await CHECK[state](flows, id);
+    return id;
+  };
+
+  if (given) {
+    test.info().annotations.push({ type: 'description', description });
+    return { data, ready: ready(flows.trades.existingTrade(given)) };
+  }
+  const provision = PROVISION[state];
+  test.skip(!provision, 'No trade ID is given (OREO_TRADE_ID, or "tradeId" in the test data) and a trade in the state this case starts from cannot be created through the API');
+  if (!data.product) throw new Error('A case that creates its trade needs "product" in its test data: list the shared block "given-trade" under "use"');
+  prepare(data.product, description, data.datFile);
+  const product = flows.tradeCreation.productAsCaseData(data.product);
+  return { data, ready: ready(() => provision!(flows, product, data as unknown as TradeProvisioningData)) };
 }
 
 /**

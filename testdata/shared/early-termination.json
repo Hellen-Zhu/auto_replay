@@ -1,0 +1,5 @@
+{
+  "earlyTerminationDirection": "Pay",
+  "earlyTerminationAmount": "100",
+  "earlyTerminationCurrency": "USD"
+}

@@ -1,21 +1,28 @@
 {
-  "use": ["given-trade"],
-  "defaults": {
-    "portfolioId": "CM_OIL_CRU_OPT"
-  },
+  "use": [
+    "given-trade",
+    "allocation"
+  ],
   "cases": [
-    {
-      "id": "TC-TRADE-ALLOCATION-UI-001",
-      "subTrades": [{ "counterpartyName": "10 AM JAK" }, { "counterpartyName": "10 AM JAK" }],
-      "allocationComments": "Allocation of 2 sub-trades for FX_TRF trade with 50% each"
-    },
     {
       "id": "TC-TRADE-ALLOCATION-UI-002",
       "subTrades": [
-        { "counterpartyName": "10 AM JAK", "percentage": "30" },
-        { "counterpartyName": "10 AM JAK", "percentage": "30" },
-        { "counterpartyName": "11 AM GMT", "percentage": "30" },
-        { "counterpartyName": "11 AM GMT", "percentage": "10" }
+        {
+          "counterpartyName": "10 AM JAK",
+          "percentage": "30"
+        },
+        {
+          "counterpartyName": "10 AM JAK",
+          "percentage": "30"
+        },
+        {
+          "counterpartyName": "11 AM GMT",
+          "percentage": "30"
+        },
+        {
+          "counterpartyName": "11 AM GMT",
+          "percentage": "10"
+        }
       ],
       "allocationComments": "Allocation of 4 sub-trades for FX_TRF trade with 30%/30%/30%/10%"
     },
@@ -24,9 +31,18 @@
       "product": "FX_PSCRIPT",
       "datFile": "FX_PSCRIPT.dat",
       "subTrades": [
-        { "counterpartyName": "10 AM JAK", "percentage": "34" },
-        { "counterpartyName": "10 AM JAK", "percentage": "34" },
-        { "counterpartyName": "10 AM JAK", "percentage": "32" }
+        {
+          "counterpartyName": "10 AM JAK",
+          "percentage": "34"
+        },
+        {
+          "counterpartyName": "10 AM JAK",
+          "percentage": "34"
+        },
+        {
+          "counterpartyName": "10 AM JAK",
+          "percentage": "32"
+        }
       ],
       "allocationComments": "Allocation of 3 sub-trades for FX_PSCRIPT trade with 34%/34%/32%"
     }

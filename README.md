@@ -78,15 +78,19 @@ npx tsc -p .                      # type check
 | `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` to `-003` | Maker allocates to 2, 4 or 3 subtrades |
 | `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-UI-001` | Maker triggers the event from the trade's action menu |
 | `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002`, `-003` | Maker amends the counterparty / the risk portfolio; pending checker approval |
-| every event spec | `TC-TRADE-<EVENT>-EXISTING-UI-...` | The event on a trade that already exists |
-| `existing-trade` | `TC-EXISTING-TRADE-UI-001` to `-005` | On an existing trade: checker decides on a new trade, maker cancels, checker decides on the cancellation |
+| `existing-trade` | `TC-EXISTING-TRADE-UI-001` to `-005`, `TC-TRADE-<EVENT>-EXISTING-UI-...` | On an existing trade: checker decides on a new trade, maker cancels, checker decides on the cancellation; every lifecycle event on a given trade |
 
 How the cases are cut:
 
 - **Minimal coverage.** A case is repeated per product only where the product changes what is tested (creation). Everything else runs for one product, with one case per kind of trade or outcome.
 - **The product and its dat file are case data** (`product`, `datFile`) in every case that is not repeated per product, so the PO runs it for another product by changing them before the run. A variation in data only (direction Sell, another counterparty, another dat file) is never a case of its own.
 - **A case logs in once.** What the other role did before is the `Given`, prepared through the API: a lifecycle event starts from a live trade that the maker submits and the checker approves through the API. Where no such request is known (a pending cancellation, a pending amendment), the maker's case ends at "pending checker approval" and the checker's decision is a case on an existing trade.
-- **Cases on an existing trade** take the trade ID as case data that is entered for every run; the case first checks the trade is in the state it starts from. QA gives the ID in `OREO_TRADE_ID` and the cases are skipped without it. They change the trade, so they cannot be repeated on the same one:
+- **Cases on an existing trade** are all in `tests/existing-trade.spec.ts`. After the login the case checks that the trade is in the state it starts from. The trade ID comes from, in this order:
+  1. the environment variable `OREO_TRADE_ID` (always wins);
+  2. `tradeId` in the case's row of `testdata/existing-trade.json` (never commit a real trade ID);
+  3. otherwise the case creates the trade through the API, where the state it starts from can be created (pending approval, Live); a case that starts from a pending cancellation or amendment is skipped.
+
+  The exported case file follows the source: with an ID (1 or 2) the PO enters the trade ID in the runner; with a created trade (3) the replay creates its own trade too. Export the PO's files with `npm run export:existing-trade`, which always gives an ID. A case changes its trade, so it cannot be repeated on the same one:
 
   ```bash
   # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-EXISTING-TRADE-UI-003"

@@ -1,9 +1,6 @@
 {
-  "use": ["given-trade"],
-  "defaults": {
-    "remainingNotional": "1,000.00",
-    "newCounterpartyName": "1330 ATH",
-    "equationLine": "Notional: 70,000.00 - 1,000.00 = 69,000.00",
-    "newNotional": "69,000.00"
-  }
+  "use": [
+    "given-trade",
+    "partial-novation-remaining"
+  ]
 }

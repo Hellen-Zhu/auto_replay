@@ -1,6 +1,85 @@
 {
-  "defaults": {
-    "cancelReason": "DEALER_ERROR",
-    "cancelComments": "cancellation for test"
-  }
+  "use": [
+    "given-trade"
+  ],
+  "cases": [
+    {
+      "id": "TC-EXISTING-TRADE-UI-003",
+      "use": [
+        "cancellation"
+      ]
+    },
+    {
+      "id": "TC-TRADE-ALLOCATION-EXISTING-UI-001",
+      "use": [
+        "allocation"
+      ]
+    },
+    {
+      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-002",
+      "use": [
+        "amendment"
+      ]
+    },
+    {
+      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-003",
+      "use": [
+        "amendment"
+      ]
+    },
+    {
+      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-004",
+      "use": [
+        "amendment"
+      ]
+    },
+    {
+      "id": "TC-TRADE-AMENDMENT-EXISTING-UI-005",
+      "use": [
+        "amendment"
+      ]
+    },
+    {
+      "id": "TC-TRADE-EARLY-TERMINATION-EXISTING-UI-001",
+      "use": [
+        "early-termination"
+      ]
+    },
+    {
+      "id": "TC-TRADE-NOVATION-REMAINING-EXISTING-UI-001",
+      "use": [
+        "novation-remaining"
+      ]
+    },
+    {
+      "id": "TC-TRADE-PARTIAL-NOVATION-REMAINING-EXISTING-UI-001",
+      "use": [
+        "partial-novation-remaining"
+      ]
+    },
+    {
+      "id": "TC-TRADE-PARTIAL-TERMINATION-EXISTING-UI-001",
+      "use": [
+        "partial-termination"
+      ]
+    },
+    {
+      "id": "TC-TRADE-PORTFOLIO-REASSIGNMENT-EXISTING-UI-001",
+      "use": [
+        "portfolio-reassignment"
+      ]
+    },
+    {
+      "id": "TC-TRADE-STEP-OUT-FULL-EXISTING-UI-001",
+      "use": [
+        "step-out-full"
+      ]
+    },
+    {
+      "id": "TC-TRADE-STEP-OUT-PARTIAL-EXISTING-UI-001",
+      "use": [
+        "step-out-partial"
+      ]
+    }
+  ]
 }

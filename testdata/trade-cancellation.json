@@ -1,7 +1,6 @@
 {
-  "use": ["given-trade"],
-  "defaults": {
-    "cancelReason": "DEALER_ERROR",
-    "cancelComments": "cancellation for test"
-  }
+  "use": [
+    "given-trade",
+    "cancellation"
+  ]
 }
