@@ -23,15 +23,18 @@ function readJson(file: string, label: string): unknown {
  * "use", then the other values of that row, which is the one of "cases" whose "id" is the case ID; a later one wins.
  *   { "use": ["given-trade"], "defaults": { ...shared by every case of this spec... },
  *     "cases": [ { "id": "TC-XXX-001", "use": ["cancellation"], ... }, ... ] }
- * A shared block is testdata/shared/<block>.json, a flat object like common.json: values that several specs need
- * but not all of them, e.g. the trade a lifecycle event starts from, or the values of one event, which its own spec
- * and its case on an existing trade both use. Everything is optional: a case needs a row only for values that
+ * A shared block is an entry of "shared" in testdata/common.json, a flat object of values that several specs need
+ * but not all of them, e.g. the trade a lifecycle event starts from:
+ *   { "counterpartyName": "...", ..., "shared": { "given-trade": { ... }, "allocation": { ... } } }
+ * "shared" itself is not a value of any case. Everything is optional: a case needs a row only for values that
  * differ from the shared ones, and a spec whose cases all use the common values needs no file.
  */
 export function findCase<T extends object>(name: string, id: string): T & { id: string } {
   const commonFile = path.join(DIR, 'common.json');
   const common = fs.existsSync(commonFile) ? readJson(commonFile, 'testdata/common.json') : {};
   if (!isObject(common)) throw new Error('testdata/common.json must be an object');
+  const { shared: sharedBlocks = {}, ...commonValues } = common;
+  if (!isObject(sharedBlocks)) throw new Error('testdata/common.json: "shared" must be an object of blocks, name -> values');
 
   const label = `testdata/${name}.json`;
   const file = path.join(DIR, `${name}.json`);
@@ -44,11 +47,9 @@ export function findCase<T extends object>(name: string, id: string): T & { id: 
     if (!Array.isArray(list) || list.some((b) => typeof b !== 'string' || !/^[\w-]+$/.test(b))) throw new Error(`${where}: "use" must be a list of shared block names`);
     const merged: Row = {};
     for (const block of list as string[]) {
-      const blockLabel = `testdata/shared/${block}.json`;
-      const blockFile = path.join(DIR, 'shared', `${block}.json`);
-      if (!fs.existsSync(blockFile)) throw new Error(`${where}: "use" names "${block}", but ${blockLabel} does not exist`);
-      const values = readJson(blockFile, blockLabel);
-      if (!isObject(values)) throw new Error(`${blockLabel} must be an object`);
+      const values = Object.prototype.hasOwnProperty.call(sharedBlocks, block) ? sharedBlocks[block] : undefined;
+      if (values === undefined) throw new Error(`${where}: "use" names "${block}", but "shared" of testdata/common.json has no such block`);
+      if (!isObject(values)) throw new Error(`testdata/common.json: the shared block "${block}" must be an object`);
       Object.assign(merged, values);
     }
     return merged;
@@ -66,7 +67,7 @@ export function findCase<T extends object>(name: string, id: string): T & { id: 
     if (row.id === id) own = row;
   });
   const { use: ownUse = [], ...ownValues } = own;
-  return { ...common, ...shared, ...defaults, ...blocks(ownUse, `${label}, row "${id}"`), ...ownValues, id } as T & { id: string };
+  return { ...commonValues, ...shared, ...defaults, ...blocks(ownUse, `${label}, row "${id}"`), ...ownValues, id } as T & { id: string };
 }
 
 /** The case ID of a test: the [xxx] at the start of its title */

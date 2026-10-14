@@ -128,27 +128,54 @@ const optionalParamsOf = (steps) => [...new Set((steps || []).filter((s) => s &&
  * the case would otherwise create through the API is not needed, nor the account that would approve it.
  * The step lines (title, substep) do not count as a use: they are text for the reader.
  */
-function onlyWhenEmptyOf(steps) {
-  const refsOf = (action) => {
-    const params = new Set();
-    const config = new Set();
-    const walk = (v) => {
-      if (typeof v === 'string') {
-        for (const m of v.matchAll(/\$\{param:([^}]+)\}/g)) params.add(m[1]);
-        for (const m of v.matchAll(/\$\{cfg:([^}]+)\}/g)) config.add(m[1]);
-      } else if (v && typeof v === 'object') {
-        if (isSwitch(v)) params.add(v.byParam);
-        Object.values(v).forEach(walk);
-      }
-    };
-    for (const [k, v] of Object.entries(action)) {
-      if (k === 'title' || k === 'substep') continue;
-      if (k === 'when') { if (isCondition(v)) params.add(v.param); continue; }
-      if (k === 'request' && v && v.setting) config.add(v.setting);
-      walk(v);
+// The case data and config entries an action uses. The step lines (title, substep) do not count: they are text for the reader
+function refsOf(action) {
+  const params = new Set();
+  const config = new Set();
+  const walk = (v) => {
+    if (typeof v === 'string') {
+      for (const m of v.matchAll(/\$\{param:([^}]+)\}/g)) params.add(m[1]);
+      for (const m of v.matchAll(/\$\{cfg:([^}]+)\}/g)) config.add(m[1]);
+    } else if (v && typeof v === 'object') {
+      if (isSwitch(v)) params.add(v.byParam);
+      Object.values(v).forEach(walk);
     }
-    return { params, config };
   };
+  for (const [k, v] of Object.entries(action)) {
+    if (k === 'title' || k === 'substep') continue;
+    if (k === 'when') { if (isCondition(v)) params.add(v.param); continue; }
+    if (k === 'request' && v && v.setting) config.add(v.setting);
+    walk(v);
+  }
+  return { params, config };
+}
+
+/**
+ * What this case data does not need: { params, config }, the case data and config entries that only actions which do
+ * not run with it use (the data of the given trade when a trade ID was entered, the third subtrade of an allocation
+ * into two). A case data that a condition names is always needed, since changing it changes what runs. An action
+ * whose condition cannot be decided (a value outside its choices) counts as running: the step fails on it.
+ */
+function notRunWith(steps, params) {
+  const runs = (s) => { try { return !s.when || conditionHolds(s.when, params); } catch { return true; } };
+  const used = { params: new Set(), config: new Set() };
+  const unused = { params: new Set(), config: new Set() };
+  const named = new Set();
+  for (const s of steps || []) {
+    if (!s) continue;
+    if (isCondition(s.when)) named.add(s.when.param);
+    const r = refsOf(s);
+    const to = runs(s) ? used : unused;
+    r.params.forEach((x) => to.params.add(x));
+    r.config.forEach((x) => to.config.add(x));
+  }
+  return {
+    params: new Set([...unused.params].filter((x) => !used.params.has(x) && !named.has(x))),
+    config: new Set([...unused.config].filter((x) => !used.config.has(x))),
+  };
+}
+
+function onlyWhenEmptyOf(steps) {
   const inside = {};
   const outside = { params: new Set(), config: new Set() };
   for (const s of steps || []) {
@@ -205,4 +232,4 @@ function resolveUrl(baseUrl, path, key = 'baseUrl') {
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
-module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, isCondition, conditionHolds, optionalParamsOf, onlyWhenEmptyOf, fillParams, showPlaceholders, resolveUrl };
+module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, isCondition, conditionHolds, optionalParamsOf, onlyWhenEmptyOf, notRunWith, fillParams, showPlaceholders, resolveUrl };

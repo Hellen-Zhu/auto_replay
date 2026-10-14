@@ -29,7 +29,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `framework/ui.ts` | Executes each action and records it; `fixtures.ts` exports the case after a pass |
 | `framework/products.ts` | Product registry: which product supports which kind of creation |
 | `core/actions.js`, `core/lib/` | Execution core, shared by QA's run and the PO's replay. `actions.js` is the entry; the code is in the modules of `core/lib/` |
-| `testdata/` | Case data: `common.json`, `shared/`, one `<spec name>.json` per spec |
+| `testdata/` | Case data: `common.json` (values every spec shares, plus a `shared` section with the blocks several specs share), one `<spec name>.json` per spec |
 | `testdata/dat/<PRODUCT>/` | The dat files cases upload or send; shipped to the PO |
 | `elements/` | Element locators, a copy of the E2E project's; never edited here |
 | `cases/<spec name>/` | Exported case files |
@@ -111,7 +111,7 @@ Not every case has been run on the real system, and some were never run at all: 
   "cases": [ { "id": "TC-TRADE-CREATION-UI-004", "product": "FX_TRF", "datFile": "FX_TRF.dat" } ]
 }
 
-// testdata/trade-cancellation.json: "use" takes a block several specs share (testdata/shared/given-trade.json)
+// testdata/trade-cancellation.json: "use" takes a block several specs share (shared.given-trade of testdata/common.json)
 {
   "use": ["given-trade"],
   "defaults": { "cancelReason": "DEALER_ERROR" }
@@ -120,11 +120,11 @@ Not every case has been run on the real system, and some were never run at all: 
 
 (The real files are plain JSON, without comments, and may hold more values.)
 
-- A case gets `common.json` → the blocks listed under `use` (`testdata/shared/<block>.json`, values several specs share) → `defaults` → its own row; the later one wins. Everything is optional, and **a case that needs nothing different has no row**.
+- A case gets `common.json` → the blocks listed under `use` (`shared.<block>` of `testdata/common.json`, values several specs share) → `defaults` → its own row; the later one wins. Everything is optional, and **a case that needs nothing different has no row**.
 - **Data is matched by case ID**: a test title starts with its ID in `[ ]`, and `testData<...>()` looks that ID up in `testdata/<spec file name>.json`. A row whose `id` matches no case is simply not used. The ID is also the exported file name.
 - In the flow, `const p = this.params(data)`: `p.counterpartyName` is recorded as `${param:counterpartyName}` and its value goes into the `params` block of the case file. Only parameters a case really uses are written.
 - What decides the scenario stays in the spec and is passed to the flow as a plain argument.
-- **The trade a lifecycle event starts from** is described by `testdata/shared/given-trade.json`: `product`, `datFile` and `tradeType` (`Normal`, `StepInFull` or `StepInPartial`; a StepIn type sends the block's `oldCounterpartyName`, `oldCounterpartyFmId` and `novationDate` as the request's `udf` list). Change them there for every event, or in a spec's `defaults` / a case's row for that spec or case. The PO can change all three in the runner: the product and the dat file from what the package has, the trade type from the three values (the case file holds the `udf` list of both StepIn types and the runner sends the one of the chosen type, none for `Normal`), so the StepIn values must be in the test data whatever type QA runs.
+- **The trade a lifecycle event starts from** is described by `shared.given-trade` of `testdata/common.json`: `product`, `datFile` and `tradeType` (`Normal`, `StepInFull` or `StepInPartial`; a StepIn type sends the block's `oldCounterpartyName`, `oldCounterpartyFmId` and `novationDate` as the request's `udf` list). Change them there for every event, or in a spec's `defaults` / a case's row for that spec or case. The PO can change all three in the runner: the product and the dat file from what the package has, the trade type from the three values (the case file holds the `udf` list of both StepIn types and the runner sends the one of the chosen type, none for `Normal`), so the StepIn values must be in the test data whatever type QA runs.
 - `testdata/` is committed: business values only. A value that must stay local is a reference, `"${cfg:tradeData.counterpartyName}"`. Passwords never go here.
 - A missing value fails the case with the name of the field.
 

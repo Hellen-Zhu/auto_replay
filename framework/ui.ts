@@ -137,6 +137,8 @@ export class UI {
   private pendingSubstep?: string;
   private depth = 0;
   private condition?: Condition;
+  /** Groups of case data whose values must all be different (distinct()): the names of each group */
+  private readonly distinctGroups: string[][] = [];
 
   constructor(readonly page: Page, readonly config: any, readonly rootDir?: string) {}
 
@@ -207,6 +209,26 @@ export class UI {
     } finally {
       this.condition = undefined;
     }
+  }
+
+  /**
+   * Case data whose values must all be different, e.g. the counterparties of the subtrades of an allocation. The values
+   * of this run are checked here; the group is written to the case file (distinct), so the runner checks the values the
+   * PO runs with too, those of the actions the run needs (the counterparties of the subtrades it splits into)
+   */
+  distinct(...vals: Val[]) {
+    const names = vals.map((v) => {
+      if (typeof v === 'string' || !('param' in v)) throw new Error('distinct needs parameters of ui.params(), e.g. p.counterpartyName');
+      return v.param;
+    });
+    const seen = new Map<string, string>();
+    for (const name of names) {
+      const key = String(this.paramValues[name] ?? '').trim().toLowerCase();
+      if (!key) continue;
+      if (seen.has(key)) throw new Error(`Test data ${seen.get(key)} and ${name} are both "${this.paramValues[name]}": they must be different`);
+      seen.set(key, name);
+    }
+    if (names.length > 1) this.distinctGroups.push([...new Set(names)]);
   }
 
   /**
@@ -494,6 +516,8 @@ export class UI {
       // ("a Live 'FX_TRF' trade ..."). For the reader only: the runner takes the lines from steps, where they follow
       // the data of the run
       scenario: steps.filter((s) => s.step).map((s) => core.fillParams(s.step, params)),
+      // Case data whose values must all be different (the runner checks the values of its run): only names the file has
+      ...(this.distinctGroups.length ? { distinct: this.distinctGroups.map((g) => g.filter((n) => n in params)).filter((g) => g.length > 1) } : {}),
       steps,
     };
     fs.mkdirSync(path.dirname(file), { recursive: true });

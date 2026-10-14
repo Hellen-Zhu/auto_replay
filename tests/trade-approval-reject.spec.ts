@@ -7,7 +7,7 @@ import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from 
 // TC-TRADE-REJECT-CREATION-..., user decision). The pending trade of the Given is created through the API (flows.tradeProvisioning),
 // so the case needs apiBaseUrl in the local config.
 // One case per kind of trade, not per product (user decision): the checker's pages are the same for every product.
-// The product and its dat file are case data ("product" and "datFile" of testdata/shared/given-trade.json), so the case IDs have no product in
+// The product and its dat file are case data ("product" and "datFile" of shared.given-trade of testdata/common.json), so the case IDs have no product in
 // them (the feature's have) and the PO runs a case for another product or another dat file of it by changing them before the run.
 // A case logs in once (user decision): whatever the maker did before the checker decides is the Given and is done
 // through the API, never by a second login in the browser.

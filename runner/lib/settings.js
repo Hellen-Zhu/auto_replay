@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf, onlyWhenEmptyOf, conditionHolds } = require('../../core/actions');
+const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf, notRunWith, conditionHolds } = require('../../core/actions');
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
@@ -34,17 +34,25 @@ function setCfg(config, key, v) {
 
 // Case data (version 2 case files): the values the case types or selects
 const paramsOf = (doc) => Object.fromEntries(Object.entries(doc.params || {}).map(([k, v]) => [k, String(v)]));
-// What a run with this case data does not need: the case data and settings that only the actions creating what an
-// optional case data names use, once it has a value (a trade ID given: the API data of a new trade, the checker's
-// account that would approve it). They are neither shown, asked for nor reported for that run.
-function notNeededOf(doc, params) {
-  const out = { params: new Set(), config: new Set() };
-  for (const [name, only] of Object.entries(onlyWhenEmptyOf(doc.steps))) {
-    if (!params || params[name] === undefined || String(params[name]) === '') continue;
-    only.params.forEach((x) => out.params.add(x));
-    only.config.forEach((x) => out.config.add(x));
+// What a run with this case data does not need: the case data and settings that only actions which do not run with it
+// use (a trade ID given: the API data of a new trade, the checker's account that would approve it; an allocation into
+// two: the third and fourth subtrade). They are neither shown, asked for nor reported for that run.
+const notNeededOf = (doc, params) => notRunWith(doc.steps, params || paramsOf(doc));
+// Case data that must differ from each other (the case file's "distinct": lists of names, e.g. the counterparties of
+// the subtrades of an allocation). Only the values this run needs count. Returns the problem, or '' when there is none
+function distinctProblem(doc, params) {
+  const notNeeded = notNeededOf(doc, params).params;
+  for (const group of Array.isArray(doc.distinct) ? doc.distinct : []) {
+    const seen = {};
+    for (const name of group) {
+      const v = params[name];
+      if (v === undefined || String(v) === '' || notNeeded.has(name)) continue;
+      const key = String(v).trim().toLowerCase();
+      if (seen[key]) return `Case data ${seen[key]} and ${name} are both "${v}": they must be different`;
+      seen[key] = name;
+    }
   }
-  return out;
+  return '';
 }
 // The data a run used, for the report: a value that points at local config is shown by its name, and a value the PO
 // changed for the run comes with the one of the case file
@@ -112,6 +120,8 @@ function checkCase({ file, doc }, params) {
   // A step that does not run with this data needs no file (the dat file of a trade that is given, not created)
   const runs = (s) => { try { return !s.when || conditionHolds(s.when, params || paramsOf(doc)); } catch { return true; } };
   for (const s of doc.steps.filter(runs)) for (const f of dataFilesOf(s, params || paramsOf(doc))) resolveDataFile(ROOT, f);
+  const problem = distinctProblem(doc, params || paramsOf(doc));
+  if (problem) throw new Error(`${path.basename(file)}: ${problem}`);
 }
 
 // Settings the runner decides itself: whatever config.local.json says, a replay runs with these values, and they are
@@ -341,6 +351,10 @@ async function askSettings(list, config) {
       rows.push({ text: single ? 'Run the case' : `Run the ${list.length} cases`, value: RUN });
       const r = await pickRow({ rows, start: RUN, hint, keys: ['s'] });
       if (r.esc) continue;
+      if ((r.key === 's' || r.value === RUN) && single && distinctProblem(single, params)) {
+        console.log(`${distinctProblem(single, params)}. Change one of them.\n`);
+        continue;
+      }
       if (r.key === 's') stepByStep = true;
       if (r.key === 's' || r.value === RUN) break;
       if (r.value.param && !told) { console.log('A change of case data applies to this run only.'); told = true; }
@@ -357,6 +371,11 @@ async function askSettings(list, config) {
     changed = false;
     const range = numbered.length === 1 ? 'type 1 to change it' : `type a number (1-${numbered.length}) to change that value`;
     const answer = (await ask(`\nPress Enter to continue${hasSettings ? ' with these settings' : ''}, or ${range}: `)).trim().toLowerCase();
+    if ((answer === '' || answer === 's') && single && distinctProblem(single, params)) {
+      if (state.inputEnded) throw new Error(distinctProblem(single, params));
+      console.log(`  ${distinctProblem(single, params)}. Type the number of one of them to change it.`);
+      continue;
+    }
     if (answer === '') break;
     if (answer === 's') { stepByStep = true; break; }
     // several numbers at once are changed one after another

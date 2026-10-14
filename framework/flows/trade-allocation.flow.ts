@@ -13,7 +13,7 @@ export interface SubTradeData {
 /** The numbers of subtrades an allocation case can be run with: case data the PO chooses in the runner */
 export const ALLOCATION_WAYS = ['2', '3', '4'] as const;
 
-/** The data of a trade allocation case (testdata/shared/allocation.json) */
+/** The data of a trade allocation case (the block allocation of testdata/common.json) */
 export interface TradeAllocationData {
   /** How many subtrades the trade is split into: one of ALLOCATION_WAYS */
   allocationWays: string;
@@ -57,6 +57,9 @@ export class TradeAllocationFlow extends BaseFlow {
     const p = this.params(data);
     const row = this.params(values);
     const ways = p.allocationWays;
+    // A trade is never allocated twice to the same counterparty: checked for the data of this run, and by the runner
+    // for the counterparties of the subtrades the PO's run splits into
+    this.ui.distinct(...subTrades.slice(0, MAX_WAYS).flatMap((s, i) => (s.counterpartyName ? [row[`subTrade${i + 1}CounterpartyName`]] : [])));
     const { trades, allocationDialog, dynamicAction } = this.app;
 
     await this.tradesFlow.openActionMenu(tradeId);

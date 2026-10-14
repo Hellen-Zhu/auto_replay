@@ -91,7 +91,7 @@ export class TradeProvisioningFlow extends BaseFlow {
   /** The "udf" list that makes a submitted trade a StepIn one */
   private stepInUdf(type: StepInType, data: TradeProvisioningData): TradeUdf[] {
     const missing = (['oldCounterpartyName', 'oldCounterpartyFmId', 'novationDate'] as const).filter((name) => !data[name]);
-    if (missing.length) throw new Error(`A ${type} trade needs ${missing.join(', ')} in the test data (testdata/shared/given-trade.json)`);
+    if (missing.length) throw new Error(`A ${type} trade needs ${missing.join(', ')} in the test data (shared.given-trade of testdata/common.json)`);
     const p = this.params(data as TradeProvisioningData & StepInProvisioningData);
     return [
       { key: 'stepInType', value: type, type: 'Text' },
