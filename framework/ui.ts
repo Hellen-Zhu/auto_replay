@@ -74,10 +74,13 @@ export type ApiPart = { json: unknown } | { file: string };
  * apiBaseUrl ends with the prefix all requests share (.../api/v1), so a path starts after it: /trades/create.
  * A text anywhere inside headers, body or a JSON part may be a reference: cfg('accounts.maker.email') or a parameter.
  * save names the fields of the JSON response to keep as variables: { createdTradeId: 'data.trade.id' }.
+ * base 'origin' is for a request of the same server that is not under that prefix: its path is joined to the
+ * address of apiBaseUrl without the prefix (/uc/api/user-preferences).
  */
 export type ApiCall = {
   method: string;
   path: string;
+  base?: 'origin';
   headers?: Record<string, Val>;
   /** JSON body; leave it out for a multipart request */
   body?: unknown;
@@ -286,6 +289,7 @@ export class UI {
       action: 'api',
       method: call.method.toUpperCase(),
       value: call.path,
+      ...(call.base ? { base: call.base } : {}),
       ...(call.headers ? { headers: json(call.headers) as Record<string, string> } : {}),
       ...(call.body !== undefined ? { body: json(call.body) } : {}),
       ...(call.multipart ? { multipart: json(call.multipart) } : {}),

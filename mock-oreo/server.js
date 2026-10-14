@@ -34,10 +34,14 @@
 //   without a body, what it does with the answer and the answer itself are this mock's own. Started with
 //   MOCK_RISK_ENGINE=down the mock answers them with 503, like a risk engine that is not available: a case then
 //   passes only with riskEngine "mock" in the local config. So is the rule that a cancellation needs comments (the real dialog marks them optional): it is there so
-//   that a case whose comments did not reach the control fails.
+//   that a case whose comments did not reach the control fails;
+// - PUT /uc/api/user-preferences (path, method, X-User-Id header and the JSON body with "activeBlotters" are the
+//   E2E project's; that it is served from the same address as /api/v1, the answer and that the preferences change
+//   nothing on the pages are this mock's own).
 
 const http = require('http');
 const PORT = Number(process.env.PORT || 4173);
+const PREFERENCES = {};
 const USERS = { 'maker@test.com': { pwd: 'maker1', name: 'maker' }, 'checker@test.com': { pwd: 'checker1', name: 'checker' } };
 
 const components = `
@@ -402,6 +406,19 @@ http.createServer((req, res) => {
   const caller = req.headers['x-user-id'];
   if (req.url.startsWith('/api/v1/') && !USERS[caller]) return json(res, 401, { message: 'X-User-Id is missing or not a known user' });
   const readBody = (then) => { let body = ''; req.on('data', (c) => (body += c)); req.on('end', () => then(body)); };
+
+  // The user's preferences: not under /api/v1. They are stored and never used: this mock always shows the same blotter
+  if (req.url === '/uc/api/user-preferences') {
+    if (!USERS[caller]) return json(res, 401, { message: 'X-User-Id is missing or not a known user' });
+    if (req.method !== 'PUT') return json(res, 405, { message: 'Method not allowed' });
+    return readBody((body) => {
+      let prefs;
+      try { prefs = JSON.parse(body); } catch { return json(res, 400, { message: 'The body is not JSON' }); }
+      if (!Array.isArray(prefs.activeBlotters)) return json(res, 400, { message: 'activeBlotters is missing' });
+      PREFERENCES[caller] = prefs;
+      json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: prefs });
+    });
+  }
 
   if (req.method === 'POST' && req.url === '/api/v1/trades/create?tradeAction=SUBMIT') {
     return readBody((body) => {

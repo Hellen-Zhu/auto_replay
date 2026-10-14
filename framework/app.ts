@@ -2,7 +2,7 @@
 // (one browser page, one recording). Injected as the `app` fixture; register a new page or API object here.
 
 import type { UI } from './ui';
-import { TradesApi } from './api';
+import { TradesApi, UserPreferencesApi } from './api';
 import { AllocationDialog } from './components/allocation-dialog';
 import { DynamicAction } from './components/dynamic-action';
 import { Toast } from './components/toast';
@@ -22,6 +22,7 @@ export class App {
     newTrade?: NewTradePage;
     tradeDetail?: TradeDetailPage;
     tradesApi?: TradesApi;
+    userPreferencesApi?: UserPreferencesApi;
   } = {};
 
   constructor(readonly ui: UI) {}
@@ -36,4 +37,5 @@ export class App {
   get newTrade() { return (this.created.newTrade ??= new NewTradePage(this.ui)); }
   get tradeDetail() { return (this.created.tradeDetail ??= new TradeDetailPage(this.ui)); }
   get tradesApi() { return (this.created.tradesApi ??= new TradesApi(this.ui)); }
+  get userPreferencesApi() { return (this.created.userPreferencesApi ??= new UserPreferencesApi(this.ui)); }
 }

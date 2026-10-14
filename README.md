@@ -196,7 +196,8 @@ async submitTrade(role: string, basic: TradeBasic, file: string) {
 - The call is recorded in the case file like any other step, so the PO's replay creates its own trade.
 - An API object holds the requests and one operation per request; a flow composes them (`flows.tradeProvisioning.provisionLiveTrade`); a case never calls them.
 - The API has no login: `this.as('maker')` sends that role's e-mail as `X-User-Id`, as a config reference.
-- A path **starts after the prefix** that `apiBaseUrl` carries: `/trades/create`, never `/api/v1/trades/create`, never a full address.
+- A path **starts after the prefix** that `apiBaseUrl` carries: `/trades/create`, never `/api/v1/trades/create`, never a full address. A request of the same server that is not under the prefix is written with its whole path and `base: 'origin'` (`UserPreferencesApi.reset`: `/uc/api/user-preferences`).
+- Every login (`flows.auth.login`) first resets the preferences of the account it logs in with (theme, formats, the blotters the trade portal shows) through the API, like the E2E project's before-scenario hook: the accounts are shared. So every case needs `apiBaseUrl`, and a replay by the PO resets that account too.
 - Use it for the `Given` only: the `When` and the `Then` stay in the browser, or the replay shows nothing.
 
 ### Porting a case from the E2E project

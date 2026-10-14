@@ -27,11 +27,13 @@ export interface TradeUdf {
 
 /**
  * A request without the user it is sent as. path is relative to apiBaseUrl of the local config, which already
- * ends with the API's prefix (.../api/v1): a path starts after it, e.g. /trades/create
+ * ends with the API's prefix (.../api/v1): a path starts after it, e.g. /trades/create. With base 'origin' the
+ * path is the whole path on that server instead, for a request that is not under the prefix
  */
 export interface ApiRequest {
   method: string;
   path: string;
+  base?: 'origin';
   body?: unknown;
 }
 

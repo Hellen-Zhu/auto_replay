@@ -139,14 +139,24 @@ async function clickAndCapture(page, loc, capture, ctx, timeout, button) {
  *     save: { createdTradeId: 'data.trade.id' } }
  * value is a path on apiBaseUrl of the local config: the API may be served from another address than the pages.
  * apiBaseUrl includes the prefix every request shares (e.g. .../api/v1), so that prefix is not part of value.
+ * With base "origin" the path is joined to the address of apiBaseUrl without that prefix: a request of the same
+ * server that is not under the prefix (e.g. /uc/api/user-preferences).
  * The request carries multipart (each part a JSON document or a file of the data folder), or body (JSON), or nothing.
  * Any answer other than 2xx fails the step. save stores fields of the JSON response as variables: name -> field.
  * The request is sent by Playwright's own API client, not by the page; it is listed in the trace.
  */
+/** The server of an address, without its path: https://host:port of https://host:port/api/v1. Empty stays empty */
+function originOf(address) {
+  if (!address) return address;
+  try { return new URL(address).origin; }
+  catch { throw new Error('apiBaseUrl in config.local.json is not a valid address'); }
+}
+
 async function callApi(page, step, apiPath, ctx, timeout) {
   const method = String(step.method || 'GET').toUpperCase();
   const what = `${method} ${apiPath}`;
-  const url = resolveUrl(ctx.config.apiBaseUrl, apiPath, 'apiBaseUrl');
+  if (step.base !== undefined && step.base !== 'origin') throw new Error(`${what}: base "${step.base}" is not supported (only "origin"). Ask QA for the current UAT-Runner package.`);
+  const url = resolveUrl(step.base === 'origin' ? originOf(ctx.config.apiBaseUrl) : ctx.config.apiBaseUrl, apiPath, 'apiBaseUrl');
   const options = { method, timeout, headers: { accept: 'application/json', ...(await resolveDeep(step.headers || {}, ctx)) } };
   if (step.multipart) {
     options.multipart = {};
@@ -171,7 +181,9 @@ async function callApi(page, step, apiPath, ctx, timeout) {
   const text = await res.text();
   // The usual reason for a 404 or for a page instead of JSON: apiBaseUrl is not the API's address, or the prefix all
   // requests share (e.g. /api/v1) is missing from it or repeated in the path
-  const hint = ' (check that apiBaseUrl in config.local.json is the address of the API including its prefix, e.g. .../api/v1)';
+  const hint = step.base === 'origin'
+    ? ' (this request is sent to the server of apiBaseUrl in config.local.json, without the prefix: check that it is served there)'
+    : ' (check that apiBaseUrl in config.local.json is the address of the API including its prefix, e.g. .../api/v1)';
   if (!res.ok()) throw new Error(`${what} returned HTTP ${res.status()}${text ? ': ' + text.slice(0, 300) : ''}${res.status() === 404 ? hint : ''}`);
   const saved = {};
   const fields = Object.entries(step.save || {});
