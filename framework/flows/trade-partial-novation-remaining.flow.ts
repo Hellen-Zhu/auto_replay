@@ -13,9 +13,6 @@ export interface TradePartialNovationRemainingData {
   newCounterpartyName: string;
 }
 
-/** Where the maker starts the event: the action menu of the trade's row, or the More Actions of its trade details */
-export type PartialNovationStart = 'portal' | 'detail';
-
 /**
  * Novating a part of a live trade to another counterparty, mirroring the E2E project's
  * trade_partial_novation_remaining snippet: the original trade keeps the remaining notional, a new trade with the
@@ -29,19 +26,13 @@ export class TradePartialNovationRemainingFlow extends BaseFlow {
    * Maker novates a part of the trade, up to the confirmed trade change.
    * Returns the ID of the new trade (recorded as ${var:newTradeId}).
    */
-  async novatePartially(tradeId: string, from: PartialNovationStart, data: TradePartialNovationRemainingData): Promise<string> {
+  async novatePartially(tradeId: string, data: TradePartialNovationRemainingData): Promise<string> {
     const p = this.params(data);
-    const { tradeDetail, dynamicAction, trades } = this.app;
+    const { dynamicAction, trades } = this.app;
 
-    if (from === 'portal') {
-      await this.lifecycleEvent.openAction(tradeId, 'partialNovationRemaining', 'Partial Novation Remaining');
-    } else {
-      await this.ui.When('I open the trade details of the trade', () => tradeDetail.open(tradeId));
-      await this.ui.And('I choose Partial Novation Remaining from More Actions', async () => {
-        await tradeDetail.clickButton('moreActions');
-        await tradeDetail.clickButton('partialNovationRemaining');
-      });
-    }
+    // Always from the action menu of the trade's row, for every product (user decision; the E2E project starts it
+    // from the trade details' More actions for FX_FSB = FX_PSCRIPT_FSKO)
+    await this.lifecycleEvent.openAction(tradeId, 'partialNovationRemaining', 'Partial Novation Remaining');
     // The equation line the dialog shows (original notional - remaining = novated) is not checked (user decision: the
     // case performs the event; the original notional depends on the product's dat file)
     await this.ui.And('I type the remaining notional', () => dynamicAction.typeField('remainingNotional', p.remainingNotional));

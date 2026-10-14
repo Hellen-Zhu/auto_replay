@@ -105,7 +105,7 @@ function paramChoicesOf(steps) {
   };
   for (const s of steps || []) if (s && s.action === 'api') [s.headers, s.body, s.multipart].forEach(walk);
   // and the case data a group of actions depends on (format version 13)
-  for (const s of steps || []) if (s && isCondition(s.when) && !s.when.empty && !out[s.when.param]) out[s.when.param] = s.when.choices.map(String);
+  for (const s of steps || []) if (s && isCondition(s.when) && Array.isArray(s.when.choices) && !out[s.when.param]) out[s.when.param] = s.when.choices.map(String);
   return out;
 }
 
@@ -116,11 +116,16 @@ function paramChoicesOf(steps) {
  */
 // Format version 15 adds { "param": "tradeId", "empty": true }: the group runs only while that case data has no
 // value, e.g. creating the given trade when no trade ID was entered (a set action of the group then fills it in).
+// Format version 17 adds { "param": "novationTargetAmount", "filled": true }: the group runs only while that case
+// data has a value, e.g. typing a field that some products do not have (the PO leaves the value empty for them).
 const isCondition = (w) => !!w && typeof w === 'object' && typeof w.param === 'string'
-  && (w.empty === true || (Array.isArray(w.choices) && Array.isArray(w.in)));
+  && (w.empty === true || w.filled === true || (Array.isArray(w.choices) && Array.isArray(w.in)));
 
 /** Case data that may stay empty: a group of the steps runs only while it is empty and gives it its value */
 const optionalParamsOf = (steps) => [...new Set((steps || []).filter((s) => s && isCondition(s.when) && s.when.empty).map((s) => s.when.param))];
+
+/** Case data that may be left empty to leave out the group that uses it (a filled condition, version 17) */
+const skippableParamsOf = (steps) => [...new Set((steps || []).filter((s) => s && isCondition(s.when) && s.when.filled).map((s) => s.when.param))];
 
 /**
  * What only the groups that run while an optional case data is empty need: optional name -> { params, config },
@@ -196,10 +201,11 @@ function onlyWhenEmptyOf(steps) {
 
 /** Whether a group with this condition runs with this case data; a value outside its choices is an error */
 function conditionHolds(when, params) {
-  if (!isCondition(when)) throw new Error(`A condition must be { param, choices, in } or { param, empty: true }; the case file has ${JSON.stringify(when)}`);
+  if (!isCondition(when)) throw new Error(`A condition must be { param, choices, in }, { param, empty: true } or { param, filled: true }; the case file has ${JSON.stringify(when)}`);
   const v = params ? params[when.param] : undefined;
   if (v === undefined) throw new Error(`Case data ${when.param} is not defined (the case file has no "${when.param}" in its params)`);
   if (when.empty) return String(v) === '';
+  if (when.filled) return String(v).trim() !== '';
   if (!when.choices.map(String).includes(String(v))) throw new Error(`Case data ${when.param} is "${v}": it must be one of ${when.choices.join(', ')}`);
   return when.in.map(String).includes(String(v));
 }
@@ -235,4 +241,4 @@ function resolveUrl(baseUrl, path, key = 'baseUrl') {
   return baseUrl.replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
 }
 
-module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, isCondition, conditionHolds, optionalParamsOf, onlyWhenEmptyOf, notRunWith, fillParams, showPlaceholders, resolveUrl };
+module.exports = { getPath, resolveValue, resolveDeep, isSwitch, paramChoicesOf, isCondition, conditionHolds, optionalParamsOf, skippableParamsOf, onlyWhenEmptyOf, notRunWith, fillParams, showPlaceholders, resolveUrl };

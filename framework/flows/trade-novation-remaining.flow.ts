@@ -6,13 +6,13 @@ import { TradesFlow } from './trades.flow';
 
 /** The data of a novation of the remaining trade (testdata/trade-novation-remaining.json) */
 export interface TradeNovationRemainingData {
-  /** Typed only with the input profile WITH_TARGET_AMOUNT */
+  /**
+   * Typed when it has a value; empty for a product whose dialog has no target amount (byProduct in the test data),
+   * which replaces the E2E project's input profiles WITH_TARGET_AMOUNT / WITHOUT_TARGET_AMOUNT (user decision)
+   */
   novationTargetAmount: string;
   newCounterpartyName: string;
 }
-
-/** What the maker enters: the E2E project's input profiles of the event */
-export type NovationInputProfile = 'WITH_TARGET_AMOUNT' | 'WITHOUT_TARGET_AMOUNT';
 
 /**
  * Novating what remains of a live trade to another counterparty from the trade portal, mirroring the E2E project's
@@ -24,14 +24,14 @@ export class TradeNovationRemainingFlow extends BaseFlow {
   private readonly lifecycleEvent = new LifecycleEventFlow(this.app);
 
   /** Maker novates the remaining trade, up to the confirmed trade change */
-  async novateRemaining(tradeId: string, profile: NovationInputProfile, data: TradeNovationRemainingData) {
+  async novateRemaining(tradeId: string, data: TradeNovationRemainingData) {
     const p = this.params(data);
     const { dynamicAction } = this.app;
 
     await this.lifecycleEvent.openAction(tradeId, 'novationRemaining', 'Novation Remaining');
-    if (profile === 'WITH_TARGET_AMOUNT') {
-      await this.ui.And('I type the target amount', () => dynamicAction.typeField('novationRemainingTargetAmount', p.novationTargetAmount));
-    }
+    // recorded for every run; it runs only while the case data has a value, which the PO may leave empty
+    await this.ui.onlyWhenFilled(p.novationTargetAmount, () =>
+      this.ui.And('I type the target amount', () => dynamicAction.typeField('novationRemainingTargetAmount', p.novationTargetAmount)));
     await this.ui.And('I select the new counterparty', () => dynamicAction.selectCounterparty(p.newCounterpartyName));
     await this.lifecycleEvent.submit(tradeId);
   }

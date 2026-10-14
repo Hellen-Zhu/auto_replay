@@ -101,7 +101,7 @@ export type ApiCall = {
  * A group of actions that runs only for some values of a case data (case format version 13): choices are the values
  * the case data may have, in those for which the group runs
  */
-export type Condition = { param: string; choices: string[]; in: string[] } | { param: string; empty: true };
+export type Condition = { param: string; choices: string[]; in: string[] } | { param: string; empty: true } | { param: string; filled: true };
 
 type Step = {
   title?: string;
@@ -191,6 +191,22 @@ export class UI {
     const value = this.paramValues[param.param];
     if (!choices.includes(value)) throw new Error(`Test data "${param.param}" is "${value}": it must be one of ${choices.join(', ')}`);
     this.condition = { param: param.param, choices: [...choices], in: [...values] };
+    try {
+      return await fn();
+    } finally {
+      this.condition = undefined;
+    }
+  }
+
+  /**
+   * Actions that run only while case data has a value (case format version 17), e.g. typing a field of the event's
+   * dialog that some products do not have: the test data leaves the value empty for them (byProduct), and the PO may
+   * leave it empty in the runner. Like onlyWhen they are recorded whatever the value of this run.
+   */
+  async onlyWhenFilled<R>(param: Val, fn: () => Promise<R>): Promise<R | undefined> {
+    if (typeof param === 'string' || !('param' in param)) throw new Error('onlyWhenFilled needs a parameter of ui.params(), e.g. p.novationTargetAmount');
+    if (this.condition) throw new Error('onlyWhenFilled cannot be nested');
+    this.condition = { param: param.param, filled: true };
     try {
       return await fn();
     } finally {

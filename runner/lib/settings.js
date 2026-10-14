@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { FORMAT_VERSION, DATA_DIR, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf, notRunWith, conditionHolds } = require('../../core/actions');
+const { FORMAT_VERSION, DATA_DIR, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf, skippableParamsOf, notRunWith, conditionHolds } = require('../../core/actions');
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
@@ -65,7 +65,8 @@ const caseDataOf = (doc, params) => Object.keys(params).filter((name) => !notNee
 // Case data without a value in the case file (version 6): what only the PO knows, e.g. the ID of an existing trade
 // case data that may stay empty (the case then gives it its value itself, e.g. creates the trade) is not asked for
 const askedParamsOf = (doc) => {
-  const optional = optionalParamsOf(doc.steps);
+  // and neither is case data that may be left empty to leave out what uses it
+  const optional = [...optionalParamsOf(doc.steps), ...skippableParamsOf(doc.steps)];
   return Object.keys(doc.params || {}).filter((k) => String(doc.params[k]) === '' && !optional.includes(k));
 };
 
@@ -234,6 +235,8 @@ async function askSettings(list, config) {
   const secrets = allRequired.filter(isSecret);
   // case data the case may give a value itself (the ID of a trade it otherwise creates): the PO may enter one or not
   const optional = single ? optionalParamsOf(single.steps) : [];
+  // case data that may be left empty, which leaves out the steps that use it (a field some products do not have)
+  const skippable = single ? skippableParamsOf(single.steps) : [];
   // With such a value given, what only creating it needs is left out (notNeededOf); the lists below follow the
   // current case data, so they change when the PO enters or removes a trade ID
   const notNeeded = () => (single ? notNeededOf(single, params) : { params: new Set(), config: new Set() });
@@ -243,7 +246,7 @@ async function askSettings(list, config) {
   const paramNames = () => [...optional.filter((n) => n in params), ...Object.keys(params).filter((n) => !optional.includes(n))]
     .filter((n) => !notNeeded().params.has(n));
   // a value that is still to be entered is asked for anyway
-  const changeable = () => paramNames().filter((n) => params[n] !== '' || optional.includes(n));
+  const changeable = () => paramNames().filter((n) => params[n] !== '' || optional.includes(n) || skippable.includes(n));
   // values that name a data file, in the order of the path: what can be chosen for the file depends on the folder
   // that was chosen before it
   const ordered = single ? choiceOrder(single) : [];
@@ -257,7 +260,7 @@ async function askSettings(list, config) {
   const no = (i) => (keys ? '' : `${String(i + 1).padStart(numbered.length > 9 ? 2 : 1)}. `);
   const settingText = (k) => (isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k));
   const paramText = (k) => (params[k] !== '' ? `${showData(params[k])}${single && fileMissing(single, params, k) ? '  (not in this package: choose another one, or drop one into this window)' : ''}`
-    : optional.includes(k) ? '(empty: the case creates a new one)' : '(to be entered below)');
+    : optional.includes(k) ? '(empty: the case creates a new one)' : skippable.includes(k) ? '(empty: the steps that use it are left out)' : '(to be entered below)');
   const show = () => {
     if (hasSettings) {
       console.log('\nSettings for this run:');
@@ -311,9 +314,10 @@ async function askSettings(list, config) {
       : `${k}: the values this case can be run with`);
     if (!list || !list.length) {
       for (;;) {
-        const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it${dropsFile(k) ? '; or drop a file into this window and press Enter' : ''}): `);
+        const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it${dropsFile(k) ? '; or drop a file into this window and press Enter' : ''}${skippable.includes(k) ? '; - leaves it empty, which leaves out the steps that use it' : ''}): `);
         if (dropsFile(k) && looksLikePath(v.trim())) { if (useDropped(k, v) || state.inputEnded) return; continue; }
-        if (v !== '') params[k] = v;
+        if (skippable.includes(k) && v.trim() === '-') params[k] = '';
+        else if (v !== '') params[k] = v;
         return;
       }
     }
@@ -489,7 +493,7 @@ async function askSettings(list, config) {
   }
 
   // Case data the case file leaves empty must be entered: the case has nothing to work on without it
-  for (const k of paramNames().filter((n) => params[n] === '' && !optional.includes(n))) {
+  for (const k of paramNames().filter((n) => params[n] === '' && !optional.includes(n) && !skippable.includes(n))) {
     while (params[k] === '') {
       params[k] = (await ask(`Enter ${k}: `)).trim();
       if (params[k] === '' && state.inputEnded) throw new Error(`Case data ${k} was not entered`);

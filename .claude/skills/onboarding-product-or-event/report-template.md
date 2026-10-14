@@ -12,7 +12,7 @@ Mode A (product `<PRODUCT>`): one row per capability. Mode B (event `<event>`): 
 | stepInFull | `TC-TRADE-CREATION-<PRODUCT>-UI-002` | ... | |
 | stepInPartial | `TC-TRADE-CREATION-<PRODUCT>-UI-003` | ... | |
 | cancellation | `TC-TRADE-CANCELLATION-UI-001 @product:<PRODUCT>` | ... | |
-| novationRemaining | `TC-TRADE-NOVATION-REMAINING-UI-001 @product:<PRODUCT>` | skipped | profile not in `PROFILES` |
+| novationRemaining | `TC-TRADE-NOVATION-REMAINING-UI-001 @product:<PRODUCT>` | ... | target amount: typed / left out (`byProduct`) |
 | stepOutFull | - | not supported | left out of the registry (confirmed by ...) |
 | approval / reject, creation UI-004 | `TC-TRADE-APPROVE-CREATION-UI-001` ... | not per product | PO changes `product` / `datFile` |
 
@@ -28,7 +28,7 @@ Status is one of: `passed on real`, `passed on mock`, `listed, not run (why)`, `
 | What | Where it goes | Unblocks |
 |---|---|---|
 | Default dat file | `testdata/dat/<PRODUCT>/<PRODUCT>.dat` | every run of the product |
-| Novation remaining input profile | `PROFILES` in `tests/trade-novation-remaining.spec.ts` | that run |
+| Whether the novation remaining dialog has a target amount | `defaults.byProduct.<PRODUCT>.novationTargetAmount = ""` in `testdata/trade-novation-remaining.json` if not | that run |
 | New and expected notional of partial termination | `defaults.byProduct.<PRODUCT>` in `testdata/trade-partial-termination.json` | that run |
 
 ## 4. QA checklist before go-live (open items)
