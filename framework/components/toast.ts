@@ -3,8 +3,8 @@ import { BaseComponent } from './base.component';
 
 /**
  * The toast notification that pops up after an action and disappears by itself after a few seconds.
- * It has no testid: the E2E project (ToastSteps) reads its title from the element with the attribute data-title
- * and its message from the one with data-description, so the same attributes are used here.
+ * The E2E project (ToastSteps) reads its title from the element with the attribute data-title and its message from
+ * the one with data-description, so the same attributes are used here; both are confirmed on the real system.
  */
 export class Toast extends BaseComponent {
   /** The messages the cases check */
@@ -17,10 +17,10 @@ export class Toast extends BaseComponent {
     /** The fixed part of "Trade <ID> updated with new notional <amount>", which the E2E project matches with wildcards */
     partialTerminationCompleted: 'updated with new notional',
     /**
-     * The fixed part of "Trade <ID> has been allocated into <n> sub-trade(s).", the E2E project's toastMessage of
-     * its allocation test data, where the trade ID is a wildcard
+     * The fixed part of "Trade <ID> has been allocated into <n> sub-trade(s): <ID>-ALLOC-1, <ID>-ALLOC-2.", as the
+     * real system shows it (title "Allocation Complete"): the IDs of the subtrades follow the number
      */
-    allocatedInto: (subTrades: number) => `has been allocated into ${subTrades} sub-trade(s).`,
+    allocatedInto: (subTrades: number) => `has been allocated into ${subTrades} sub-trade(s)`,
   };
   /** The titles the cases check */
   static readonly title = {
@@ -40,23 +40,11 @@ export class Toast extends BaseComponent {
     return { css: '[data-title]', hasText: title, nth: 0 };
   }
 
-  /**
-   * The toast that shows this text, in its title or in its message. For a toast of which only the wording is known:
-   * the allocation's was not found in the message on the real system, and where it is shown was not seen
-   */
-  protected withText(text: Val): TargetIn {
-    return { css: '[data-title], [data-description]', hasText: text, nth: 0 };
-  }
-
   async expectMessage(message: Val) {
     await this.ui.expectVisible(this.withMessage(message));
   }
 
   async expectTitle(title: Val) {
     await this.ui.expectVisible(this.withTitle(title));
-  }
-
-  async expectText(text: Val) {
-    await this.ui.expectVisible(this.withText(text));
   }
 }
