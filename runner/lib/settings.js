@@ -354,8 +354,10 @@ async function askSettings(list, config) {
           : `    "${v}" ${inPath ? 'has no data file' : 'is not one of them'}: type one of the ${above} above${valid ? `, or press Enter to keep ${params[k]}` : ''}.`);
       }
     }
-    // what follows in the path (the file after its folder) may no longer exist for the new value: chosen again
+    // what follows in the path (the file after its folder) may no longer exist for the new value: chosen again,
+    // unless this run does not need it (a given trade: the dat file it would be created from)
     for (const next of inPath ? ordered.slice(ordered.indexOf(k) + 1) : []) {
+      if (notNeeded().params.has(next)) break;
       const l = choicesOf(single, params)[next];
       if (l && l.length && !l.includes(params[next])) { await changeParam(next); break; }
     }

@@ -155,6 +155,8 @@ function refsOf(action) {
  * not run with it use (the data of the given trade when a trade ID was entered, the third subtrade of an allocation
  * into two). A case data that a condition names is always needed, since changing it changes what runs. An action
  * whose condition cannot be decided (a value outside its choices) counts as running: the step fails on it.
+ * A case data in a step line (title) is needed too: the step line is shown whatever runs, e.g. the product of the
+ * given trade ("a Live '${param:product}' trade exists"), which the PO states with the ID of an existing trade.
  */
 function notRunWith(steps, params) {
   const runs = (s) => { try { return !s.when || conditionHolds(s.when, params); } catch { return true; } };
@@ -164,6 +166,7 @@ function notRunWith(steps, params) {
   for (const s of steps || []) {
     if (!s) continue;
     if (isCondition(s.when)) named.add(s.when.param);
+    for (const m of String(s.title || '').matchAll(/\$\{param:([^}]+)\}/g)) used.params.add(m[1]);
     const r = refsOf(s);
     const to = runs(s) ? used : unused;
     r.params.forEach((x) => to.params.add(x));

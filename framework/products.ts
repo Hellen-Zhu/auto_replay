@@ -10,13 +10,32 @@
 export type Capability =
   | 'create' // book a normal trade
   | 'stepInFull'
-  | 'stepInPartial';
+  | 'stepInPartial'
+  | LifecycleEvent;
+
+/**
+ * The lifecycle events on a live trade, one spec each. A spec has one case (one case file, the product is its case
+ * data); QA's run repeats it for every product with the event's capability, each creating its trade through the API
+ */
+export const LIFECYCLE_EVENTS = [
+  'cancellation',
+  'allocation',
+  'amendment',
+  'earlyTermination',
+  'partialTermination',
+  'novationRemaining',
+  'partialNovationRemaining',
+  'stepOutFull',
+  'stepOutPartial',
+  'portfolioReassignment',
+] as const;
+export type LifecycleEvent = (typeof LIFECYCLE_EVENTS)[number];
 
 /** Product type (also what is typed as the Product ID, and the name of its folder in testdata/dat/ and of its default dat file) -> supported capabilities */
 export const PRODUCTS: Record<string, readonly Capability[]> = {
-  FX_PSCRIPT: ['create', 'stepInFull', 'stepInPartial'],
-  FX_TRF: ['create', 'stepInFull', 'stepInPartial'],
-  FX_PSCRIPT_FSKO: ['create', 'stepInFull', 'stepInPartial'],
+  FX_PSCRIPT: ['create', 'stepInFull', 'stepInPartial', ...LIFECYCLE_EVENTS],
+  FX_TRF: ['create', 'stepInFull', 'stepInPartial', ...LIFECYCLE_EVENTS],
+  FX_PSCRIPT_FSKO: ['create', 'stepInFull', 'stepInPartial', ...LIFECYCLE_EVENTS],
 };
 
 /** The products that support a capability, in the order of the registry */

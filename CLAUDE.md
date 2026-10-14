@@ -15,7 +15,7 @@ UAT of OREO, a bank-internal system for the lifecycle of non-flow FX structured 
 - Locators: `data-testid`, via the E2E project's element JSON copied into `elements/`, used by name: `element('new_trade.book_btn')`.
 - A trade a case needs beforehand is created through the API (`api` step, `page.request`, header `X-User-Id` = role's e-mail; no login).
 - `FX_CO` = `FX_PSCRIPT`, `FX_FSB` = `FX_PSCRIPT_FSKO`: use only the new names.
-- A case logs in once (one role). Specs are per lifecycle event, not per product; minimal coverage (repeat per product only where the product changes what is tested).
+- A case logs in once (one role). Specs are per lifecycle event, not per product; creation and every lifecycle event run for every product of its capability (title tag `@product:X`, exported once), approval / reject for one product.
 - The PO's runner always uses the real risk engine (`FIXED_SETTINGS` in `runner/lib/settings.js`); QA's run reads `riskEngine` (`real` / `mock`) from config.
 - The runner never uses a password from the config file: the PO types it (kept in memory only).
 - **English only** in the repo (code, comments, messages, file names, docs, case files). Exception: `docs/demo-slide.html` and `docs/how-it-works.html` (Chinese at the user's request).

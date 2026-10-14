@@ -440,7 +440,9 @@ export class UI {
     // Show what the step read or received, e.g. the ID of the trade it created: in the console and in Playwright's report.
     // With several workers the lines of different cases are mixed in the console, so each says which case it is from
     const info = test.info();
-    const owner = info.config.workers > 1 ? `[${caseIdOf(info.title) || info.title}] ` : '';
+    // (and, for a case that runs for every product, which product: the runs share the case ID)
+    const forProduct = info.title.match(/@product:([\w-]+)/)?.[1];
+    const owner = info.config.workers > 1 ? `[${caseIdOf(info.title) || info.title}${forProduct ? ` ${forProduct}` : ''}] ` : '';
     for (const [name, value] of Object.entries(core.savedValues(recorded, result))) {
       console.log(`  ${owner}${name} = ${value}`);
       info.annotations.push({ type: 'value', description: `${name} = ${value}` });
