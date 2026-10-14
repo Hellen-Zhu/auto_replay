@@ -110,7 +110,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       pausing = true;
       await discardTyped();
       setQuietKeys(false);
-      console.log(`\n  ⏸ Paused after step ${n}/${doc.steps.length}. The browser stays open so you can look at the page.`);
+      console.log(`\n  ⏸ Paused after step ${n}/${shown}. The browser stays open so you can look at the page.`);
       console.log('    Note: operating the page by hand, or waiting until the session expires, may make the remaining steps fail.');
       const t = Date.now();
       await askOptional('    Press Enter to continue: ');
@@ -126,6 +126,13 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
     // An action of a group that runs only for some values of a case data (format version 13), e.g. the third subtrade
     // of an allocation into two: with this run's data it is not needed. A wrong value is left to the step, which fails on it
     const notNeeded = (s) => { try { return !!s && !!s.when && !conditionHolds(s.when, ctx.params); } catch { return false; } };
+    // Actions that run only while a case data is empty (creating the given trade, format version 15): when the PO gave
+    // its value they are not shown at all, the step line says which value is used instead. Their number is left out of
+    // the count, so the actions shown are numbered 1 to n
+    const given = (s) => !!s && !!s.when && s.when.empty === true && notNeeded(s);
+    const shown = doc.steps.filter((s) => !given(s)).length;
+    let shownNo = 0;
+    const givenSaid = new Set();
     let failed = false;
     for (let i = 0; i < doc.steps.length; i++) {
       const step = doc.steps[i];
@@ -138,6 +145,14 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       run.steps.push(rec);
       if (failed) continue;
 
+      if (given(step)) {
+        rec.status = 'notNeeded';
+        rec.given = { [step.when.param]: ctx.params[step.when.param] };
+        if (title) say(`  ■ ${title}`);
+        if (!givenSaid.has(step.when.param)) say(`    - uses the given ${step.when.param} ${ctx.params[step.when.param]}`);
+        givenSaid.add(step.when.param);
+        continue;
+      }
       if (notNeeded(step)) {
         rec.status = 'notNeeded';
         rec.note = step.when.empty ? `not needed: ${step.when.param} is given (${ctx.params[step.when.param]})` : `not needed: ${step.when.param} is ${ctx.params[step.when.param]}`;
@@ -147,7 +162,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       }
       if (title) say(`  ■ ${title}`);
       if (substep) say(`    - ${substep}`);
-      if (!quiet) process.stdout.write(`    [${i + 1}/${doc.steps.length}] ${desc} ... `);
+      if (!quiet) process.stdout.write(`    [${++shownNo}/${shown}] ${desc} ... `);
       try {
         if (step.when) conditionHolds(step.when, ctx.params); // fails the step for a value that is not one of its choices
         const r = await executeStep(page, step, ctx);
@@ -181,7 +196,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       }
 
       const next = doc.steps[i + 1];
-      if (!quiet && !failed && next && !notNeeded(next) && (pauseRequested || (stepByStep && (next.title || next.substep)))) await pause(rec, i + 1);
+      if (!quiet && !failed && next && !notNeeded(next) && (pauseRequested || (stepByStep && (next.title || next.substep)))) await pause(rec, shownNo);
     }
 
     await context.tracing.stop({ path: path.join(dir, 'trace.zip') });

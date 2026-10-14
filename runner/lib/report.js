@@ -10,17 +10,26 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const bdd = (title) => esc(title).replace(/^(Given|When|Then|And|But)\b/, '<b class="kw">$1</b>');
 
 // notNeeded: an action of a group that this run's case data does not need (format version 13), e.g. a third subtrade
-const STATUS_TEXT = { passed: 'Passed', failed: 'Failed', skipped: 'Not run', notNeeded: 'Not needed' };
+// given: a step whose actions only create what the PO gave (the trade of a given tradeId), so none of them was shown
+const STATUS_TEXT = { passed: 'Passed', failed: 'Failed', skipped: 'Not run', notNeeded: 'Not needed', given: 'Given' };
 
 // Group the recorded actions by BDD step: a titled action starts a new group and the untitled ones after it belong to it.
 // A substep (a step of the flow behind the case's step) is a heading inside the group's action list
+// The actions of a given value (rec.given) are left out: the row names the value instead
 function groupSteps(steps) {
   const groups = [];
-  steps.forEach((s, i) => {
-    if (s.title || !groups.length) groups.push({ title: s.title || '', actions: [] });
-    groups[groups.length - 1].actions.push({ ...s, no: i + 1 });
+  let no = 0;
+  steps.forEach((s) => {
+    if (s.title || !groups.length) groups.push({ title: s.title || '', actions: [], given: {} });
+    const g = groups[groups.length - 1];
+    if (s.given) Object.assign(g.given, s.given);
+    else g.actions.push({ ...s, no: ++no });
   });
   for (const g of groups) {
+    if (!g.actions.length) {
+      Object.assign(g, { status: 'given', saved: {}, pausedSec: 0, paused: false });
+      continue;
+    }
     const failed = g.actions.find((a) => a.status === 'failed');
     const done = (a) => a.status === 'passed' || a.status === 'notNeeded';
     g.status = failed ? 'failed'
@@ -47,14 +56,14 @@ function writeReport(dir, run) {
     return `
     <tr class="${g.status}">
       <td>${i + 1}</td>
-      <td><div class="step">${bdd(g.title) || esc(g.actions[0].desc)}</div>${Object.entries(g.saved).map(([k, v]) => `<div class="saved">${esc(k)}: <b>${esc(v)}</b></div>`).join('')}${g.error ? `<pre>${esc(g.error)}</pre>` : ''}${g.paused ? `<div class="paused">Paused for ${fmtSec(g.pausedSec)} during this step</div>` : ''}
-        <details${g.status === 'failed' ? ' open' : ''}><summary>${g.actions.length} action${g.actions.length === 1 ? '' : 's'}</summary><ul>${actions}</ul></details></td>
+      <td><div class="step">${bdd(g.title) || esc((g.actions[0] || {}).desc)}</div>${Object.entries(g.given).map(([k, v]) => `<div class="saved">${esc(k)}: <b>${esc(v)}</b> (given for this run)</div>`).join('')}${Object.entries(g.saved).map(([k, v]) => `<div class="saved">${esc(k)}: <b>${esc(v)}</b></div>`).join('')}${g.error ? `<pre>${esc(g.error)}</pre>` : ''}${g.paused ? `<div class="paused">Paused for ${fmtSec(g.pausedSec)} during this step</div>` : ''}
+        ${g.actions.length ? `<details${g.status === 'failed' ? ' open' : ''}><summary>${g.actions.length} action${g.actions.length === 1 ? '' : 's'}</summary><ul>${actions}</ul></details>` : ''}</td>
       <td>${STATUS_TEXT[g.status]}</td>
       <td>${shot(g.screenshot)}</td>
     </tr>`;
   }).join('');
   const count = (st) => groups.filter((g) => g.status === st).length;
-  const summary = `${groups.length} step${groups.length === 1 ? '' : 's'}: ${count('passed')} passed${count('failed') ? `, ${count('failed')} failed` : ''}${count('skipped') ? `, ${count('skipped')} not run` : ''}${count('notNeeded') ? `, ${count('notNeeded')} not needed` : ''}`;
+  const summary = `${groups.length} step${groups.length === 1 ? '' : 's'}: ${count('passed')} passed${count('failed') ? `, ${count('failed')} failed` : ''}${count('skipped') ? `, ${count('skipped')} not run` : ''}${count('notNeeded') ? `, ${count('notNeeded')} not needed` : ''}${count('given') ? `, ${count('given')} given` : ''}`;
   // The data the case ran with; a value the PO changed for this run is flagged, with the value of the case file
   const caseData = run.caseData && run.caseData.length ? `<table class="data"><caption>Case data</caption><tbody>${run.caseData.map((d) => `
     <tr><td>${esc(d.name)}</td><td>${esc(d.value)}${d.changedFrom !== undefined ? ` <span class="changed">changed for this run (case file: ${esc(d.changedFrom)})</span>` : ''}</td></tr>`).join('')}
@@ -75,7 +84,7 @@ function writeReport(dir, run) {
   .badge.passed{background:#16a34a} .badge.failed{background:#dc2626}
   table{border-collapse:collapse;width:100%;font-size:13px}
   th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}
-  tr.failed td{background:#fef2f2} tr.skipped td,tr.notNeeded td{color:#9ca3af}
+  tr.failed td{background:#fef2f2} tr.skipped td,tr.notNeeded td{color:#9ca3af} tr.given td{color:#374151}
   .step{font-size:14px} li.sub{list-style:none;margin:6px 0 2px -14px;font-weight:600;color:#374151}
   details{margin-top:6px;color:#4b5563;font-size:12px} summary{cursor:pointer;color:#6b7280}
   ul{list-style:none;margin:6px 0 0;padding:0} li{padding:2px 0} li.skipped,li.notNeeded{color:#9ca3af} .note{color:#9ca3af;font-weight:normal}
