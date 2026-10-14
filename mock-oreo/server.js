@@ -35,9 +35,9 @@
 //   MOCK_RISK_ENGINE=down the mock answers them with 503, like a risk engine that is not available: a case then
 //   passes only with riskEngine "mock" in the local config. So is the rule that a cancellation needs comments (the real dialog marks them optional): it is there so
 //   that a case whose comments did not reach the control fails;
-// - PUT /uc/api/user-preferences (path, method, X-User-Id header and the JSON body with "activeBlotters" are the
-//   E2E project's; that it is served from the same address as /api/v1, the answer and that the preferences change
-//   nothing on the pages are this mock's own).
+// - PUT /api/v1/uc/api/user-preferences (path under /api/v1, method, X-User-Id header, the JSON body with
+//   "activeBlotters" and the answer { code, status: 'SUCCESS', data } are real; that the preferences change nothing
+//   on the pages is this mock's own).
 
 const http = require('http');
 const PORT = Number(process.env.PORT || 4173);
@@ -407,8 +407,9 @@ http.createServer((req, res) => {
   if (req.url.startsWith('/api/v1/') && !USERS[caller]) return json(res, 401, { message: 'X-User-Id is missing or not a known user' });
   const readBody = (then) => { let body = ''; req.on('data', (c) => (body += c)); req.on('end', () => then(body)); };
 
-  // The user's preferences: not under /api/v1. They are stored and never used: this mock always shows the same blotter
-  if (req.url === '/uc/api/user-preferences') {
+  // The user's preferences, under /api/v1 like on the real system. They are stored and never used: this mock always
+  // shows the same blotter
+  if (req.url === '/api/v1/uc/api/user-preferences') {
     if (!USERS[caller]) return json(res, 401, { message: 'X-User-Id is missing or not a known user' });
     if (req.method !== 'PUT') return json(res, 405, { message: 'Method not allowed' });
     return readBody((body) => {

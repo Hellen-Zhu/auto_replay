@@ -19,11 +19,12 @@ export class UserPreferencesApi extends BaseApi {
   };
 
   /**
-   * PUT /uc/api/user-preferences, as that hook sends it. The path is not under the prefix apiBaseUrl ends with
-   * (/api/v1), so it is joined to the server of apiBaseUrl; that this server also serves /uc/api is inferred (the
-   * hook sends it with the same helper as the trade requests), not seen on the real system.
+   * PUT /uc/api/user-preferences under the prefix apiBaseUrl ends with (/api/v1), as the page itself sends it:
+   * confirmed on the real system (the browser's Network tab: JSON body, X-User-Id, answer 200 with
+   * { code: 200, status: 'SUCCESS', data: <the preferences> }). An earlier version sent it without the prefix,
+   * which the real system answered with 404.
    */
-  static readonly reset: ApiRequest = { method: 'PUT', path: '/uc/api/user-preferences', base: 'origin', body: UserPreferencesApi.defaults };
+  static readonly reset: ApiRequest = { method: 'PUT', path: '/uc/api/user-preferences', body: UserPreferencesApi.defaults };
 
   /** Set that user's preferences back to the defaults */
   async resetToDefaults(role: string) {

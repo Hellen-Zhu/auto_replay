@@ -75,7 +75,7 @@ export type ApiPart = { json: unknown } | { file: string };
  * A text anywhere inside headers, body or a JSON part may be a reference: cfg('accounts.maker.email') or a parameter.
  * save names the fields of the JSON response to keep as variables: { createdTradeId: 'data.trade.id' }.
  * base 'origin' is for a request of the same server that is not under that prefix: its path is joined to the
- * address of apiBaseUrl without the prefix (/uc/api/user-preferences).
+ * address of apiBaseUrl without the prefix (no request uses it so far).
  */
 export type ApiCall = {
   method: string;

@@ -140,7 +140,7 @@ async function clickAndCapture(page, loc, capture, ctx, timeout, button) {
  * value is a path on apiBaseUrl of the local config: the API may be served from another address than the pages.
  * apiBaseUrl includes the prefix every request shares (e.g. .../api/v1), so that prefix is not part of value.
  * With base "origin" the path is joined to the address of apiBaseUrl without that prefix: a request of the same
- * server that is not under the prefix (e.g. /uc/api/user-preferences).
+ * server that is not under the prefix (no case uses it so far).
  * The request carries multipart (each part a JSON document or a file of the data folder), or body (JSON), or nothing.
  * Any answer other than 2xx fails the step. save stores fields of the JSON response as variables: name -> field.
  * The request is sent by Playwright's own API client, not by the page; it is listed in the trace.
