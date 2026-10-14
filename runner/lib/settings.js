@@ -2,11 +2,12 @@
 
 const fs = require('fs');
 const path = require('path');
-const { FORMAT_VERSION, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf, notRunWith, conditionHolds } = require('../../core/actions');
+const { FORMAT_VERSION, DATA_DIR, showPlaceholders, resolveDataFile, dataFilesOf, fillParams, paramChoicesOf, optionalParamsOf, notRunWith, conditionHolds } = require('../../core/actions');
 const { ROOT } = require('./paths');
 const state = require('./state');
 const { ask, askHidden } = require('./console');
 const { useKeys, pickRow } = require('./menu');
+const { looksLikePath, droppedPath } = require('./case-list');
 
 // ---------------- Saving settings ----------------
 // Update only the given keys in the config file and leave everything else in it untouched.
@@ -109,6 +110,62 @@ function choiceOrder(doc) {
   return order;
 }
 
+// The case data that is the name of a data file itself (datFile of testdata/dat/${param:product}/${param:datFile}):
+// { dir, before, after } for the case data as it is now (dir is null while a folder before it has no value), or null
+function fileParamOf(doc, params, name) {
+  for (const f of dataFileNames(doc)) {
+    const parts = f.split('/');
+    const m = PARAM_PART.exec(parts.at(-1));
+    if (!m || m[2] !== name) continue;
+    const dir = fillParams(parts.slice(0, -1).join('/'), params);
+    return { dir: dir.includes('${param:') ? null : dir, before: m[1], after: m[3] };
+  }
+  return null;
+}
+// Whether the data file a case data names is in the package
+const fileMissing = (doc, params, name) => {
+  const t = fileParamOf(doc, params, name);
+  return !!(t && t.dir && params[name] !== '' && !fs.existsSync(path.join(ROOT, t.dir, `${t.before}${params[name]}${t.after}`)));
+};
+/**
+ * A data file the PO dropped into the window (from anywhere on the computer) is copied into the folder of the package
+ * where the case looks for it (testdata/dat/<PRODUCT>/), so that core still only reads files of DATA_DIR and the file
+ * can be chosen from the list in later runs. A file of that name that is already there is never replaced: the same
+ * file is simply chosen, another one has to be renamed. Returns the value of the case data, or throws why not.
+ */
+function adoptDataFile(doc, params, name, src) {
+  const t = fileParamOf(doc, params, name);
+  if (!t) throw new Error(`${name} does not name a data file`);
+  if (!t.dir) throw new Error('Choose the folder of the file first');
+  if (!fs.statSync(src).isFile()) throw new Error(`${src} is a folder, not a file`);
+  const file = path.basename(src);
+  if (!file.startsWith(t.before) || !file.endsWith(t.after) || file.length <= t.before.length + t.after.length) {
+    throw new Error(`The file name must ${t.before ? `start with "${t.before}"${t.after ? ' and ' : ''}` : ''}${t.after ? `end with "${t.after}"` : ''}`);
+  }
+  const base = path.join(ROOT, DATA_DIR);
+  const dest = path.resolve(ROOT, t.dir, file);
+  if (!dest.startsWith(base + path.sep)) throw new Error(`Data files must be inside ${DATA_DIR}`);
+  const rel = `${t.dir}/${file}`;
+  if (fs.existsSync(dest)) {
+    if (!fs.readFileSync(dest).equals(fs.readFileSync(src))) {
+      throw new Error(`${rel} is already in the package and is a different file: rename yours, or choose that one from the list`);
+    }
+    console.log(`  ${rel} is already in the package (the same file): it is chosen`);
+  } else if (path.resolve(src) !== dest) {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
+    console.log(`  Copied ${file} to ${t.dir}/ (it stays in the package and can be chosen from the list later)`);
+  }
+  return file.slice(t.before.length, file.length - t.after.length);
+}
+// A case whose data file can be chosen by the PO (or dropped into the window): a missing file of the case file is no
+// reason to refuse it before anything is asked
+const choosesDataFile = (doc) => dataFileNames(doc).some((f) => PARAM_PART.test(f.split('/').at(-1)));
+// Why the case cannot run with this data because a data file is missing, or ''
+function missingFileProblem(chosen, params) {
+  try { checkCase(chosen, params); return ''; } catch (e) { return /^File to upload was not found/.test(e.message) ? String(e.message).replace(/ \(expected at .*\)$/, '') : ''; }
+}
+
 // Fails when this runner cannot run the case, before anything is asked or opened
 function checkCase({ file, doc }, params) {
   if (!doc || !Array.isArray(doc.steps)) throw new Error(`${path.basename(file)} is not a case file (it has no steps)`);
@@ -199,7 +256,7 @@ async function askSettings(list, config) {
   const keys = useKeys();
   const no = (i) => (keys ? '' : `${String(i + 1).padStart(numbered.length > 9 ? 2 : 1)}. `);
   const settingText = (k) => (isEmpty(get(k)) ? (isSecret(k) ? '(to be typed in below)' : '(not set)') : isSecret(k) ? '****** (typed in earlier in this window)' : get(k));
-  const paramText = (k) => (params[k] !== '' ? showData(params[k])
+  const paramText = (k) => (params[k] !== '' ? `${showData(params[k])}${single && fileMissing(single, params, k) ? '  (not in this package: choose another one, or drop one into this window)' : ''}`
     : optional.includes(k) ? '(empty: the case creates a new one)' : '(to be entered below)');
   const show = () => {
     if (hasSettings) {
@@ -238,6 +295,13 @@ async function askSettings(list, config) {
 
   // case data that decides a part of a request (the trade type): the case file lists the values it can have
   const fixed = single ? paramChoicesOf(single.steps) : {};
+  // a data file dropped into the window (the console types its path) for case data that names one
+  const dropsFile = (k) => !!(single && fileParamOf(single, params, k));
+  const useDropped = (k, text) => {
+    const src = droppedPath(text);
+    if (!src) { console.log('  There is no file with this path.'); return false; }
+    try { params[k] = adoptDataFile(single, params, k, src); return true; } catch (e) { console.log(`  ${e.message}.`); return false; }
+  };
   const changeParam = async (k) => {
     if (optional.includes(k)) return chooseGiven(k);
     const inPath = ordered.includes(k);
@@ -246,24 +310,30 @@ async function askSettings(list, config) {
       ? `${k}: the values that have a data file in this package${valid ? '' : ` for the new ${ordered[ordered.indexOf(k) - 1] || 'values'}`}`
       : `${k}: the values this case can be run with`);
     if (!list || !list.length) {
-      const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it): `);
-      if (v !== '') params[k] = v;
-      return;
+      for (;;) {
+        const v = await ask(`  ${k} [${showData(params[k])}] (Enter keeps it${dropsFile(k) ? '; or drop a file into this window and press Enter' : ''}): `);
+        if (dropsFile(k) && looksLikePath(v.trim())) { if (useDropped(k, v) || state.inputEnded) return; continue; }
+        if (v !== '') params[k] = v;
+        return;
+      }
     }
     // a value that needs its data file: the PO picks one of those that came with the package. The current
     // value can be kept only while it is one of them (it is not after the folder before it was changed)
     const valid = list.includes(params[k]);
-    if (!valid && list.length === 1) {
+    // a data file the PO may drop instead is always offered as a list, also when the package has only one
+    if (!valid && list.length === 1 && !dropsFile(k)) {
       console.log(`  ${k}: ${list[0]}  (the only data file of that ${ordered[ordered.indexOf(k) - 1] || 'value'})`);
       params[k] = list[0];
     } else if (keys) {
       const rows = [{ text: heading(valid) },
         ...list.map((v) => ({ text: `  ${v}${v === params[k] ? '  (current)' : ''}`, value: v }))];
-      const hint = `Up/Down: move   Enter: choose${valid ? '   Esc: keep the current value' : ''}`;
+      const drops = dropsFile(k);
+      const hint = `Up/Down: move   Enter: choose${valid ? '   Esc: keep the current value' : ''}${drops ? '   Or drop a file into this window' : ''}`;
       // without a value that can be kept, Esc has nothing to go back to: the list is shown again
       for (let r = {}; r.value === undefined && !(r.esc && valid);) {
-        r = await pickRow({ rows, start: params[k], hint });
+        r = await pickRow({ rows, start: params[k], hint, typing: drops });
         if (r.value !== undefined) params[k] = r.value;
+        if (r.typed !== undefined && useDropped(k, r.typed)) break;
       }
       console.log(`  ${k}: ${params[k]}`);
     } else {
@@ -272,8 +342,10 @@ async function askSettings(list, config) {
       const byName = list.some((x) => /^\d+$/.test(x));
       const what = byName ? 'value' : 'number or name';
       list.forEach((v, i) => console.log(`    ${byName ? '-' : `${i + 1}.`} ${v}${v === params[k] ? '  (current)' : ''}`));
+      const drop = dropsFile(k) ? ', or drop a file into this window and press Enter' : '';
       for (;;) {
-        const v = (await ask(valid ? `  ${k} [${showData(params[k])}], ${what} (Enter keeps it): ` : `  ${k}, ${what}: `)).trim();
+        const v = (await ask(valid ? `  ${k} [${showData(params[k])}], ${what} (Enter keeps it${drop}): ` : `  ${k}, ${what}${drop}: `)).trim();
+        if (drop && looksLikePath(v)) { if (useDropped(k, v) || state.inputEnded) break; continue; }
         const picked = /^\d+$/.test(v) && !byName ? list[Number(v) - 1] : list.find((x) => x.toLowerCase() === v.toLowerCase());
         if (picked) params[k] = picked;
         if ((v === '' && valid) || picked || state.inputEnded) break;
@@ -365,6 +437,10 @@ async function askSettings(list, config) {
         console.log(`${distinctProblem(single, params)}. Change one of them.\n`);
         continue;
       }
+      if ((r.key === 's' || r.value === RUN) && single && missingFileProblem(list[0], params)) {
+        console.log(`${missingFileProblem(list[0], params)}. Choose another one, or drop one into this window.\n`);
+        continue;
+      }
       if (r.key === 's') stepByStep = true;
       if (r.key === 's' || r.value === RUN) break;
       if (r.value.param && !told) { console.log('A change of case data applies to this run only.'); told = true; }
@@ -385,6 +461,11 @@ async function askSettings(list, config) {
     if ((answer === '' || answer === 's') && single && distinctProblem(single, params)) {
       if (state.inputEnded) throw new Error(distinctProblem(single, params));
       console.log(`  ${distinctProblem(single, params)}. Type the number of one of them to change it.`);
+      continue;
+    }
+    if ((answer === '' || answer === 's') && single && missingFileProblem(list[0], params)) {
+      if (state.inputEnded) throw new Error(missingFileProblem(list[0], params));
+      console.log(`  ${missingFileProblem(list[0], params)}. Type its number to choose another one, or to drop one into this window.`);
       continue;
     }
     if (answer === '') break;
@@ -441,4 +522,4 @@ async function askSettings(list, config) {
   return { params, askConfig, stepByStep };
 }
 
-module.exports = { BACK, isBack, FIXED_SETTINGS, setCfg, paramsOf, caseDataOf, askedParamsOf, checkCase, askSettings };
+module.exports = { BACK, isBack, FIXED_SETTINGS, setCfg, paramsOf, caseDataOf, askedParamsOf, checkCase, choosesDataFile, askSettings };

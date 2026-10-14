@@ -10,7 +10,7 @@ const state = require('./state');
 const { interactive, askOptional, discardTyped, setQuietKeys } = require('./console');
 const { writeReport } = require('./report');
 const { reportUrl, traceUrl } = require('./view-server');
-const { BACK, paramsOf, caseDataOf, checkCase, askSettings, FIXED_SETTINGS } = require('./settings');
+const { BACK, paramsOf, caseDataOf, checkCase, choosesDataFile, askSettings, FIXED_SETTINGS } = require('./settings');
 
 // A new folder evidence/<name>_<timestamp>. The timestamp has seconds only, so two runs of one case that start in
 // the same second (cases running at the same time) would share a folder: the later one gets the next free second.
@@ -250,8 +250,10 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
         say('✘');
         say(`\n    Failure reason: ${rec.error}\n`);
       }
-      // An API call does not touch the page, so it has no picture: what it sent and received is in the trace
-      if (step.action !== 'api') {
+      // An API call and a set (a value taken over as case data) do not touch the page, so they have no picture: what
+      // an API call sent and received is in the trace. A step that only has such actions (creating the given trade)
+      // then has no screenshot, as when a trade ID was given
+      if (step.action !== 'api' && step.action !== 'set') {
         try {
           const shot = `step-${String(i + 1).padStart(2, '0')}.png`;
           await page.screenshot({ path: path.join(dir, shot) });
@@ -300,7 +302,14 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
 
 /** One case: its settings and case data are asked, then it runs with every step shown. BACK: the PO went back */
 async function runCase(chosen, config) {
-  checkCase(chosen);
+  try {
+    checkCase(chosen);
+  } catch (e) {
+    // A data file of the case file that is not in the package: the PO can choose another one, or drop one into the
+    // window (it is checked again with the data of the run below, and askSettings does not start a run without it)
+    if (!/^File to upload was not found/.test(e.message) || !choosesDataFile(chosen.doc)) throw e;
+    console.log(`\nNote: ${String(e.message).replace(/ \(expected at .*\)$/, '')}. Choose another data file below, or drop one into this window (not needed when the case runs on an existing trade).`);
+  }
   const asked = await askSettings([chosen], config);
   if (asked === BACK) return BACK;
   const { params, askConfig, stepByStep } = asked;

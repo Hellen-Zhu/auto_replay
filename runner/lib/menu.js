@@ -34,15 +34,18 @@ process.on('exit', () => { if (cursorHidden) process.stdout.write('\x1b[?25h'); 
 /**
  * Shows rows and lets one of them be picked: Up / Down move, Enter picks. A row is { text, value }; a row without a
  * value is a heading and cannot be picked. `start` is the value of the row that is highlighted first, `hint` the
- * line below the list, `keys` the letters that end the list by themselves.
- * Resolves to { value } (Enter), { key } (one of `keys`) or { esc: true }. Ctrl+C closes the window like at a prompt.
+ * line below the list, `keys` the letters that end the list by themselves. With `typing`, what is typed is collected
+ * instead (a console types the path of a file dropped into the window): Enter then ends the list with it, Esc clears it.
+ * Resolves to { value } (Enter), { typed } (Enter after typing), { key } (one of `keys`) or { esc: true }. Ctrl+C
+ * closes the window like at a prompt.
  * The list is erased again when it ends, so the caller prints what is to stay on the screen.
  */
-function pickRow({ rows, start, hint, keys = [] }) {
+function pickRow({ rows, start, hint, keys = [], typing = false }) {
   const out = process.stdout;
   const pickable = rows.map((r, i) => (r.value === undefined ? -1 : i)).filter((i) => i >= 0);
   let cur = Math.max(0, pickable.findIndex((i) => rows[i].value === start));
   let top = 0, drawn = 0;
+  let typed = '';
 
   const build = () => {
     const W = Math.max(20, (out.columns || 80) - 1); // one column less than the window, so that no line ever wraps
@@ -64,7 +67,10 @@ function pickRow({ rows, start, hint, keys = [] }) {
       const below = rows.length - top - win;
       lines.push(below > 0 ? `      ... ${below} more below` : '');
     }
-    return [...lines, '', fit(`  ${hint}`, W)];
+    // a long path keeps its end, where the file name is
+    const tail = (t, room) => (textWidth(t) <= room ? t : `...${[...t].slice(-Math.max(1, room - 3)).join('')}`);
+    const keysText = '   Enter: use this file   Esc: clear';
+    return [...lines, '', typed ? `  File: ${tail(typed, W - 8 - keysText.length)}${keysText}` : fit(`  ${hint}`, W)];
   };
   // Only the list itself is redrawn, as the case tree does it
   const erase = () => `${drawn ? `\x1b[${drawn}A` : ''}\x1b[1G\x1b[0J`;
@@ -103,9 +109,11 @@ function pickRow({ rows, start, hint, keys = [] }) {
         case 'down': cur = Math.min(pickable.length - 1, cur + 1); break;
         case 'home': case 'pageup': cur = 0; break;
         case 'end': case 'pagedown': cur = pickable.length - 1; break;
-        case 'return': case 'enter': done({ value: rows[pickable[cur]].value }); return;
-        case 'escape': done({ esc: true }); return;
+        case 'return': case 'enter': done(typed ? { typed } : { value: rows[pickable[cur]].value }); return;
+        case 'escape': if (typed) { typed = ''; break; } done({ esc: true }); return;
+        case 'backspace': if (!typed) return; typed = typed.slice(0, -1); break;
         default:
+          if (typing && typeof s === 'string' && !key.meta && /^[^\x00-\x1f\x7f]+$/.test(s)) { typed += s; break; }
           if (typeof s === 'string' && keys.includes(s.toLowerCase())) done({ key: s.toLowerCase() });
           return;
       }
