@@ -7,9 +7,12 @@
 //   npm run build:portable -- --node-zip D:\soft\node-v22.22.0-win-x64.zip   # to pin a different Node version
 //   npm run build:portable -- --download-node   # download from nodejs.org (needs internet access)
 //   npm run build:portable -- --fresh-node      # replace the node.exe an earlier build left in the output folder
+//   npm run build:portable -- --fresh-deps      # install node_modules again with npm instead of reusing / copying it
 //
 // A node.exe that an earlier build left in the output folder is kept and reused when it is the version of the Node
-// running the build (unless --node-zip, --download-node or --fresh-node is given); everything else is built anew.
+// running the build (unless --node-zip, --download-node or --fresh-node is given). Its node_modules is kept too when it
+// has the Playwright version of this project; otherwise the Playwright packages are copied from this project's
+// node_modules, and npm install runs only when they are not there. Everything else is built anew.
 //
 // Output layout:
 //   UAT-Runner/
@@ -103,14 +106,27 @@ function existingNode() {
   try { return execSync(`"${NODE_EXE}" -v`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return undefined; }
 }
 
+// The packages the runner needs: @playwright/test and what it depends on (no other dependencies, no browser)
+const PW_PACKAGES = ['@playwright/test', 'playwright', 'playwright-core'];
+const versionIn = (modules, pkg) => {
+  try { return JSON.parse(fs.readFileSync(path.join(modules, pkg, 'package.json'), 'utf-8')).version; } catch { return undefined; }
+};
+/** Whether a node_modules folder has every Playwright package in this version */
+const hasPlaywright = (modules, version) => PW_PACKAGES.every((p) => versionIn(modules, p) === version);
+
 async function main() {
   console.log(`\nBuilding portable runner -> ${OUT}\n`);
   // An earlier build's node is kept unless another one is asked for, or it is not the version of the node running this
   // build (the local Node was upgraded since)
   const found = !flag('--skip-node') && !flag('--fresh-node') && !opt('--node-zip') && !flag('--download-node') && existingNode();
   const keepNode = found === process.version && found;
-  if (keepNode) {
-    for (const e of fs.readdirSync(OUT)) if (e !== 'node') fs.rmSync(path.join(OUT, e), { recursive: true, force: true });
+  // The same for the node_modules of an earlier build: kept when it has the Playwright version of this project
+  const pwVersion = versionIn(path.join(ROOT, 'node_modules'), '@playwright/test');
+  if (!pwVersion) throw new Error('node_modules/@playwright/test is missing: run npm install first');
+  const keepDeps = !flag('--fresh-deps') && hasPlaywright(path.join(OUT, 'node_modules'), pwVersion);
+  const kept = new Set([keepNode && 'node', ...(keepDeps ? ['node_modules', 'package.json', 'package-lock.json'] : [])].filter(Boolean));
+  if (kept.size && fs.existsSync(OUT)) {
+    for (const e of fs.readdirSync(OUT)) if (!kept.has(e)) fs.rmSync(path.join(OUT, e), { recursive: true, force: true });
   } else {
     fs.rmSync(OUT, { recursive: true, force: true });
   }
@@ -175,13 +191,20 @@ async function main() {
     console.log('  Included config.local.json (passwords stripped; the PO is prompted for them at run time)');
   }
 
-  // 4. Dependencies: install only @playwright/test, no browser download (the PO machine's own Edge is used)
-  console.log('4/5 Installing dependencies (no browser download)');
-  const pwVersion = require(path.join(ROOT, 'node_modules/@playwright/test/package.json')).version;
+  // 4. Dependencies: only @playwright/test, no browser download (the PO machine's own Edge is used). npm install
+  // through the company mirror is slow, so it runs only when neither an earlier build nor this project has the packages
   fs.writeFileSync(path.join(OUT, 'package.json'), JSON.stringify({
     name: 'oreo-uat-runner', private: true, dependencies: { '@playwright/test': pwVersion },
   }, null, 2));
-  sh('npm install --omit=dev --no-audit --no-fund', OUT);
+  if (keepDeps) {
+    console.log(`4/5 Keeping the dependencies already in the output folder (@playwright/test ${pwVersion}); --fresh-deps installs them again`);
+  } else if (!flag('--fresh-deps') && hasPlaywright(path.join(ROOT, 'node_modules'), pwVersion)) {
+    console.log(`4/5 Copying dependencies from this project's node_modules (@playwright/test ${pwVersion}, no download)`);
+    for (const p of PW_PACKAGES) copyDir(path.join(ROOT, 'node_modules', p), path.join(OUT, 'node_modules', p));
+  } else {
+    console.log('4/5 Installing dependencies (no browser download)');
+    sh('npm install --omit=dev --no-audit --no-fund', OUT);
+  }
 
   // 5. Zip
   if (flag('--no-zip')) {

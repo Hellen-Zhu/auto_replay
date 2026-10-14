@@ -47,13 +47,94 @@ function groupSteps(steps) {
   return groups;
 }
 
+// The screenshots of the run in order, for the replay player of the report: one frame per action that has one,
+// with the step line and substep it belongs to. Built from the groups, so what the table leaves out is left out here too
+function framesOf(groups) {
+  const frames = [];
+  for (const g of groups) {
+    let sub = '';
+    for (const a of g.actions) {
+      if (a.substep) sub = a.substep;
+      if (a.screenshot) frames.push({ src: a.screenshot, step: g.title, sub, no: a.no, desc: a.desc, status: a.status });
+    }
+  }
+  return frames;
+}
+
+// The replay player: the step screenshots shown one after another at full size, since the screencast of the trace
+// viewer is at most 800 pixels wide (fixed by Playwright). The page works without it; the thumbnails then stay links
+const PLAYER = `
+<div id="player" hidden>
+  <div class="pl-top"><div class="pl-step" id="pl-step"></div><div class="pl-sub" id="pl-sub"></div>
+    <div class="pl-desc"><span id="pl-no"></span> <span id="pl-desc"></span> <span id="pl-st"></span></div>
+    <button class="pl-close" id="pl-close" title="Close (Esc)">&times;</button></div>
+  <div class="pl-img"><img id="pl-img" alt=""></div>
+  <div class="pl-bar">
+    <button id="pl-prev" title="Previous (Left)">&#9664;&#9664;</button>
+    <button id="pl-play" title="Play / pause (Space)">&#9654;</button>
+    <button id="pl-next" title="Next (Right)">&#9654;&#9654;</button>
+    <input type="range" id="pl-pos" min="0" value="0">
+    <span id="pl-count"></span>
+    <select id="pl-speed" title="Time per screenshot"><option value="1000">1 s</option><option value="2000" selected>2 s</option><option value="3000">3 s</option><option value="5000">5 s</option></select>
+  </div>
+</div>
+<script>
+(function () {
+  var frames = JSON.parse(document.getElementById('frames').textContent);
+  if (!frames.length) return;
+  var $ = function (id) { return document.getElementById(id); };
+  var player = $('player'), pos = $('pl-pos'), i = 0, timer = null;
+  pos.max = frames.length - 1;
+  var STATUS = { passed: 'Passed', failed: 'Failed', skipped: 'Not run' };
+  var bdd = function (el, t) { var m = /^(Given|When|Then|And|But)\\b(.*)$/.exec(t || ''); el.textContent = ''; if (m) { var b = document.createElement('b'); b.className = 'kw'; b.textContent = m[1]; el.appendChild(b); el.appendChild(document.createTextNode(m[2])); } else el.textContent = t || ''; };
+  function show(n) {
+    i = Math.max(0, Math.min(frames.length - 1, n));
+    var f = frames[i];
+    $('pl-img').src = f.src;
+    bdd($('pl-step'), f.step); bdd($('pl-sub'), f.sub);
+    $('pl-no').textContent = f.no + '.'; $('pl-desc').textContent = f.desc;
+    $('pl-st').textContent = STATUS[f.status] || ''; $('pl-st').className = f.status;
+    pos.value = i; $('pl-count').textContent = (i + 1) + ' / ' + frames.length;
+    if (frames[i + 1]) new Image().src = frames[i + 1].src;
+  }
+  function stop() { clearTimeout(timer); timer = null; $('pl-play').innerHTML = '&#9654;'; }
+  function tick() { if (i >= frames.length - 1) return stop(); show(i + 1); timer = setTimeout(tick, +$('pl-speed').value); }
+  function play() { if (i >= frames.length - 1) show(0); $('pl-play').innerHTML = '&#10074;&#10074;'; timer = setTimeout(tick, +$('pl-speed').value); }
+  function open(n) { player.hidden = false; document.body.style.overflow = 'hidden'; show(n); }
+  function close() { stop(); player.hidden = true; document.body.style.overflow = ''; }
+  $('pl-open').hidden = false;
+  $('pl-open').onclick = function () { open(0); play(); };
+  $('pl-close').onclick = close;
+  $('pl-prev').onclick = function () { stop(); show(i - 1); };
+  $('pl-next').onclick = function () { stop(); show(i + 1); };
+  $('pl-play').onclick = function () { timer ? stop() : play(); };
+  pos.oninput = function () { stop(); show(+pos.value); };
+  document.addEventListener('keydown', function (e) {
+    if (player.hidden) return;
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowLeft') { stop(); show(i - 1); }
+    else if (e.key === 'ArrowRight') { stop(); show(i + 1); }
+    else if (e.key === ' ') { e.preventDefault(); timer ? stop() : play(); }
+  });
+  // A screenshot of the table opens the player at that screenshot
+  document.querySelectorAll('a[data-shot]').forEach(function (a) {
+    a.onclick = function (e) {
+      var n = frames.findIndex(function (f) { return f.src === a.getAttribute('data-shot'); });
+      if (n < 0) return;
+      e.preventDefault(); open(n);
+    };
+  });
+})();
+</script>`;
+
 function writeReport(dir, run) {
   fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify(run, null, 2), 'utf-8');
-  const shot = (file) => (file ? `<a href="${esc(file)}" target="_blank"><img src="${esc(file)}"></a>` : '');
+  const shot = (file) => (file ? `<a href="${esc(file)}" target="_blank" data-shot="${esc(file)}"><img src="${esc(file)}"></a>` : '');
   const groups = groupSteps(run.steps);
+  const frames = framesOf(groups);
   const rows = groups.map((g, i) => {
     const actions = g.actions.map((a) => `
-          ${a.substep ? `<li class="sub">${bdd(a.substep)}</li>` : ''}<li class="${a.status}"><span class="no">${a.no}.</span> ${esc(a.desc)} <span class="st">${STATUS_TEXT[a.status]}</span>${a.screenshot ? ` <a href="${esc(a.screenshot)}" target="_blank">screenshot</a>` : ''}${a.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(a.pausedSec)} after this action</div>` : ''}</li>`).join('');
+          ${a.substep ? `<li class="sub">${bdd(a.substep)}</li>` : ''}<li class="${a.status}"><span class="no">${a.no}.</span> ${esc(a.desc)} <span class="st">${STATUS_TEXT[a.status]}</span>${a.screenshot ? ` <a href="${esc(a.screenshot)}" target="_blank" data-shot="${esc(a.screenshot)}">screenshot</a>` : ''}${a.pausedSec !== undefined ? `<div class="paused">Paused for ${fmtSec(a.pausedSec)} after this action</div>` : ''}</li>`).join('');
     return `
     <tr class="${g.status}">
       <td>${i + 1}</td>
@@ -96,15 +177,29 @@ function writeReport(dir, run) {
   table.data{width:auto;margin-bottom:16px} table.data caption{text-align:left;font-weight:600;padding:0 8px 2px}
   table.data td{padding:4px 8px} table.data td:first-child{color:#6b7280} .changed{color:#b45309}
   video{max-width:100%;margin-top:16px;border:1px solid #e5e7eb}
+  .pl-open{font:inherit;font-size:13px;padding:6px 14px;margin:0 0 16px;border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:6px;cursor:pointer}
+  #player{position:fixed;inset:0;z-index:10;background:#111827;color:#f9fafb;display:flex;flex-direction:column}
+  #player[hidden]{display:none}
+  .pl-top{position:relative;padding:12px 56px 8px 20px;font-size:14px} .pl-step{font-size:16px;font-weight:600}
+  .pl-sub{color:#d1d5db;margin-top:2px} .pl-desc{color:#9ca3af;font-size:13px;margin-top:4px}
+  #player .kw{color:#93c5fd} #pl-st.passed{color:#4ade80} #pl-st.failed{color:#f87171} #pl-st.skipped{color:#9ca3af}
+  .pl-close{position:absolute;top:8px;right:14px;font-size:28px;line-height:1;background:none;border:0;color:#f9fafb;cursor:pointer}
+  .pl-img{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 12px}
+  .pl-img img{max-width:100%;max-height:100%;object-fit:contain;border:0;border-radius:2px}
+  .pl-bar{display:flex;align-items:center;gap:10px;padding:10px 20px 14px;font-size:13px}
+  .pl-bar button,.pl-bar select{font:inherit;background:#374151;color:#f9fafb;border:0;border-radius:4px;padding:5px 10px;cursor:pointer}
+  #pl-pos{flex:1;min-width:60px}
 </style></head><body>
 <h1><span class="kw">Scenario:</span> ${esc(run.caseName)} <span class="badge ${run.status}">${run.status === 'passed' ? 'Passed' : 'Failed'}</span></h1>
 ${run.description ? `<p class="desc">${esc(run.description)}</p>` : ''}
 <div class="meta">${summary} · Machine: ${esc(run.machine)} · Started: ${esc(run.startedAt)} · Duration: ${fmtSec(run.durationSec)}${run.pausedSec ? ` (plus ${fmtSec(run.pausedSec)} paused)` : ''}${run.stepByStep ? ' · Mode: step by step' : ''}${run.source ? ` · Case source: ${esc(run.source)}` : ''}</div>
 ${run.mocked && run.mocked.length ? `<p class="desc changed">Note: ${esc(run.mocked.join(', '))} was set to "mock" for this run: its requests were answered by the runner, not by the system.</p>` : ''}
-${caseData}${runValues}<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
+${frames.length ? `<button class="pl-open" id="pl-open" hidden>&#9654; Play the screenshots (${frames.length})</button>
+` : ''}${caseData}${runValues}<table><thead><tr><th>#</th><th>Step</th><th>Result</th><th>Screenshot</th></tr></thead><tbody>${rows}</tbody></table>
 ${run.video ? `<video src="${esc(run.video)}" controls></video>` : ''}
 <p class="meta">Full replay: <a href="${esc(run.traceUrl)}">Open trace viewer</a><br>
-Opens the trace viewer (every action with page snapshots, console and network). The link works while the runner window is still open; later, double-click view-trace.bat first. The same data is in trace.zip in this folder.</p>
+Opens the trace viewer (every action with page snapshots, console and network). Click an action on the left to see the page as it was in the large view, which is sharp; the strip at the top and its playback are small pictures (Playwright records them at most 800 pixels wide): for a sharp playback use "Play the screenshots" above. The link works while the runner window is still open; later, double-click view-trace.bat first. The same data is in trace.zip in this folder.</p>
+<script type="application/json" id="frames">${JSON.stringify(frames).replace(/</g, '\\u003c')}</script>${frames.length ? PLAYER : ''}
 </body></html>`;
   fs.writeFileSync(path.join(dir, 'report.html'), html, 'utf-8');
 }

@@ -217,9 +217,10 @@ npm run build:portable                    # copies your local node.exe, no inter
 npm run build:portable -- --with-config   # include your baseUrl and accounts (passwords are stripped)
 npm run build:portable -- --no-zip        # the folder only
 npm run build:portable -- --fresh-node    # copy node.exe again although the last build left one
+npm run build:portable -- --fresh-deps    # run npm install again instead of keeping / copying node_modules
 ```
 
-A rebuild keeps the `node/node.exe` that the last build left in `dist/UAT-Runner/` when it is the version of the Node you run the build with; everything else is built anew.
+A rebuild keeps the `node/node.exe` that the last build left in `dist/UAT-Runner/` when it is the version of the Node you run the build with, and its `node_modules` when it has this project's Playwright version; otherwise the Playwright packages are copied from your `node_modules`, and `npm install` runs only when they are missing there. Everything else is built anew.
 
 This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files have to be sent: the PO drops them into the package's `cases` folder (plus any new file under `testdata/dat/` and `requests/`).
 
@@ -253,7 +254,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
    - A case that creates its trade first asks **which trade it runs on**: create a new one (through the API), or use an existing one (type its `tradeId`). With an existing trade the data and the account needed only to create a trade are not shown or asked for. The trade must be in the state the case starts from, and the run changes it.
    - A typed-in address or account can be saved to `config.local.json` for next time.
 4. Edge opens and runs the steps. Press `P` in the console window to pause after the current step, Enter to resume; Ctrl+C stops the run.
-5. The report opens: one row per Given / When / Then step with its result and screenshot, and the values the run produced (e.g. the ID of the trade it created). The console and the report also give two links: **Report** and **Full replay** (Playwright's trace viewer). They work on this computer only, while the runner window is open.
+5. The report opens: one row per Given / When / Then step with its result and screenshot, and the values the run produced (e.g. the ID of the trade it created). The console and the report also give two links: **Report** and **Full replay** (Playwright's trace viewer). They work on this computer only, while the runner window is open. **Play the screenshots** at the top of the report (or a click on any screenshot) plays the step screenshots one after another at full size, with the step each belongs to; it works from the evidence folder alone. In the trace viewer, click an action to see the page sharply in the large view: its playback strip is recorded small by Playwright and looks blurred.
 6. After a single case the browser stays open, so you can look at the result or go on by hand (that is not in the report). Press Enter to close it and choose the next case, or type `Q` to close the window.
 7. **view-trace.bat** lists earlier runs with their links. If something goes wrong, send the run's folder under `evidence/` to QA.
 
