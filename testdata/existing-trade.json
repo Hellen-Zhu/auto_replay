@@ -4,7 +4,7 @@
   ],
   "cases": [
     {
-      "id": "TC-EXISTING-TRADE-UI-003",
+      "id": "TC-TRADE-CANCELLATION-EXISTING-UI-001",
       "use": [
         "cancellation"
       ]

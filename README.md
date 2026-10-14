@@ -33,6 +33,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `testdata/dat/<PRODUCT>/` | The dat files cases upload or send; shipped to the PO |
 | `elements/` | Element locators, a copy of the E2E project's; never edited here |
 | `cases/<spec name>/` | Exported case files |
+| `requests/` | The API requests the case files name (a case file holds only `"ref"` for each); written by the export, packaged next to `cases/` |
 | `runner/`, `portable/*.bat` | The PO's runner and its launchers |
 | `scripts/` | `build-portable`, `sync-elements`, `export-existing-trade-cases` |
 | `mock-oreo/` | Mock OREO, for local tries only |
@@ -78,7 +79,7 @@ npx tsc -p .                      # type check
 | `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` | Maker allocates to 2, 3 or 4 subtrades: the case data `allocationWays`, chosen in the runner |
 | `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-UI-001` | Maker triggers the event from the trade's action menu |
 | `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002`, `-003` | Maker amends the counterparty / the risk portfolio; pending checker approval |
-| `existing-trade` | `TC-EXISTING-TRADE-UI-001` to `-005`, `TC-TRADE-<EVENT>-EXISTING-UI-...` | On an existing trade: checker decides on a new trade, maker cancels, checker decides on the cancellation; every lifecycle event on a given trade |
+| `existing-trade` | `TC-TRADE-APPROVAL-REJECT-EXISTING-UI-001` / `-002`, `TC-TRADE-CANCELLATION-EXISTING-UI-001` to `-003`, `TC-TRADE-<EVENT>-EXISTING-UI-...` | On an existing trade: checker decides on a new trade, maker cancels, checker decides on the cancellation; every lifecycle event on a given trade |
 
 How the cases are cut:
 
@@ -90,12 +91,13 @@ How the cases are cut:
   2. `tradeId` in the case's row of `testdata/existing-trade.json` (never commit a real trade ID);
   3. otherwise the case creates the trade through the API, where the state it starts from can be created (pending approval, Live); a case that starts from a pending cancellation or amendment is skipped.
 
-  The exported case file follows the source: with an ID (1 or 2) the PO enters the trade ID in the runner; with a created trade (3) the replay creates its own trade too. Export the PO's files with `npm run export:existing-trade`, which always gives an ID. A case changes its trade, so it cannot be repeated on the same one:
+  The exported case file follows the source: with an ID (1 or 2) the PO enters the trade ID in the runner; with a created trade (3) the replay creates its own trade too. Export the PO's files with `npm run export:existing-trade`, which always gives an ID: it creates each trade through the API with the case data of the case it is for (product, dat file, trade type of `testdata/existing-trade.json` and `testdata/shared/given-trade.json`). A case changes its trade, so it cannot be repeated on the same one:
 
   ```bash
-  # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-EXISTING-TRADE-UI-003"
-  OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-EXISTING-TRADE-UI-003"
-  npm run export:existing-trade                # creates three trades and runs the five existing-trade cases on them
+  # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-TRADE-CANCELLATION-EXISTING-UI-001"
+  OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-TRADE-CANCELLATION-EXISTING-UI-001"
+  npm run export:existing-trade                # creates three trades through the API and runs the approval and cancellation cases on them
+  npm run export:existing-trade -- --product=FX_PSCRIPT --datFile=FX_PSCRIPT.dat --tradeType=StepInFull   # the same for another product, dat file or trade type
   npm run export:existing-trade -- --events    # also the cases of the event specs; one more real trade per case
   ```
 
@@ -197,7 +199,7 @@ async submitTrade(role: string, basic: TradeBasic, file: string) {
 }
 ```
 
-- The call is recorded in the case file like any other step, so the PO's replay creates its own trade.
+- The call is recorded like any other step, so the PO's replay creates its own trade. The case file holds only the name of the request (`{ "action": "api", "ref": "post-trades-create-..." }`); the request itself (path, headers, body, parts) is written to `requests/<ref>.json`, which the package carries. Send `requests/` along with case files whose requests are new or changed.
 - An API object holds the requests and one operation per request; a flow composes them (`flows.tradeProvisioning.provisionLiveTrade`); a case never calls them.
 - The API has no login: `this.as('maker')` sends that role's e-mail as `X-User-Id`, as a config reference.
 - A path **starts after the prefix** that `apiBaseUrl` carries: `/trades/create`, never `/api/v1/trades/create`, never a full address. A request of the same server that is not under the prefix would be written with its whole path and `base: 'origin'`; no request needs it so far (the preference reset `/uc/api/user-preferences` is under the prefix).
@@ -220,7 +222,7 @@ npm run build:portable -- --with-config   # include your baseUrl and accounts (p
 npm run build:portable -- --no-zip        # the folder only
 ```
 
-This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files have to be sent: the PO drops them into the package's `cases` folder (plus any new file under `testdata/dat/`).
+This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files have to be sent: the PO drops them into the package's `cases` folder (plus any new file under `testdata/dat/` and `requests/`).
 
 **Build and send a new package whenever the case format or the runner changed.** A case file does not carry its format version, so an older runner cannot tell that a file is too new and fails at its first step. The current runner still runs older files.
 

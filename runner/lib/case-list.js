@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { CASES_DIR } = require('./paths');
+const { ROOT, CASES_DIR } = require('./paths');
 const { readCase } = require('../../core/actions');
 const { ask } = require('./console');
 
@@ -20,7 +20,7 @@ function listCases(dir = CASES_DIR) {
       const rel = path.relative(CASES_DIR, file).split(path.sep);
       const where = { file, id: rel.at(-1).slice(0, -'.json'.length), dir: rel.slice(0, -1).join('/') };
       try {
-        return [{ ...where, doc: readCase(JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, ''))) }];
+        return [{ ...where, doc: readCase(JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, '')), ROOT) }];
       } catch (err) {
         return [{ ...where, error: err.message }];
       }

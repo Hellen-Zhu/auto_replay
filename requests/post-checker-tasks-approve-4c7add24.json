@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/checker/tasks/${var:createdTaskId}/approve",
+  "headers": {
+    "X-User-Id": "${cfg:accounts.checker.email}"
+  },
+  "body": {}
+}

@@ -2,6 +2,7 @@
 // After the test passes, the fixture calls exportCase() to export the case file for the PO to replay.
 
 import { Page, test } from '@playwright/test';
+import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { caseIdOf } from './data';
@@ -87,6 +88,8 @@ export type ApiCall = {
   multipart?: Record<string, ApiPart>;
   save?: Record<string, string>;
   timeout?: number;
+  // in the case file, the name of the request in requests/ instead of the fields above
+  ref?: string;
 };
 
 /**
@@ -419,7 +422,9 @@ export class UI {
     // A value the PO enters is written empty: the one of this run (a trade that is used up by now) is of no use
     const asked = Object.keys(params).filter((name) => name in this.inputs);
     for (const name of asked) params[name] = '';
-    const steps = nested(this.steps);
+    // An api step names its request; the request itself goes to requests/ (format version 14), so that the case file
+    // reads as what the case does. The params, the settings and the data files are worked out from the full steps above
+    const steps = nested(this.steps).map((g) => ({ ...g, actions: g.actions.map((e) => (isSubstepEntry(e) ? { ...e, actions: e.actions.map((a) => this.toRef(a)) } : this.toRef(e))) }));
     const caseDoc = {
       // The steps are nested (format version 10): one entry per step line of the scenario, and inside it one entry
       // per substep with the actions behind it; a substep that runs only for some values of case data carries them as
@@ -438,6 +443,27 @@ export class UI {
     };
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify(caseDoc, null, 2), 'utf-8');
+  }
+
+  /**
+   * An api step as the case file holds it: { action: 'api', ref }, its request written to requests/<ref>.json. The name
+   * is the method and the path, plus a hash of the whole request, since one path is sent with different bodies (the
+   * submit of a normal and of a StepIn trade). A request already written is not written again.
+   */
+  private toRef(step: Step): Step {
+    if (step.action !== 'api') return step;
+    const request = core.requestOf(step);
+    const json = JSON.stringify(request, null, 2);
+    const slug = `${request.method} ${String(request.path).split('?')[0]}`.replace(/\$\{[^}]*\}/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const ref = `${slug}-${createHash('sha1').update(json).digest('hex').slice(0, 8)}`;
+    const dir = process.env.OREO_REQUESTS_DIR || path.join(this.rootDir ?? process.cwd(), core.REQUESTS_DIR);
+    const file = path.join(dir, `${ref}.json`);
+    if (!fs.existsSync(file)) {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(file, json + '\n', 'utf-8');
+    }
+    const rest = Object.fromEntries(Object.entries(step).filter(([k]) => !['method', 'value', 'base', 'headers', 'body', 'multipart', 'save', 'timeout'].includes(k)));
+    return { ...rest, action: 'api', ref } as Step;
   }
 }
 

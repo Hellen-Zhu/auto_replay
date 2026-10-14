@@ -1,0 +1,15 @@
+{
+  "method": "PUT",
+  "path": "/uc/api/user-preferences",
+  "headers": {
+    "X-User-Id": "${cfg:accounts.maker.email}"
+  },
+  "body": {
+    "theme": "light",
+    "numberFormat": "en-US",
+    "dateFormat": "MM/DD/YYYY",
+    "activeBlotters": [
+      "BLT-DEFAULT-NEW-TODAY"
+    ]
+  }
+}

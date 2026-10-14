@@ -14,7 +14,43 @@
 // 12 = adds base "origin" on an api step: its path is joined to the server of apiBaseUrl, without the prefix
 // 13 = adds a condition on a substep entry: { substep, when: { param, choices, in }, actions } runs only for those
 // values of that case data (values.js); in the flat list every action of the substep carries it
-const FORMAT_VERSION = 13;
+// 14 = an api step may name its request instead of holding it: { action: 'api', ref: '<id>' }, the request being the
+// file requests/<id>.json of the package (expandRequests below)
+const FORMAT_VERSION = 14;
+
+const fs = require('fs');
+const path = require('path');
+
+// The folder of the API requests, next to cases/: the case file names a request, the request itself is here, so that
+// the PO reading a case file sees what the case does and not the bodies it sends
+const REQUESTS_DIR = 'requests';
+// What a request file holds, and the name each has in an api step (its path is the step's value)
+const REQUEST_FIELDS = { method: 'method', path: 'value', base: 'base', headers: 'headers', body: 'body', multipart: 'multipart', save: 'save', timeout: 'timeout' };
+
+/** An api step's request as the content of its request file */
+function requestOf(step) {
+  const out = {};
+  for (const [field, key] of Object.entries(REQUEST_FIELDS)) if (step[key] !== undefined) out[field] = step[key];
+  return out;
+}
+
+/**
+ * Every api step that names its request (ref) as the full step: the request is read from requests/<ref>.json under
+ * rootDir. A step without ref is returned as it is, so a case file that holds its requests (up to version 13) runs as before.
+ */
+function expandRequests(steps, rootDir) {
+  return steps.map((step) => {
+    if (!step || step.action !== 'api' || step.ref === undefined) return step;
+    const { ref, ...rest } = step;
+    if (typeof ref !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(ref)) throw new Error(`The API request "${ref}" of this case is not a valid request name`);
+    const file = path.join(rootDir || '.', REQUESTS_DIR, `${ref}.json`);
+    if (!fs.existsSync(file)) throw new Error(`The API request ${ref} of this case is missing (${REQUESTS_DIR}/${ref}.json). Ask QA for the current UAT-Runner package.`);
+    const request = JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, ''));
+    const fields = {};
+    for (const [field, key] of Object.entries(REQUEST_FIELDS)) if (request[field] !== undefined) fields[key] = request[field];
+    return { ...rest, ...fields, action: 'api' };
+  });
+}
 
 /**
  * The actions of a case file as one flat list, which is what runs: a nested entry (version 9) gives its actions, the
@@ -34,11 +70,15 @@ function flatSteps(steps) {
   });
 }
 
-/** A case file as the runner works on it: whatever its version, steps is the flat list of actions */
+/**
+ * A case file as the runner works on it: whatever its version, steps is the flat list of actions, each api step with
+ * its request (read from requests/ under rootDir, the root of the package)
+ */
 // (a file of a newer version is left alone: the runner refuses it by its version)
-const readCase = (doc) => (doc && Array.isArray(doc.steps) && !(Number(doc.formatVersion) > FORMAT_VERSION) ? { ...doc, steps: flatSteps(doc.steps) } : doc);
+const readCase = (doc, rootDir) => (doc && Array.isArray(doc.steps) && !(Number(doc.formatVersion) > FORMAT_VERSION)
+  ? { ...doc, steps: expandRequests(flatSteps(doc.steps), rootDir) } : doc);
 
 /** The checks that came with version 8: a case that uses one cannot be run by an older runner */
 const V8_ACTIONS = ['expectHidden', 'expectEnabled', 'expectDisabled', 'expectValue'];
 
-module.exports = { FORMAT_VERSION, V8_ACTIONS, flatSteps, readCase };
+module.exports = { FORMAT_VERSION, V8_ACTIONS, REQUESTS_DIR, flatSteps, requestOf, expandRequests, readCase };

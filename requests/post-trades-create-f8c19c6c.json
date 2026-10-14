@@ -1,0 +1,83 @@
+{
+  "method": "POST",
+  "path": "/trades/create?tradeAction=SUBMIT",
+  "headers": {
+    "X-User-Id": "${cfg:accounts.maker.email}"
+  },
+  "multipart": {
+    "trade": {
+      "json": {
+        "basic": {
+          "counterpartyFmId": "${param:counterpartyFmId}",
+          "counterpartyName": "${param:counterpartyName}",
+          "portfolioId": "${param:portfolioId}",
+          "productId": "${param:product}",
+          "direction": "${param:direction}",
+          "premiumAmount": 10000,
+          "premiumCurrency": "${param:premiumCurrency}",
+          "udf": {
+            "byParam": "tradeType",
+            "choices": [
+              "Normal",
+              "StepInFull",
+              "StepInPartial"
+            ],
+            "values": {
+              "StepInFull": [
+                {
+                  "key": "stepInType",
+                  "value": "StepInFull",
+                  "type": "Text"
+                },
+                {
+                  "key": "oldCptyName",
+                  "value": "${param:oldCounterpartyName}",
+                  "type": "Text"
+                },
+                {
+                  "key": "oldCptyFmId",
+                  "value": "${param:oldCounterpartyFmId}",
+                  "type": "Text"
+                },
+                {
+                  "key": "novationDate",
+                  "value": "${param:novationDate}",
+                  "type": "Date"
+                }
+              ],
+              "StepInPartial": [
+                {
+                  "key": "stepInType",
+                  "value": "StepInPartial",
+                  "type": "Text"
+                },
+                {
+                  "key": "oldCptyName",
+                  "value": "${param:oldCounterpartyName}",
+                  "type": "Text"
+                },
+                {
+                  "key": "oldCptyFmId",
+                  "value": "${param:oldCounterpartyFmId}",
+                  "type": "Text"
+                },
+                {
+                  "key": "novationDate",
+                  "value": "${param:novationDate}",
+                  "type": "Date"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "datFile": {
+      "file": "testdata/dat/${param:product}/${param:datFile}"
+    }
+  },
+  "save": {
+    "createdTradeId": "data.trade.id",
+    "createdTaskId": "data.checkerContext.taskId"
+  }
+}

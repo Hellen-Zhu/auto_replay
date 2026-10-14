@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { CASES_DIR } = require('./paths');
+const { ROOT, CASES_DIR } = require('./paths');
 const { readCase } = require('../../core/actions');
 const state = require('./state');
 const { rl, plural } = require('./console');
@@ -340,7 +340,7 @@ function casesFromArgs(args) {
         else list.push(c);
       }
     } else {
-      list.push({ file, id: path.basename(file, '.json'), doc: readCase(JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, ''))) });
+      list.push({ file, id: path.basename(file, '.json'), doc: readCase(JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^\uFEFF/, '')), ROOT) });
     }
   }
   const cases = list.filter((c, i) => list.findIndex((x) => x.file === c.file) === i);

@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
-const { DATA_DIR } = require('../core/actions');
+const { DATA_DIR, REQUESTS_DIR } = require('../core/actions');
 
 const ROOT = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
@@ -91,6 +91,8 @@ async function main() {
   copyDir(path.join(ROOT, 'runner'), path.join(OUT, 'runner'));
   copyDir(path.join(ROOT, 'core'), path.join(OUT, 'core'));
   copyDir(path.join(ROOT, 'cases'), path.join(OUT, 'cases'), (p) => fs.statSync(p).isDirectory() || p.endsWith('.json'));
+  // The API requests the cases name (a case file holds only the name of each request)
+  if (fs.existsSync(path.join(ROOT, REQUESTS_DIR))) copyDir(path.join(ROOT, REQUESTS_DIR), path.join(OUT, REQUESTS_DIR), (p) => fs.statSync(p).isDirectory() || p.endsWith('.json'));
   // Files the cases upload (e.g. the product .dat files)
   // Only the dat folder of testdata/: the JSON test data stays with QA, a case file carries the values it uses
   if (fs.existsSync(path.join(ROOT, DATA_DIR))) copyDir(path.join(ROOT, DATA_DIR), path.join(OUT, DATA_DIR));
