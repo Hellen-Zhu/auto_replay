@@ -17,6 +17,10 @@ const DEFAULTS = {
     args: [],
     headless: false,
     slowMo: 300, // slow every step by 300ms so the PO can follow along
+    // The runner frames the element of each action and pauses this long before it acts, so the PO can follow the
+    // replay (0 or highlight: false turns it off). QA's Playwright run does not use it
+    highlight: true,
+    highlightMs: 600,
   },
   // response: how long a click waits for the answer of a request it is known to trigger (a risk calculation is slow)
   timeouts: { step: 15000, response: 60000 },

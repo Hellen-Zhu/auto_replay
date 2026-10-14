@@ -23,6 +23,8 @@ async function executeStep(page, step, ctx) {
     const resolved = {};
     for (const [k, v] of Object.entries(step.target)) resolved[k] = await resolveValue(v, ctx);
     step = { ...step, target: resolved };
+    // The runner shows the PO which element the action is about to work on (ctx.highlight, runner only)
+    if (ctx.highlight) await ctx.highlight(resolveTarget(page, step.target), step);
   }
 
   switch (step.action) {

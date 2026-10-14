@@ -279,6 +279,7 @@ A recording is evidence, not a case: it cannot be replayed. Password fields are 
 - A replay really operates in UAT: real bookings, real approvals. A case with API steps creates a new trade on every replay.
 - The PO's computer needs Edge (default) or Chrome (`browser.channel`: `"chrome"`), and the company must allow running `node.exe` and `.bat` from an unzipped folder. Test on one PO machine first.
 - The runner's case list, running several cases at the same time and the browser that stays open were verified on macOS against the mock only, not on Windows / Edge.
+- The replay frames the element each action works on (orange: an action, blue: a value read, green: a check) and waits 600 ms before acting, so it can be followed. `"browser": { "highlight": false }` in `config.local.json` turns it off, `"highlightMs": 300` makes it faster.
 - No video by default: it needs Playwright's ffmpeg, which cannot be downloaded on the intranet. Screenshots and the trace are enough to reproduce.
 - The report and trace viewer links are local (`127.0.0.1:9400`; another port: `"evidence": { "viewPort": 9500 }`). To show a run to someone else, send the evidence folder.
 - An API step has no screenshot: the report shows the call and the values it saved. API calls are sent from Node, which does not use the certificates Windows trusts: an `https` API with a company certificate may fail, which is not handled yet.

@@ -22,13 +22,68 @@ function evidenceDir(name) {
   }
 }
 
-// Browsers that run at the same time open a little apart, so that every window can be seen and reached
-function launchFor(config, slot) {
+// Browsers that run at the same time open a little apart, so that every window can be seen and reached.
+// The page takes the size of the window (viewport: null in executeCase): a single case opens maximized, cases that
+// run at the same time get a window of a fixed size. A size in browser.args of the config wins
+function launchFor(config, slot, maximized = false) {
   const options = launchOptions(config);
-  if (slot > 0 && !(options.args || []).some((a) => String(a).startsWith('--window-position'))) {
+  const has = (flag) => (options.args || []).some((a) => String(a).startsWith(flag));
+  if (slot > 0 && !has('--window-position')) {
     options.args = [...(options.args || []), `--window-position=${slot * 60},${slot * 40}`];
   }
+  if (!has('--window-size') && !has('--start-maximized')) {
+    options.args = [...(options.args || []), maximized ? '--start-maximized' : '--window-size=1280,800'];
+  }
   return options;
+}
+
+// The actions whose element is framed before they run, and the color of the frame: what the step works on, or what
+// it checks. expectHidden has nothing to show
+const HIGHLIGHT = { click: '#f97316', fill: '#f97316', press: '#f97316', select: '#f97316', upload: '#f97316',
+  read: '#2563eb', expectVisible: '#16a34a', expectEnabled: '#16a34a', expectDisabled: '#16a34a', expectValue: '#16a34a', expectText: '#16a34a' };
+
+/**
+ * ctx.highlight of executeStep: frames the element the action is about to work on, with a dot where a click lands,
+ * and waits browser.highlightMs before the action runs, so the PO can see what the replay does. The frame is drawn
+ * in a layer of its own over the page (no click reaches it) and disappears by itself shortly after. It is only an
+ * aid: an element that does not show up within 2 s, or anything else that goes wrong, just means no frame (the
+ * action then waits and fails on its own terms)
+ */
+function highlighterOf(config) {
+  const b = config.browser || {};
+  const ms = Number(b.highlightMs ?? 600);
+  if (b.highlight === false || !(ms > 0)) return undefined;
+  return async (locator, step) => {
+    const color = HIGHLIGHT[step.action];
+    if (!color) return;
+    try {
+      const el = locator.first();
+      await el.waitFor({ state: step.action === 'upload' || step.action === 'read' ? 'attached' : 'visible', timeout: 2000 });
+      const drawn = await el.evaluate((node, { color, ms, dot }) => {
+        const r = node.getBoundingClientRect();
+        if (!r.width || !r.height) return false;
+        const id = '__oreo_replay_highlight__';
+        document.getElementById(id)?.remove();
+        const layer = document.createElement('div');
+        layer.id = id;
+        layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647';
+        const box = document.createElement('div');
+        box.style.cssText = `position:fixed;left:${r.left - 3}px;top:${r.top - 3}px;width:${r.width + 6}px;height:${r.height + 6}px;`
+          + `border:3px solid ${color};border-radius:4px;box-shadow:0 0 0 4px ${color}40;box-sizing:border-box`;
+        layer.appendChild(box);
+        if (dot) {
+          const d = document.createElement('div');
+          d.style.cssText = `position:fixed;left:${r.left + r.width / 2 - 9}px;top:${r.top + r.height / 2 - 9}px;width:18px;height:18px;`
+            + `border-radius:50%;background:${color}99;border:2px solid #fff;box-shadow:0 0 4px #0006`;
+          layer.appendChild(d);
+        }
+        document.documentElement.appendChild(layer);
+        setTimeout(() => layer.remove(), ms + 1200);
+        return true;
+      }, { color, ms, dot: step.action === 'click' }, { timeout: 2000 });
+      if (drawn) await new Promise((r) => setTimeout(r, ms));
+    } catch { /* no frame for this action */ }
+  };
 }
 
 /**
@@ -65,23 +120,27 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
   }
   const t0 = Date.now();
 
-  const viewport = { width: 1280, height: 720 };
+  // The page has the size of the browser window (no viewport of its own): with a fixed viewport in a larger window,
+  // every screenshot of a step made the page jump between that size and the window's, which flickered on the PO's screen.
+  // A video needs a size; it is only recorded when the config asks for it
+  const viewport = null;
+  const videoSize = { width: 1280, height: 720 };
   let browser, context, page, onKey;
   let kept = false;
   state.openRuns++;
   // However the run ends (also with an error, e.g. a browser closed by hand): the browser is closed and the
   // keyboard given back, since the window goes on with the next case
   try {
-    browser = await chromium.launch(launchFor(config, slot));
+    browser = await chromium.launch(launchFor(config, slot, !quiet));
     if (config.evidence?.video === true) {
       try {
-        context = await browser.newContext({ viewport, recordVideo: { dir, size: viewport } });
+        context = await browser.newContext({ viewport, recordVideo: { dir, size: videoSize } });
         page = await context.newPage();
       } catch (e) {
         // Missing ffmpeg does not block execution; there is just no video (screenshots and trace are still saved).
         // Relaunch a clean browser so the failed context cannot affect the rest of the run.
         await browser.close().catch(() => {});
-        browser = await chromium.launch(launchFor(config, slot));
+        browser = await chromium.launch(launchFor(config, slot, !quiet));
         context = undefined;
         say(`  (Note: video recording is unavailable; only screenshots and trace will be saved. Reason: ${String(e.message).split('\n')[0]})\n`);
       }
@@ -91,7 +150,7 @@ async function executeCase({ file, doc }, config, { params = paramsOf(doc), step
       page = await context.newPage();
     }
     await context.tracing.start({ screenshots: true, snapshots: true });
-    const ctx = { config, vars: {}, params, askConfig: quiet ? undefined : askConfig, rootDir: ROOT, fixed: FIXED_SETTINGS };
+    const ctx = { config, vars: {}, params, askConfig: quiet ? undefined : askConfig, rootDir: ROOT, fixed: FIXED_SETTINGS, highlight: highlighterOf(config) };
 
     // Pausing only ever happens between steps, never in the middle of an action.
     // P is picked up as a single key press (console only); the run stops once the current step has finished.
