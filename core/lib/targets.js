@@ -6,7 +6,7 @@ const { showPlaceholders } = require('./values');
  * Turn a target description from the JSON into a Playwright Locator.
  * Supported fields (in priority order): testId / role(+name) / label / placeholder / text / css
  * Extra fields, applied in this order: inner (locate again inside the host element, e.g. the input in a web
- * component's shadow DOM), hasText (keep only the elements that contain this text), nth
+ * component's shadow DOM), hasText (keep only the elements that contain this text), visible (keep only the visible ones), nth
  * A row of a list found by a text it shows: { testId: '<list>', inner: 'role=row', hasText: '${var:tradeId}', nth: 0 }
  */
 function resolveTarget(page, target) {
@@ -23,6 +23,7 @@ function resolveTarget(page, target) {
   // CSS locators pierce open shadow roots automatically, so inner: 'input' finds the native input inside sc-text-input
   if (target.inner) loc = loc.locator(target.inner);
   if (target.hasText) loc = loc.filter({ hasText: target.hasText });
+  if (target.visible) loc = loc.filter({ visible: true });
   if (target.nth !== undefined && target.nth !== null) loc = loc.nth(target.nth);
   return loc;
 }
@@ -37,7 +38,7 @@ function describeTarget(target, vars, params) {
     (target.text && `text=${target.text}`) ||
     (target.css && `css=${target.css}`) ||
     '?';
-  const within = (target.inner ? ` >> ${target.inner}` : '') + (target.hasText ? ` containing "${target.hasText}"` : '');
+  const within = (target.inner ? ` >> ${target.inner}` : '') + (target.hasText ? ` containing "${target.hasText}"` : '') + (target.visible ? ' (visible)' : '');
   return showPlaceholders(base + within + (target.nth !== undefined ? ` [${target.nth}]` : ''), vars, params);
 }
 

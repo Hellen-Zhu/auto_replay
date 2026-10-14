@@ -71,7 +71,7 @@ Per-file details (every flow, page operation, spec): `docs/handover-notes.md` se
 
 ## 5. Case file format
 
-`FORMAT_VERSION` = 15 (`core/lib/case-format.js`). Shape: `name`, `description`, `requiredConfig`, `params`, `distinct`, `scenario` (step lines for the reader), `steps` = `[{ step, actions: [ action | { substep, when?, actions } ] }]`. No `formatVersion`, `source` or `codeVersion` is written. Placeholders `${cfg:...}`, `${var:...}`, `${param:...}`, resolved in values and targets. Actions: `goto fill click press select upload api set read expectVisible expectHidden expectEnabled expectDisabled expectValue expectText expectUrl wait`. An `api` step is `{ action: 'api', ref }` -> `requests/<ref>.json`. **When changing the format, change both `framework/ui.ts` (writer) and `core/lib/` (reader)**, and remember that the PO then needs a newly built package. Full spec: `docs/handover-notes.md` section 5.
+`FORMAT_VERSION` = 16 (`core/lib/case-format.js`). Shape: `name`, `description`, `requiredConfig`, `params`, `distinct`, `scenario` (step lines for the reader), `steps` = `[{ step, actions: [ action | { substep, when?, actions } ] }]`. No `formatVersion`, `source` or `codeVersion` is written. Placeholders `${cfg:...}`, `${var:...}`, `${param:...}`, resolved in values and targets. Actions: `goto fill click press select upload api set read expectVisible expectHidden expectEnabled expectDisabled expectValue expectText expectUrl wait`. An `api` step is `{ action: 'api', ref }` -> `requests/<ref>.json`. **When changing the format, change both `framework/ui.ts` (writer) and `core/lib/` (reader)**, and remember that the PO then needs a newly built package. Full spec: `docs/handover-notes.md` section 5.
 
 ## 6. OREO page facts
 

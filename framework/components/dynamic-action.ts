@@ -73,11 +73,6 @@ export class DynamicAction extends ConfirmDialog {
   async confirmAndAwaitPartialNovationRisk(tradeId: string) {
     await this.ui.clickAndAwait(this.confirmBtn, RiskCalculation.forPartialNovation(tradeId));
   }
-
-  /** The line that shows how the result of the event is calculated */
-  async expectEquationContains(text: Val) {
-    await this.ui.expectText(element('dynamic_action.equation_line'), text);
-  }
 }
 
 export type DynamicActionField = keyof typeof DynamicAction.fields;

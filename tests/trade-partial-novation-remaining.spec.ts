@@ -7,7 +7,8 @@ import { givenProduct, givenTrade, productTag, type GivenTradeData, type Product
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
 // in the local config.
 // The page the event is started from is the one the feature's Examples give for the product (STARTS).
-// The equation line and the new notional of the test data follow from the notional of the product's dat file.
+// Values that follow from the notional of the product's dat file (the dialog's equation line, the new trade's
+// notional) are not checked: the case performs the event (user decision).
 // The feature's step "the partial novation remaining is completed successfully" is commented out there, so it is
 // not a step here either.
 

@@ -149,7 +149,8 @@ export class TradeDetailPage extends BasePage {
   }
 
   async select(name: TradeDetailCombobox, value: Val) {
-    await new Combobox(this.ui, element(TradeDetailPage.comboboxes[name].element, { inner: 'input' })).select(value);
+    // the dropdowns here keep a hidden copy of the unfiltered list (see Combobox)
+    await new Combobox(this.ui, element(TradeDetailPage.comboboxes[name].element, { inner: 'input' }), true).select(value);
   }
 
   async expectScheduleFixing(name: ScheduleFixing, text: Val) {

@@ -19,7 +19,8 @@
 // 15 = adds the condition { param, empty: true } (the group runs while that case data is empty) and the action set,
 // { action: 'set', param, value }, which gives case data its value at run time: a case on an existing trade
 // creates its trade when no trade ID was entered (values.js, execute.js)
-const FORMAT_VERSION = 15;
+// 16 = adds visible on a target: only the visible elements it matches (targets.js)
+const FORMAT_VERSION = 16;
 
 const fs = require('fs');
 const path = require('path');

@@ -11,10 +11,6 @@ export interface TradePartialNovationRemainingData {
   /** The notional that stays on the original trade */
   remainingNotional: string;
   newCounterpartyName: string;
-  /** What the dialog shows as the calculation of the novated notional; it depends on the notional of the product's dat file */
-  equationLine: string;
-  /** The notional of the new trade: the rest of the original notional */
-  newNotional: string;
 }
 
 /** Where the maker starts the event: the action menu of the trade's row, or the More Actions of its trade details */
@@ -46,10 +42,9 @@ export class TradePartialNovationRemainingFlow extends BaseFlow {
         await tradeDetail.clickButton('partialNovationRemaining');
       });
     }
-    await this.ui.And('I type the remaining notional', async () => {
-      await dynamicAction.typeField('remainingNotional', p.remainingNotional);
-      await dynamicAction.expectEquationContains(p.equationLine);
-    });
+    // The equation line the dialog shows (original notional - remaining = novated) is not checked (user decision: the
+    // case performs the event; the original notional depends on the product's dat file)
+    await this.ui.And('I type the remaining notional', () => dynamicAction.typeField('remainingNotional', p.remainingNotional));
     await this.ui.And('I select the new counterparty', () => dynamicAction.selectCounterparty(p.newCounterpartyName));
     await this.ui.And('I confirm the event', async () => {
       await dynamicAction.confirmAndAwaitPartialNovationRisk(tradeId);
@@ -62,24 +57,25 @@ export class TradePartialNovationRemainingFlow extends BaseFlow {
 
   /**
    * The original trade is live with the remaining notional and its own counterparty; the new trade is live with
-   * the rest of the notional and the new counterparty. Both are read in their trade details.
+   * the new counterparty. Both are read in their trade details. The new trade's notional (the rest of the original
+   * one) is not checked: it depends on the product's dat file.
    */
   async expectPartiallyNovated(tradeId: string, newTradeId: string, data: TradePartialNovationRemainingData, keyword: Keyword = 'Then') {
     const p = this.params(data);
     await this.expectTradeDetails('the original trade', tradeId, p.remainingNotional, p.counterpartyName, keyword);
-    await this.expectTradeDetails('the new trade', newTradeId, p.newNotional, p.newCounterpartyName, 'And');
+    await this.expectTradeDetails('the new trade', newTradeId, undefined, p.newCounterpartyName, 'And');
   }
 
   /** The E2E project's "trade details show '<status>' status with correct notional ... and counterparty ..." */
-  private async expectTradeDetails(which: string, tradeId: string, notional: Val, counterparty: Val, keyword: Keyword) {
+  private async expectTradeDetails(which: string, tradeId: string, notional: Val | undefined, counterparty: Val, keyword: Keyword) {
     const { tradeDetail } = this.app;
     await this.ui[keyword](`I open the trade details of ${which}`, async () => {
       await tradeDetail.open(tradeId);
       await tradeDetail.expectTradeId(tradeId);
     });
     await this.ui.And(`its status badge shows ${TradesPage.status.live}`, () => tradeDetail.expectStatusBadge(TradesPage.status.live));
-    await this.ui.And('its notional and counterparty are as expected', async () => {
-      await tradeDetail.expectValue('notionalAmount', notional);
+    await this.ui.And(notional === undefined ? 'its counterparty is as expected' : 'its notional and counterparty are as expected', async () => {
+      if (notional !== undefined) await tradeDetail.expectValue('notionalAmount', notional);
       await tradeDetail.expectValue('counterparty', counterparty);
     });
   }

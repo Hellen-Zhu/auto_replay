@@ -28,6 +28,11 @@ export type Target = {
   inner?: string;
   /** Keeps only the elements that contain this text, e.g. the row of a list that shows a trade ID (after inner, before nth) */
   hasText?: string;
+  /**
+   * Keeps only the elements that are visible (after hasText, before nth): a list that keeps a hidden copy of its
+   * entries next to the ones it shows, e.g. the comboboxes of the trade details (case format version 16)
+   */
+  visible?: boolean;
   nth?: number;
   exact?: boolean;
 };
