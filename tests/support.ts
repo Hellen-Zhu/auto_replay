@@ -33,13 +33,13 @@ export function givenProduct<T extends ProductData>(flows: Flows, row: T, descri
 }
 
 /** The state a case on an existing trade starts from */
-export type TradeState = 'pendingApproval' | 'live' | 'pendingCancellation' | 'pendingAmendment';
+export type TradeState = 'pendingApproval' | 'live';
 
 /** What the test data of a case on an existing trade may hold on top of the event's values */
 export type GivenTradeData = Partial<ProductData> & { tradeId?: string };
 
-/** How a new trade in that state is created through the API; a state without an entry needs the ID of a trade */
-const PROVISION: Partial<Record<TradeState, (flows: Flows, product: string, data: TradeProvisioningData) => Promise<string>>> = {
+/** How a new trade in that state is created through the API */
+const PROVISION: Record<TradeState, (flows: Flows, product: string, data: TradeProvisioningData) => Promise<string>> = {
   pendingApproval: (flows, product, data) => flows.tradeProvisioning.provisionPendingTrade(product, data),
   live: (flows, product, data) => flows.tradeProvisioning.provisionLiveTrade(product, data),
 };
@@ -48,8 +48,6 @@ const PROVISION: Partial<Record<TradeState, (flows: Flows, product: string, data
 const CHECK: Record<TradeState, (flows: Flows, tradeId: string) => Promise<void>> = {
   pendingApproval: (flows, tradeId) => flows.trades.expectPendingApproval(tradeId),
   live: (flows, tradeId) => flows.trades.expectLive(tradeId),
-  pendingCancellation: (flows, tradeId) => flows.tradeCancellation.expectPendingCheckerApproval(tradeId),
-  pendingAmendment: (flows, tradeId) => flows.tradeAmendment.expectPendingCheckerApproval(tradeId),
 };
 
 /**
@@ -60,9 +58,9 @@ const CHECK: Record<TradeState, (flows: Flows, tradeId: string) => Promise<void>
  *      Given of the event's own case (product, dat file and trade type of the shared block "given-trade").
  * The exported case file always has "tradeId" empty and holds the steps that create the trade, which run only while
  * it is empty: the PO enters an ID in the runner to work on that trade, or leaves it empty to get a new one.
- * A state no API request is known for (a pending cancellation, a pending amendment) cannot be created: there the ID
- * is needed, the case is skipped without one and its case file asks the PO for it on every run. A case that may
- * create its trade is skipped while the dat file is missing, also with an ID, since its case file names that file.
+ * Every state a case starts from can be created through the API (there is no case on a pending cancellation or
+ * amendment, whose request is not known). The case is skipped while the dat file is missing, also with an ID, since
+ * its case file names that file.
  * Sets the description shown to the PO. Returns the rest of the data for the flows, and "ready", which the case
  * calls in its step after the login: it creates the trade when there is none, checks that the trade is in the
  * state the case starts from (a wrong trade fails there and nothing is done to it) and returns the trade ID.
@@ -70,19 +68,13 @@ const CHECK: Record<TradeState, (flows: Flows, tradeId: string) => Promise<void>
 export function givenTrade<T extends GivenTradeData>(flows: Flows, row: T, state: TradeState, description: string) {
   const { tradeId: fromData, ...data } = row;
   const given = (process.env.OREO_TRADE_ID || '').trim() || (fromData || '').trim();
-  const ready = (tradeId: string | (() => Promise<string>)) => async () => {
-    const id = typeof tradeId === 'string' ? tradeId : await tradeId();
+  const ready = (tradeId: () => Promise<string>) => async () => {
+    const id = await tradeId();
     await CHECK[state](flows, id);
     return id;
   };
 
   const provision = PROVISION[state];
-  if (!provision) {
-    // the ID is needed for every run: the case file asks the PO for it
-    test.skip(!given, 'No trade ID is given (OREO_TRADE_ID, or "tradeId" in the test data) and a trade in the state this case starts from cannot be created through the API');
-    test.info().annotations.push({ type: 'description', description });
-    return { data, ready: ready(flows.trades.existingTrade(given)) };
-  }
   if (!data.product) throw new Error('A case that creates its trade needs "product" in its test data: list the shared block "given-trade" under "use"');
   // the case file holds the steps that create the trade too: its dat file is needed whether this run creates one or not
   prepare(data.product, description, data.datFile);

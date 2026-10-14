@@ -1,34 +1,29 @@
 #!/usr/bin/env node
-// Runs the cases of tests/existing-trade.spec.ts on trades it creates, one after another on the same trade, so that
-// every case of a chain is run and exported, also those whose start state cannot be created through the API.
+// Runs the cases of tests/existing-trade.spec.ts on trades it creates, one after another on the same trade where a
+// case leaves the trade in the state the next one starts from, so that fewer real trades are booked.
 //
 //   npm run export:existing-trade
 //   npm run export:existing-trade -- --events          (also the TC-TRADE-<EVENT>-EXISTING-UI-... cases of that spec)
 //   npm run export:existing-trade -- --product=FX_DCD --datFile=FX_DCD.dat --tradeType=StepInFull --headed
 //
-// The exported file of a case whose start state can be created (pending approval, live) is the same with or without
-// an ID: it holds the API steps that create the trade, run only while the case data tradeId is empty, and tradeId
-// empty, so the PO either enters an ID or lets the case create its trade. A case whose start state cannot be created
-// (a pending cancellation or amendment) is skipped without an ID; its file always asks for the ID. This script gives
-// each case the ID of a trade in OREO_TRADE_ID. Each trade is created through the API (scripts/provision/given-trade.spec.ts) in the state the
+// Every case of that spec can also create its own trade (npx playwright test tests/existing-trade.spec.ts): the
+// exported file is the same with or without an ID, since it holds the API steps that create the trade, run only
+// while the case data tradeId is empty, and tradeId empty. This script gives each case the ID of a trade in
+// OREO_TRADE_ID. Each trade is created through the API (scripts/provision/given-trade.spec.ts) in the state the
 // first case of its chain starts from, with the data of that case: product, dat file, trade type and values of
 // testdata/existing-trade.json and its shared blocks ("given-trade"), as when the case creates its own trade.
 // --product, --datFile and --tradeType replace those values for every trade of the run; another product without
-// --datFile takes that product's default dat file. Then the chain runs on the trade, each case leaving it in the
-// state the next one starts from:
+// --datFile takes that product's default dat file. Then the chain runs on the trade:
 //
-//   pending approval: approve-creation 001 (LIVE) -> cancellation 001 cancel -> approve-cancellation 001 (DEAD)
+//   pending approval: approve-creation 001 (LIVE) -> cancellation 001 (pending cancellation)
 //   pending approval: reject-creation 001 (DRFT)
-//   live:             cancellation 001 cancel -> reject-cancellation 001 (LIVE)
 //
-// Cancellation 001 runs twice; the second run only prepares the trade and exports the same case file again.
-// Every run books three real trades in the system the local config points at. It stops at the first case that
+// Every run books two real trades in the system the local config points at. It stops at the first case that
 // does not pass; nothing is rolled back.
 // With --events it goes on with the case on an existing trade of each other lifecycle event
-// (TC-TRADE-<EVENT>-EXISTING-UI-..., in the same spec): one more Live trade per chain, then the event (for the
-// amendment the maker's case and then the checker's on the same trade: approve-amendment 001 on one trade,
-// reject-amendment 001 on another; amendment 001 runs twice). That books ten more real trades. The values
-// those cases check come from testdata/ and may depend on the dat file (the notionals of the partial novation).
+// (TC-TRADE-<EVENT>-EXISTING-UI-..., in the same spec): one more Live trade per event. That books eight more real
+// trades. The values those cases check come from testdata/ and may depend on the dat file (the notionals of the
+// partial novation).
 // Any other argument is passed on to Playwright (--headed, --trace ...).
 
 const { spawn } = require('child_process');
@@ -62,9 +57,8 @@ const id = (action, n = 1) => `TC-TRADE-${action.toUpperCase()}-EXISTING-UI-00${
 const chain = (state, ...cases) => ({ state, cases });
 const event = (name, ...then) => chain('live', id(name), ...then.map((action) => id(action)));
 const PLAN = [
-  chain('pendingApproval', id('approve-creation'), id('cancellation'), id('approve-cancellation')),
+  chain('pendingApproval', id('approve-creation'), id('cancellation')),
   chain('pendingApproval', id('reject-creation')),
-  chain('live', id('cancellation'), id('reject-cancellation')),
   ...(withEvents ? [
     event('allocation'),
     event('early-termination'),
@@ -73,9 +67,7 @@ const PLAN = [
     event('step-out-full'),
     event('step-out-partial'),
     event('portfolio-reassignment'),
-    // the maker amends, then the checker decides: two cases, each with its own login
-    event('amendment', 'approve-amendment'),
-    event('amendment', 'reject-amendment'),
+    event('amendment'),
     event('partial-novation-remaining'),
   ] : []),
 ];

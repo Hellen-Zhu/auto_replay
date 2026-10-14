@@ -24,17 +24,16 @@ import { givenTrade, loggedIn, type GivenTradeData } from './support';
 //   3. neither: a new trade is created through the API in the state the case starts from.
 // With 1 and 2 the trade ID is case data that is entered for every run: the exported case file holds no ID and the
 // PO types one in the runner. With 3 the exported case file creates its own trade on every replay.
-// The cases that start from a pending cancellation or a pending amendment need an ID (no API request that leaves
-// a trade in that state is known): without one they are skipped.
 // The step after the login checks that the trade is in the state the case starts from, so a wrong trade fails
 // there and nothing is done to it.
 // On a given trade a case cannot be repeated: a run changes the trade's state. No product in the ID or the title,
 // since the trade decides it. The values of an event are those of its own spec: a row of the test data lists the
 // event's shared block under "use". Every ID names the action the case performs: the maker's event
-// (TC-TRADE-<EVENT>-EXISTING-...) or the checker's decision on what is pending
-// (TC-TRADE-<APPROVE|REJECT>-<CREATION|CANCELLATION|AMENDMENT>-EXISTING-...). The checker's cases do not depend on
-// what the pending event changes. The approval and cancellation cases are this repo's own, the others are the
-// event's case with its Given replaced.
+// (TC-TRADE-<EVENT>-EXISTING-...) or the checker's decision on a pending new trade
+// (TC-TRADE-<APPROVE|REJECT>-CREATION-EXISTING-...). There is no checker case on a pending cancellation or amendment
+// (user decision): the checker's approve / reject is the same action whatever is pending, and the creation cases
+// cover it. The approval and cancellation cases are this repo's own, the others are the event's case with its Given
+// replaced.
 
 // The input profile and the start page of the events' own cases (FX_TRF in the feature's Examples)
 const profile: NovationInputProfile = 'WITH_TARGET_AMOUNT';
@@ -71,26 +70,6 @@ test.describe('Existing trade', () => {
     await And('the cancellation request is pending checker approval', () => flows.tradeCancellation.expectPendingCheckerApproval(tradeId));
   });
 
-  test('[TC-TRADE-APPROVE-CANCELLATION-EXISTING-UI-001] Checker approves the pending cancellation of a given trade', async ({ Given, When, Then, And, flows, testData }) => {
-    const given = givenTrade(flows, testData<GivenTradeData>(), 'pendingCancellation', 'Checker approves the cancellation of the trade with the given ID, which must be pending approval; the trade is dead afterwards');
-
-    await Given('checker is logged in to the trade portal', () => loggedIn(flows, 'checker'));
-    const tradeId = await And('the cancellation of the given trade is pending checker approval', () => given.ready());
-    await When('approves the pending trade from trade portal', () => flows.tradeApproval.approveFromTradePortal(tradeId));
-    await Then('the trade is approved successfully', () => flows.tradeApproval.expectApproved());
-    await And('the trade is closed as Cancelled', () => flows.tradeCancellation.expectClosedAsCancelled(tradeId));
-  });
-
-  test('[TC-TRADE-REJECT-CANCELLATION-EXISTING-UI-001] Checker rejects the pending cancellation of a given trade', async ({ Given, When, Then, And, flows, testData }) => {
-    const given = givenTrade(flows, testData<GivenTradeData>(), 'pendingCancellation', 'Checker rejects the cancellation of the trade with the given ID, which must be pending approval; the trade is live again');
-
-    await Given('checker is logged in to the trade portal', () => loggedIn(flows, 'checker'));
-    const tradeId = await And('the cancellation of the given trade is pending checker approval', () => given.ready());
-    await When('rejects the pending trade from trade portal', () => flows.tradeApproval.rejectFromTradePortal(tradeId));
-    await Then('the trade is rejected successfully', () => flows.tradeApproval.expectRejected());
-    await And('the trade is Live and marked as New', () => flows.trades.expectLiveAndNew(tradeId));
-  });
-
   test('[TC-TRADE-ALLOCATION-EXISTING-UI-001] Given Live trade splits into sub-trades after allocation', async ({ Given, When, Then, And, flows, testData }) => {
     const given = givenTrade(flows, testData<TradeAllocationData & GivenTradeData>(), 'live', 'Maker allocates the live trade with the given ID to the number of subtrades in the case data (2, 3 or 4) from the trade portal and the trade is Dead');
 
@@ -108,26 +87,6 @@ test.describe('Existing trade', () => {
     const tradeId = await And('the given trade is Live', () => given.ready());
     await When("perform amendment for '${param:amendmentField}' on the trade", () => flows.tradeAmendment.amend(tradeId, given.data));
     await Then('the amendment is pending checker approval', () => flows.tradeAmendment.expectPendingCheckerApproval(tradeId));
-  });
-
-  test('[TC-TRADE-APPROVE-AMENDMENT-EXISTING-UI-001] Checker approves the pending amendment of a given trade', async ({ Given, When, Then, And, flows, testData }) => {
-    const given = givenTrade(flows, testData<GivenTradeData>(), 'pendingAmendment', 'Checker approves, from the trade portal, the amendment of the trade with the given ID, whatever field it changes; the amendment must be pending approval; the trade is Live with the event status Amended afterwards');
-
-    await Given('checker is logged in to the trade portal', () => loggedIn(flows, 'checker'));
-    const tradeId = await And('the amendment of the given trade is pending checker approval', () => given.ready());
-    await When('approves the pending trade from trade portal', () => flows.tradeApproval.approveFromTradePortal(tradeId));
-    await Then('the trade is approved successfully', () => flows.tradeApproval.expectApproved());
-    await And('the trade is Live and marked as Amended', () => flows.tradeAmendment.expectLiveAndAmended(tradeId));
-  });
-
-  test('[TC-TRADE-REJECT-AMENDMENT-EXISTING-UI-001] Checker rejects the pending amendment of a given trade', async ({ Given, When, Then, And, flows, testData }) => {
-    const given = givenTrade(flows, testData<GivenTradeData>(), 'pendingAmendment', 'Checker rejects, from the trade portal, the amendment of the trade with the given ID, whatever field it changes; the amendment must be pending approval; the trade is Live afterwards');
-
-    await Given('checker is logged in to the trade portal', () => loggedIn(flows, 'checker'));
-    const tradeId = await And('the amendment of the given trade is pending checker approval', () => given.ready());
-    await When('rejects the pending trade from trade portal', () => flows.tradeApproval.rejectFromTradePortal(tradeId));
-    await Then('the trade is rejected successfully', () => flows.tradeApproval.expectRejected());
-    await And('the trade remains Live', () => flows.tradeApproval.expectLive(tradeId));
   });
 
   test('[TC-TRADE-EARLY-TERMINATION-EXISTING-UI-001] should able to perform EarlyTermination event for a given Live trade successfully', async ({ Given, When, Then, And, flows, testData }) => {

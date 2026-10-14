@@ -6,8 +6,8 @@ import { givenProduct, type ProductData } from './support';
 // through the API (flows.tradeProvisioning), so the case needs apiBaseUrl in the local config.
 // A case logs in once (user decision), so the feature's two scenarios, which go on with the checker's approval or
 // rejection, are one case here that ends when the cancellation is pending. The checker's decision on a pending
-// cancellation is TC-TRADE-APPROVE-CANCELLATION-EXISTING-UI-001 / TC-TRADE-REJECT-CANCELLATION-EXISTING-UI-001 (existing-trade.spec.ts), run on the trade this case leaves: no
-// API request that leaves a trade with a pending cancellation is known, so that Given cannot be provisioned.
+// cancellation has no case of its own (user decision): it is the same approve / reject as on a pending new trade,
+// which TC-TRADE-APPROVE-CREATION-UI-001 / TC-TRADE-REJECT-CREATION-UI-001 cover.
 // One product only (user decision, minimal coverage): the pages of a cancellation and of the checker's decision
 // are the same for every product, while the feature's Examples list three.
 

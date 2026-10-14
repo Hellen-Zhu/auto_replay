@@ -19,14 +19,6 @@
       ]
     },
     {
-      "id": "TC-TRADE-APPROVE-CANCELLATION-EXISTING-UI-001",
-      "tradeId": ""
-    },
-    {
-      "id": "TC-TRADE-REJECT-CANCELLATION-EXISTING-UI-001",
-      "tradeId": ""
-    },
-    {
       "id": "TC-TRADE-ALLOCATION-EXISTING-UI-001",
       "tradeId": "",
       "use": [
@@ -39,14 +31,6 @@
       "use": [
         "amendment"
       ]
-    },
-    {
-      "id": "TC-TRADE-APPROVE-AMENDMENT-EXISTING-UI-001",
-      "tradeId": ""
-    },
-    {
-      "id": "TC-TRADE-REJECT-AMENDMENT-EXISTING-UI-001",
-      "tradeId": ""
     },
     {
       "id": "TC-TRADE-EARLY-TERMINATION-EXISTING-UI-001",

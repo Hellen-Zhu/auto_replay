@@ -5,12 +5,10 @@ import { givenProduct, type ProductData } from './support';
 // Mirrors trade_amendment.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
 // in the local config.
-// A case logs in once (user decision), so each scenario of the feature is two cases here: the maker's part, which
-// ends when the amendment is pending (-UI-002), and the checker's part on a given trade whose amendment is pending
-// (TC-TRADE-APPROVE-AMENDMENT-EXISTING-UI-001 / TC-TRADE-REJECT-AMENDMENT-EXISTING-UI-001 in
-// tests/existing-trade.spec.ts), run on the trade the maker's case leaves. No API request that leaves a trade with a
-// pending amendment is known, so the checker's Given cannot be provisioned. That a pending amendment shows the
-// status PARV in the blotter is inferred.
+// A case logs in once (user decision), so each scenario of the feature is the maker's part here, which ends when
+// the amendment is pending (-UI-002). The checker's decision on a pending amendment has no case of its own (user
+// decision): it is the same approve / reject as on a pending new trade, which TC-TRADE-APPROVE-CREATION-UI-001 /
+// TC-TRADE-REJECT-CREATION-UI-001 cover. That a pending amendment shows the status PARV in the blotter is inferred.
 // The feature's two scenarios (counterparty, risk portfolio) are one case (user decision): the field is the case
 // data amendmentField, which the PO chooses in the runner, and the new value of each field is case data too.
 // The feature runs each scenario for three products; here they run for one (user decision, minimal coverage: the
