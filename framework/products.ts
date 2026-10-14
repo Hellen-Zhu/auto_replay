@@ -36,6 +36,12 @@ export const PRODUCTS: Record<string, readonly Capability[]> = {
   FX_PSCRIPT: ['create', 'stepInFull', 'stepInPartial', ...LIFECYCLE_EVENTS],
   FX_TRF: ['create', 'stepInFull', 'stepInPartial', ...LIFECYCLE_EVENTS],
   FX_PSCRIPT_FSKO: ['create', 'stepInFull', 'stepInPartial', ...LIFECYCLE_EVENTS],
+  // A product that does not support an event leaves that capability out: the event's spec then has no run for it and
+  // creates no trade of that product. Example, a product without step out:
+  // FX_PSCRIPT_FSKO: ['create', 'stepInFull', 'stepInPartial',
+  //   ...LIFECYCLE_EVENTS.filter((e) => e !== 'stepOutFull' && e !== 'stepOutPartial')],
+  // The PO's runner does not know the capabilities: the product of a case file stays free case data, so tell the PO
+  // which products an event does not support.
 };
 
 /** The products that support a capability, in the order of the registry */
