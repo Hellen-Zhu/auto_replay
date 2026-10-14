@@ -38,6 +38,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `scripts/` | `build-portable`, `sync-elements` |
 | `mock-oreo/` | Mock OREO, for local tries only |
 | `.claude/skills/porting-java-e2e-cases/` | Claude Code skill that ports a case of the E2E project |
+| `.claude/skills/onboarding-product-or-event/` | Claude Code skill that covers a new product or lifecycle event and reports what QA still has to provide |
 
 ## QA: setup and running
 
@@ -209,6 +210,15 @@ async submitTrade(role: string, basic: TradeBasic, file: string) {
 ```
 
 The skill translates level by level (feature step → case step, FLOW snippet → flow method, PAGE / COMPONENT snippet → atomic operation, element key → `element('<same key>')`, API provisioning step → API object operation). It stops instead of guessing and never commits; review, run and commit yourself.
+
+### Covering a new product or lifecycle event
+
+```
+/onboarding-product-or-event product FX_NEW
+/onboarding-product-or-event event <eventName> C:\path\to\the-e2e-project <feature file>
+```
+
+A product is one row of the coverage matrix (registry line, dat file, per-product values; no new spec), an event one column (capability, flow, spec, test data, looped over every product that supports it). The skill first asks for what it needs (product type, capabilities confirmed by the BA, dat file, per-product values, and for an event without a Java feature the elements, texts and requests), skips the runs whose values are missing, and ends with the coverage matrix, the list of what QA still has to provide and a go-live checklist. For the Java tracing of an event it uses the porting skill.
 
 ## Packaging for the PO
 
