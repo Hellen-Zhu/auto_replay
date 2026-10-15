@@ -126,6 +126,10 @@ PO:  run-case.bat → runner/runner.js ──reads cases/**/*.json, calls step b
 | `requests/` | The API requests the case files name (format version 14, section 5): one JSON file per distinct request, `<method>-<path slug>-<hash>.json`, written by the export (`OREO_REQUESTS_DIR` overrides the folder), committed and packaged next to `cases/`. A changed request is a new file; an old one is never deleted by the export, and only the files the packaged cases name go into the package (`build-portable.js`) |
 | `cases/` | Exported case files, one folder per spec: `cases/<spec name>/<caseId>.json` (committed to Git, distributed to the PO; packaged with its folders). Empty in the repo until the trade creation cases are exported with the real `.dat` files |
 
+### Java test data module (`java/`)
+
+A separate Maven module (`cd java && mvn test`), not used by the replay or the package: this project's test data mechanism (shared blocks, feature defaults, case rows, `byProduct`, the product from the case ID) for the Java + Cucumber (Genie) E2E project, which kept one YAML entry per case and product. Trade creation is migrated; `TestDataLoaderTest` shows the 9 cases resolve to exactly the old YAML's data, and the feature runs through Cucumber with data-only step stand-ins. The loader keeps the hook's API (`tcKeyFromName`, `getByTcId`) and falls back to the old YAML for features not migrated yet. Inferred, to confirm on the E2E project: the old `requestRef` merge is deep. Porting steps: `java/README.md`.
+
 ## 5. Case file format (formatVersion 1 to 15)
 
 ```json

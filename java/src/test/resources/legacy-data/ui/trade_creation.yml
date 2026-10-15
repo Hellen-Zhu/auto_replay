@@ -1,0 +1,92 @@
+# The old format, as in the E2E project: kept only to prove the new files resolve to the same data
+REQ-TPL-TRADE-CREATION-UI-001:
+  request: |
+    {
+      "basic": {
+        "portfolioId":       "CM_OIL_CRU_OPT",
+        "counterpartyFmId": "300036958",
+        "counterpartyName": "10 AM NY",
+        "productId": "FX_TRF",
+        "direction": "Buy"
+      }
+    }
+
+REQ-TPL-TRADE-CREATION-STEPIN-UI-001:
+  request: |
+    {
+      "basic": {
+        "portfolioId":       "CM_OIL_CRU_OPT",
+        "counterpartyFmId": "300036958",
+        "counterpartyName": "10 AM NY",
+        "productId": "FX_TRF",
+        "direction": "Buy"
+      },
+      "stepIn": {
+        "oldCounterpartyName": "ACACSUPRIANI SUP*JBA"
+      }
+    }
+
+TC-TRADE-CREATION-FX_CO-UI-001:
+  requestRef: REQ-TPL-TRADE-CREATION-UI-001
+  request: |
+    {
+      "basic": {
+        "productId": "FX_PSCRIPT"
+      }
+    }
+
+TC-TRADE-CREATION-FX_TRF-UI-001:
+  requestRef: REQ-TPL-TRADE-CREATION-UI-001
+
+TC-TRADE-CREATION-FX_FSB-UI-001:
+  requestRef: REQ-TPL-TRADE-CREATION-UI-001
+  request: |
+    {
+      "basic": {
+        "productId": "FX_PSCRIPT_FSKO"
+      }
+    }
+
+TC-TRADE-CREATION-FX_TRF-UI-002:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-UI-001
+
+TC-TRADE-CREATION-FX_FSB-UI-002:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-UI-001
+  request: |
+    {
+      "basic": {
+        "productId": "FX_PSCRIPT_FSKO",
+        "direction": "Sell"
+      }
+    }
+
+TC-TRADE-CREATION-FX_CO-UI-002:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-UI-001
+  request: |
+    {
+      "basic": {
+        "productId": "FX_PSCRIPT",
+        "direction": "Sell"
+      }
+    }
+
+TC-TRADE-CREATION-FX_TRF-UI-003:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-UI-001
+
+TC-TRADE-CREATION-FX_FSB-UI-003:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-UI-001
+  request: |
+    {
+      "basic": {
+        "productId": "FX_PSCRIPT_FSKO"
+      }
+    }
+
+TC-TRADE-CREATION-FX_CO-UI-003:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-UI-001
+  request: |
+    {
+      "basic": {
+        "productId": "FX_PSCRIPT"
+      }
+    }

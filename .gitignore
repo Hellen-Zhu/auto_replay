@@ -6,3 +6,4 @@ evidence/
 dist/
 .DS_Store
 .history
+java/target/

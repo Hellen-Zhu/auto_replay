@@ -1,0 +1,15 @@
+{
+  "use": ["trade-basic"],
+  "productPath": "basic.productId",
+  "cases": {
+    "TC-TRADE-CREATION-UI-002": {
+      "use": ["step-in"],
+      "_comment": "Sell for FX_FSB and FX_CO as in the old YAML: confirm it is on purpose, otherwise remove byProduct",
+      "byProduct": {
+        "FX_FSB": { "request": { "basic": { "direction": "Sell" } } },
+        "FX_CO": { "request": { "basic": { "direction": "Sell" } } }
+      }
+    },
+    "TC-TRADE-CREATION-UI-003": { "use": ["step-in"] }
+  }
+}

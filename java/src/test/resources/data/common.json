@@ -1,0 +1,22 @@
+{
+  "_comment": "Shared blocks only. A feature file lists the blocks it starts from in \"use\"; a request is the API body as it is.",
+  "shared": {
+    "trade-basic": {
+      "request": {
+        "basic": {
+          "portfolioId": "CM_OIL_CRU_OPT",
+          "counterpartyFmId": "300036958",
+          "counterpartyName": "10 AM NY",
+          "direction": "Buy"
+        }
+      }
+    },
+    "step-in": {
+      "request": {
+        "stepIn": {
+          "oldCounterpartyName": "ACACSUPRIANI SUP*JBA"
+        }
+      }
+    }
+  }
+}
