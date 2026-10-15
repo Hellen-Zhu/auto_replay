@@ -1,18 +1,16 @@
-# Onboarding report template
+# Product onboarding report template
 
 Fill in and post in the conversation, in the user's language. Keep every row: an empty cell is a question for QA.
 
-## 1. Coverage matrix
+## 1. Coverage matrix: `<PRODUCT>`
 
-Mode A (product `<PRODUCT>`): one row per capability. Mode B (event `<event>`): one row per product.
-
-| Capability / product | Case ID | Status | Note |
+| Capability | Case ID | Status | Note |
 |---|---|---|---|
 | create | `TC-TRADE-CREATION-<PRODUCT>-UI-001` | listed, not run | dat file missing |
 | stepInFull | `TC-TRADE-CREATION-<PRODUCT>-UI-002` | ... | |
 | stepInPartial | `TC-TRADE-CREATION-<PRODUCT>-UI-003` | ... | |
 | cancellation | `TC-TRADE-CANCELLATION-<PRODUCT>-UI-001` | ... | |
-| novationRemaining | `TC-TRADE-NOVATION-REMAINING-<PRODUCT>-UI-001` | ... | target amount: typed / left out (`byProduct`) |
+| novationRemaining | `TC-TRADE-NOVATION-REMAINING-<PRODUCT>-UI-001` | ... | target amount: typed / left out |
 | stepOutFull | - | not supported | left out of the registry (confirmed by ...) |
 | approval / reject | `TC-TRADE-APPROVE-CREATION-UI-001` ... | not per product | PO changes `product` / `datFile` |
 
@@ -28,16 +26,16 @@ Status is one of: `passed on real`, `passed on mock`, `listed, not run (why)`, `
 | What | Where it goes | Unblocks |
 |---|---|---|
 | Default dat file | `testdata/dat/<PRODUCT>/<PRODUCT>.dat` | every run of the product |
-| Whether the novation remaining dialog has a target amount, and its value | `defaults.byProduct.<PRODUCT>.novationTargetAmount` in `testdata/trade-novation-remaining.json` if it has (default `""`: the step is left out) | that run |
+| Novation remaining target amount, if the dialog has it | `defaults.byProduct.<PRODUCT>.novationTargetAmount` in `testdata/trade-novation-remaining.json` | that run |
 | New and expected notional of partial termination | `defaults.byProduct.<PRODUCT>` in `testdata/trade-partial-termination.json` | that run |
 
-## 4. QA checklist before go-live (open items)
+## 4. Go-live checklist (open items)
 
 - [ ] ...
 
 ## 5. For the PO
 
-- Events `<PRODUCT>` does not support (do not choose it there): ...
+- Events `<PRODUCT>` does not support (the runner does not know, so do not change a case's `product` to it there): ...
 
 ## 6. To verify on the real system
 

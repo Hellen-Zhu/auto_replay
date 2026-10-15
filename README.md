@@ -38,7 +38,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `scripts/` | `build-portable`, `sync-elements` |
 | `mock-oreo/` | Mock OREO, for local tries only |
 | `.claude/skills/porting-java-e2e-cases/` | Claude Code skill that ports a case of the E2E project |
-| `.claude/skills/onboarding-product-or-event/` | Claude Code skill that covers a new product or lifecycle event and reports what QA still has to provide |
+| `.claude/skills/onboarding-product/`, `onboarding-lifecycle-event/` | Claude Code skills that cover a new product or a new lifecycle event and report what QA still has to provide |
 
 ## QA: setup and running
 
@@ -213,11 +213,11 @@ The skill translates level by level (feature step â†’ case step, FLOW snippet â†
 ### Covering a new product or lifecycle event
 
 ```
-/onboarding-product-or-event product FX_NEW
-/onboarding-product-or-event event <eventName> C:\path\to\the-e2e-project <feature file>
+/onboarding-product FX_NEW
+/onboarding-lifecycle-event <eventName>
 ```
 
-A product is one row of the coverage matrix (registry line, dat file, per-product values; no new spec), an event one column (capability, flow, spec, test data, looped over every product that supports it). The skill first asks for what it needs (product type, capabilities confirmed by the BA, dat file, per-product values, and for an event without a Java feature the elements, texts and requests), skips the runs whose values are missing, and ends with the coverage matrix, the list of what QA still has to provide and a go-live checklist. For the Java tracing of an event it uses the porting skill.
+A product is one row of the coverage matrix (registry line, dat file, per-product values; no new spec), an event one column (capability, page / component entries, flow, test data, one spec looped over every product that supports it), built from the closest existing event. Each skill first asks for what it needs (product: type, capabilities confirmed by the BA, dat file, per-product values; event: where it starts, the dialog's fields with their testids, the request it waits for, the outcome texts, the checker, the products; a `record-session.bat` recording of the event done by hand gives the testids in order), leaves out what nobody gave, and ends with the coverage matrix, what QA still has to provide and a go-live checklist.
 
 ## Packaging for the PO
 

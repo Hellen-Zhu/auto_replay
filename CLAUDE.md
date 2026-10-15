@@ -66,7 +66,7 @@ Details of each point: `docs/handover-notes.md` section 3.
 | `mock-oreo/server.js` | Mock OREO for local verification (its header lists what is real vs. mock-only: never copy mock-only testids into `framework/`) |
 | `cases/`, `requests/` | Exported case files and their API requests |
 | `.claude/skills/porting-java-e2e-cases/` | Skill to port a Java + Cucumber E2E case |
-| `.claude/skills/onboarding-product-or-event/` | Skill to cover a new product (registry row) or lifecycle event (new spec): asks QA for the inputs, reports the coverage matrix and go-live checklist |
+| `.claude/skills/onboarding-product/`, `onboarding-lifecycle-event/` | Skills to cover a new product (a registry row) or a new lifecycle event (a new spec) from this project's code: ask QA for the inputs, report the coverage matrix and go-live checklist |
 
 Per-file details (every flow, page operation, spec): `docs/handover-notes.md` section 4.
 
