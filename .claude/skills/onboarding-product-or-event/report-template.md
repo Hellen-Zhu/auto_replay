@@ -11,8 +11,8 @@ Mode A (product `<PRODUCT>`): one row per capability. Mode B (event `<event>`): 
 | create | `TC-TRADE-CREATION-<PRODUCT>-UI-001` | listed, not run | dat file missing |
 | stepInFull | `TC-TRADE-CREATION-<PRODUCT>-UI-002` | ... | |
 | stepInPartial | `TC-TRADE-CREATION-<PRODUCT>-UI-003` | ... | |
-| cancellation | `TC-TRADE-CANCELLATION-UI-001 @product:<PRODUCT>` | ... | |
-| novationRemaining | `TC-TRADE-NOVATION-REMAINING-UI-001 @product:<PRODUCT>` | ... | target amount: typed / left out (`byProduct`) |
+| cancellation | `TC-TRADE-CANCELLATION-<PRODUCT>-UI-001` | ... | |
+| novationRemaining | `TC-TRADE-NOVATION-REMAINING-<PRODUCT>-UI-001` | ... | target amount: typed / left out (`byProduct`) |
 | stepOutFull | - | not supported | left out of the registry (confirmed by ...) |
 | approval / reject | `TC-TRADE-APPROVE-CREATION-UI-001` ... | not per product | PO changes `product` / `datFile` |
 

@@ -47,7 +47,7 @@ Ask for everything missing in one message, as a checklist in the user's language
    - whether a checker has to approve it (then the maker's case ends at "pending checker approval": a case logs in once).
 2. **required** The products that support it (mode A item 2 for this event only).
 3. Test data values, the E2E project's request template names if there are any, and per-product values (dat-dependent amounts, Examples columns).
-4. The case ID (`TC-TRADE-<EVENT>-UI-001` unless the feature has one) and the title.
+4. The case ID (`TC-TRADE-<EVENT>-<PRODUCT>-UI-001` unless the feature has one) and the title.
 
 ## Mode A: a new product
 
@@ -66,7 +66,7 @@ Bottom-up, reusing before writing (the closest existing event is the template: `
 2. **Page / component entries**: the row action in `TradesPage.rowActions` (with `lifecycle: true`), new dialog fields in `DynamicAction.fields`, the toast text in `Toast.message` / `Toast.title`, a new event status in `TradesPage.eventStatus`, a new risk calculation in `RiskCalculation` with its real mocked answer. Only names that are in `elements/`.
 3. **Flow** `framework/flows/trade-<event>.flow.ts`: `<verb>(tradeId, data)` = `lifecycleEvent.openAction` -> substeps that fill the dialog -> `lifecycleEvent.submit` (or the event's own confirm); `expect...` methods for the outcome, which the action method never asserts. Its `...Data` interface next to it. Register it in `framework/flows/index.ts` and export the type.
 4. **Test data**: `testdata/trade-<event>.json` with `"use": ["given-trade"]` (the common block of the given trade) and the event's own values in `"defaults"`, plus `"tradeId": ""`. Nothing goes into `testdata/common.json`, which holds only what is common.
-5. **Spec** `tests/trade-<event>.spec.ts`, the same shape as `tests/trade-step-out-full.spec.ts`: the NOTE comment, `for (const forProduct of productsWith('<event>'))`, title `[<case ID>] <title> ${productTag(forProduct)}`, `givenProduct(..., forProduct)` with a one-sentence description for the PO, `givenTrade(flows, data)`, `Given ... flows.trades.orCreate(() => flows.tradeProvisioning.provisionLiveTrade(product, data))`, `maker is logged in to the trade portal`, the When, the Thens. A field only some products have goes under `this.ui.onlyWhenFilled(data, '<name>', (value) => ...)` in the flow (it reads the value from `data` itself: `p.<name>` of `this.params(data)` fails on an empty value), its value `""` in `defaults` and set in `byProduct` for the products that have it; no table of products in the spec. Example: `novateRemaining` in `framework/flows/trade-novation-remaining.flow.ts`.
+5. **Spec** `tests/trade-<event>.spec.ts`, the same shape as `tests/trade-step-out-full.spec.ts`: the NOTE comment, `for (const forProduct of productsWith('<event>'))`, title `[TC-TRADE-<EVENT>-${forProduct}-UI-001] <title>` (the product in the case ID, as in creation: one case file per product), `givenProduct(..., forProduct)` with a one-sentence description for the PO, `givenTrade(flows, data)`, `Given ... flows.trades.orCreate(() => flows.tradeProvisioning.provisionLiveTrade(product, data))`, `maker is logged in to the trade portal`, the When, the Thens. A field only some products have goes under `this.ui.onlyWhenFilled(data, '<name>', (value) => ...)` in the flow (it reads the value from `data` itself: `p.<name>` of `this.params(data)` fails on an empty value), its value `""` in `defaults` and set in `byProduct` for the products that have it; no table of products in the spec. Example: `novateRemaining` in `framework/flows/trade-novation-remaining.flow.ts`.
 6. **Docs**: the spec's row in `docs/handover-notes.md` section 4, the capability list in the `framework/products.ts` row, and section 10 for what was not run.
 
 ## Verify
@@ -75,7 +75,7 @@ In this order; stop at the first failure and report it.
 
 1. `npx tsc -p .`
 2. `npm run sync:elements` with `OREO_E2E_DIR` unset (then it only checks; with a path or that variable it syncs and rewrites `elements/`): no element name the new code uses may be undefined.
-3. Mode A: `npx playwright test --list --grep "(@product:|CREATION-)<PRODUCT>\b"`. The event runs carry the tag `@product:<PRODUCT>`, the creation tests only have the product in their case ID; `\b` keeps `FX_PSCRIPT` from also matching `FX_PSCRIPT_FSKO`. Mode B: `npx playwright test tests/trade-<event>.spec.ts --list`. The titles are the coverage matrix of step "Report".
+3. Mode A: `npx playwright test --list --grep "<PRODUCT>-UI-"`. Creation and event case IDs both have the product before `-UI-`, so `FX_PSCRIPT-UI-` does not also match `FX_PSCRIPT_FSKO`. Mode B: `npx playwright test tests/trade-<event>.spec.ts --list`. The titles are the coverage matrix of step "Report".
 4. On the mock (`npm run mock`, mock config, `OREO_ELEMENTS_DIR` for elements the partial files lack) only what the mock implements: its header in `mock-oreo/server.js` says which pages and events. Its Product ID dropdown has a fixed list of products, so a new product's creation in the browser is "not run on mock"; a trade created through the API works when the dat file name starts with the product. Never edit the mock to make a case pass.
 5. On the real system, only when `config.local.json` points at it and the dat file is there: the same `--grep` without `--list`, or the event's spec. Every run books real UAT trades: at most three runs per case. A case file is exported only from the run for the test data's product.
 
@@ -98,7 +98,7 @@ What a QA lead checks beyond "the cases are written"; the report lists the open 
 - Creation: normal, StepIn full and partial where supported, the default dat file and each variant the business uses (the PO runs a variant by changing the case data `datFile` of the product's creation case).
 - Each event: passed once on the real system with `"riskEngine": "real"`, not only on the mock.
 - Events that need a checker: the maker's case ends at pending; the checker's decision is covered by the approval / reject cases (one product), so check that the event's pending item appears for the checker.
-- A run on an existing trade (`OREO_TRADE_ID` with `--grep @product:<PRODUCT>`) for at least one event, since that is how the PO replays on their own trades.
+- A run on an existing trade (`OREO_TRADE_ID` with `-g "<case ID>"` of that product) for at least one event, since that is how the PO replays on their own trades.
 - Data variations are case data, not cases (direction, number of ways, amendment field): the PO knows which case data to change.
 - Values checked against the dat file are either given per product (`byProduct`) or deliberately not checked.
 - The case files are exported again and the portable package rebuilt (`npm run build:portable`) after any change in `core/`; the PO gets the new package.

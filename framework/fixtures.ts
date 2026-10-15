@@ -14,8 +14,6 @@ const ROOT = path.resolve(__dirname, '..');
 const CASES_DIR = process.env.OREO_CASES_DIR || path.join(ROOT, 'cases');
 
 const CASE_TAG = /@case:([\w-]+)/;
-// The product a case runs for when QA repeats it for every product (tests/support.ts productTag): not part of its name
-const PRODUCT_TAG = /\s*@product:[\w-]+/;
 
 /**
  * The name of a spec: tests/trade-creation.spec.ts -> trade-creation. One spec covers one lifecycle event, and its
@@ -63,10 +61,9 @@ export const test = base.extend<{ ui: UI; app: App; flows: Flows; testData: Test
 
     // Export only passing cases, so a half-finished flow never reaches the PO. The cases of a spec share a folder,
     // so that the hundreds of cases of all events and products stay easy to find, for QA and in the runner's menu
-    // A case that runs for every product is exported once, from the run for the product of its test data
-    if (testInfo.status === 'passed' && !testInfo.annotations.some((a) => a.type === 'no-export')) {
+    if (testInfo.status === 'passed') {
       const id = exportIdOf(testInfo.title);
-      const name = testInfo.title.replace(CASE_TAG, '').replace(PRODUCT_TAG, '').trim();
+      const name = testInfo.title.replace(CASE_TAG, '').trim();
       const file = path.join(CASES_DIR, specNameOf(testInfo.file), `${id}.json`);
       ui.exportCase(file, {
         name,

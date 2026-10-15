@@ -75,14 +75,14 @@ npx tsc -p .                      # type check
 |---|---|---|
 | `trade-creation` | `TC-TRADE-CREATION-<PRODUCT>-UI-001` to `-003` | Maker creates a normal / StepIn full / StepIn partial trade, per product that supports it |
 | `trade-approval-reject` | `TC-TRADE-APPROVE-CREATION-UI-001` / `-002`, `TC-TRADE-REJECT-CREATION-UI-001` / `-002` | Checker approves or rejects a pending new trade (normal, StepIn full, StepIn partial) |
-| `trade-cancellation` | `TC-TRADE-CANCELLATION-UI-001` | Maker cancels a live trade; pending checker approval |
-| `trade-allocation` | `TC-TRADE-ALLOCATION-UI-001` | Maker allocates to 2, 3 or 4 subtrades: the case data `allocationWays`, chosen in the runner |
-| `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-UI-001` | Maker triggers the event from the trade's action menu |
-| `trade-amendment` | `TC-TRADE-AMENDMENT-UI-002` | Maker amends the field named by the case data `amendmentField` (`Counterparty` or `Risk Portfolio`, chosen in the runner); pending checker approval |
+| `trade-cancellation` | `TC-TRADE-CANCELLATION-<PRODUCT>-UI-001` | Maker cancels a live trade; pending checker approval |
+| `trade-allocation` | `TC-TRADE-ALLOCATION-<PRODUCT>-UI-001` | Maker allocates to 2, 3 or 4 subtrades: the case data `allocationWays`, chosen in the runner |
+| `trade-early-termination`, `trade-partial-termination`, `trade-novation-remaining`, `trade-step-out-full`, `trade-step-out-partial`, `trade-portfolio-reassignment`, `trade-partial-novation-remaining` | `TC-TRADE-<EVENT>-<PRODUCT>-UI-001` | Maker triggers the event from the trade's action menu |
+| `trade-amendment` | `TC-TRADE-AMENDMENT-<PRODUCT>-UI-002` | Maker amends the field named by the case data `amendmentField` (`Counterparty` or `Risk Portfolio`, chosen in the runner); pending checker approval |
 
 How the cases are cut:
 
-- **Every lifecycle event runs for every product** (explicit user requirement), as creation does: one case per event, which QA's run repeats for each product that has the event's capability in `framework/products.ts` (the test title ends with `@product:<PRODUCT>`; `npx playwright test --grep @product:FX_TRF` runs one product). The case file is exported once, from the run for the product of its test data; the PO changes `product` (and `datFile`) or gives a `tradeId` of that product. A value that differs per product goes into `byProduct` of the test data (`"byProduct": { "FX_PSCRIPT": { "remainingNotional": "..." } }`). The checker's decision runs for one product, one case per kind of trade or outcome.
+- **Every lifecycle event runs for every product** (explicit user requirement), as creation does: one case per event and product: the test is repeated for each product that has the event's capability in `framework/products.ts`, with the product in its case ID (`TC-TRADE-CANCELLATION-FX_TRF-UI-001`; `npx playwright test --grep FX_TRF-UI` runs one product's creation and event cases), and each exports its own case file, so the PO picks the case of the product (or gives a `tradeId` of that product). A value that differs per product goes into `byProduct` of the test data (`"byProduct": { "FX_PSCRIPT": { "remainingNotional": "..." } }`). The checker's decision runs for one product, one case per kind of trade or outcome.
 - **The product and its dat file are case data** (`product`, `datFile`) in every case that is not repeated per product, so the PO runs it for another product by changing them before the run. A variation in data only (direction Sell, another counterparty, another dat file) is never a case of its own.
 - **A case logs in once.** What the other role did before is the `Given`, prepared through the API: a lifecycle event starts from a live trade that the maker submits and the checker approves through the API. Where no such request is known (a pending cancellation, a pending amendment), the maker's case ends at "pending checker approval".
 - **Every case whose `Given` creates its trade can also run on a trade that already exists** (there are no separate existing-trade cases). Each such case has its own `"tradeId": ""` in its test data (an event changes its trade, so the next event may not be able to run on it; never commit a real trade ID). The trade ID comes from, in this order:
@@ -93,8 +93,8 @@ How the cases are cut:
   The exported case file is the same whichever source the run took: it holds the API steps that create the trade, run only while `tradeId` is empty, and `tradeId` is empty. In the runner the PO leaves `tradeId` empty (the case creates its trade, also in a batch) or changes it by its number to an existing trade's ID (the creating steps are then not run and not shown; `-` empties it again). Nothing checks that a given trade is in the state the case starts from: a wrong trade fails at the first step that needs that state.
 
   ```bash
-  # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-TRADE-CANCELLATION-UI-001"
-  OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-TRADE-CANCELLATION-UI-001"
+  # PowerShell: $env:OREO_TRADE_ID = "<trade ID>"; npx playwright test -g "TC-TRADE-CANCELLATION-FX_TRF-UI-001"
+  OREO_TRADE_ID=<trade ID> npx playwright test -g "TC-TRADE-CANCELLATION-FX_TRF-UI-001"
   ```
 
 Not every case has been run on the real system, and some were never run at all: the status per event and what still has to be checked are in `CLAUDE.md`, section 10.
@@ -159,9 +159,9 @@ Three layers, each calling only the one below:
 
 ```ts
 // tests/trade-cancellation.spec.ts (shortened)
-test('[TC-TRADE-CANCELLATION-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it',
+test(`[TC-TRADE-CANCELLATION-${forProduct}-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it`,
   async ({ flows, testData, Given, When, Then, And }) => {
-    const { product, data } = givenProduct(flows, testData<TradeCancellationData>(), '...');
+    const { product, data } = givenProduct(flows, testData<TradeCancellationData>(), '...', forProduct);
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));
     await And('maker is logged in to the trade portal', () => flows.auth.login('maker'));
     await When('perform cancellation for the trade from trade portal', () => flows.tradeCancellation.cancelFromTradePortal(tradeId, data));

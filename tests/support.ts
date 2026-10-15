@@ -24,12 +24,6 @@ export function prepare(product: string, description: string, file?: string) {
 export type ProductData = { product: string; datFile?: string; byProduct?: Record<string, Record<string, unknown>> };
 
 /**
- * The tag that tells apart the runs of one case for each product: "[TC-...] <title> @product:FX_TRF". It is not part
- * of the exported case's name, and a run for one product is chosen with --grep @product:FX_TRF
- */
-export const productTag = (product: string) => `@product:${product}`;
-
-/**
  * For a case that is the same for every product: the product is case data ("product" of its test data, with
  * "datFile", the file of testdata/dat/<product>/ the trade is created from), so the PO can run the case for another product
  * or another variant of the product's structure by changing them before the run. Skips the case while the dat file
@@ -38,15 +32,11 @@ export const productTag = (product: string) => `@product:${product}`;
  */
 export function givenProduct<T extends ProductData>(flows: Flows, row: T, description: string, forProduct?: string) {
   const { product: dataProduct, byProduct, ...rest } = row;
-  // A case that QA runs for every product of a lifecycle event (forProduct, from the spec's loop): one case file per
-  // event, so only the run for the product of the test data exports it; the others create their trades and check
-  // the event for their product. Another product sends its own default dat file
+  // A lifecycle event case is one test per product (forProduct, from the spec's loop, also in its case ID): that
+  // product replaces the one of the data, and sends its own default dat file unless byProduct names another
   const product = forProduct || dataProduct;
   const data = { ...rest } as Omit<T, 'product' | 'byProduct'> & { datFile?: string };
-  if (product !== dataProduct) {
-    delete data.datFile;
-    test.info().annotations.push({ type: 'no-export', description: `the case file is exported from the run for ${dataProduct}` });
-  }
+  if (product !== dataProduct) delete data.datFile;
   Object.assign(data, byProduct?.[product]);
   prepare(product, description, data.datFile);
   return { product: flows.tradeCreation.productAsCaseData(product), data };

@@ -1,7 +1,7 @@
 import { test } from '../framework/fixtures';
 import type { TradeAmendmentData, TradeProvisioningData } from '../framework/flows';
 import { productsWith } from '../framework/products';
-import { givenProduct, givenTrade, productTag, type GivenTradeData, type ProductData } from './support';
+import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from './support';
 
 // Mirrors trade_amendment.feature of the E2E project, steps included.
 // The live trade of the Given is created through the API (flows.tradeProvisioning), so the case needs apiBaseUrl
@@ -19,14 +19,13 @@ import { givenProduct, givenTrade, productTag, type GivenTradeData, type Product
 
 type Data = TradeProvisioningData & TradeAmendmentData & ProductData;
 
-// One case for every product (explicit user requirement): QA's run repeats it for each product with the event's
-// capability (framework/products.ts), each run creating its trade through the API (titles tagged @product:<PRODUCT>,
-// so --grep @product:FX_TRF runs one). The case file is exported once, from the run for the product of the test
-// data; the PO chooses the product, or gives the ID of a trade of that product, in the runner. Values that differ
-// for a product go under "byProduct" in the test data.
+// One case per product (explicit user requirement): the test is repeated for each product with the event's capability
+// (framework/products.ts), the product in its case ID like the creation cases ([TC-TRADE-<EVENT>-<PRODUCT>-UI-001],
+// so --grep FX_TRF-UI runs one product), each run creating its trade through the API and exporting its own case file.
+// Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade amendment', () => {
   for (const forProduct of productsWith('amendment')) {
-    test(`[TC-TRADE-AMENDMENT-UI-002] Amendment of a Live trade is pending checker approval after Maker submits it ${productTag(forProduct)}`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-AMENDMENT-${forProduct}-UI-002] Amendment of a Live trade is pending checker approval after Maker submits it`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker changes the field named by the case data amendmentField (Counterparty or Risk Portfolio) in the trade details and the amendment is pending checker approval', forProduct);
       givenTrade(flows, data);
 

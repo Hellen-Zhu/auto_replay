@@ -1,7 +1,7 @@
 import { test } from '../framework/fixtures';
 import type { TradeCancellationData, TradeProvisioningData } from '../framework/flows';
 import { productsWith } from '../framework/products';
-import { givenProduct, givenTrade, productTag, type GivenTradeData, type ProductData } from './support';
+import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from './support';
 
 // Mirrors trade_cancellation.feature of the E2E project, steps included. The live trade of the Given is created
 // through the API (flows.tradeProvisioning), so the case needs apiBaseUrl in the local config.
@@ -10,14 +10,13 @@ import { givenProduct, givenTrade, productTag, type GivenTradeData, type Product
 // cancellation has no case of its own (user decision): it is the same approve / reject as on a pending new trade,
 // which TC-TRADE-APPROVE-CREATION-UI-001 / TC-TRADE-REJECT-CREATION-UI-001 cover.
 
-// One case for every product (explicit user requirement): QA's run repeats it for each product with the event's
-// capability (framework/products.ts), each run creating its trade through the API (titles tagged @product:<PRODUCT>,
-// so --grep @product:FX_TRF runs one). The case file is exported once, from the run for the product of the test
-// data; the PO chooses the product, or gives the ID of a trade of that product, in the runner. Values that differ
-// for a product go under "byProduct" in the test data.
+// One case per product (explicit user requirement): the test is repeated for each product with the event's capability
+// (framework/products.ts), the product in its case ID like the creation cases ([TC-TRADE-<EVENT>-<PRODUCT>-UI-001],
+// so --grep FX_TRF-UI runs one product), each run creating its trade through the API and exporting its own case file.
+// Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade cancellation', () => {
   for (const forProduct of productsWith('cancellation')) {
-    test(`[TC-TRADE-CANCELLATION-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it ${productTag(forProduct)}`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-CANCELLATION-${forProduct}-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<TradeProvisioningData & TradeCancellationData & ProductData & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker cancels it from the trade portal and the cancellation is pending checker approval', forProduct);
       givenTrade(flows, data);
 
