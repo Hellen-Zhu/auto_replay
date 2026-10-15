@@ -1,5 +1,5 @@
 {
-  "_comment": "Shared blocks only. A feature file lists the blocks it starts from in \"use\"; a request is the API body as it is.",
+  "_comment": "Shared blocks a feature uses, and setup data an API step loads with TestDataLoader.forKey(key). A request is the API body as it is.",
   "shared": {
     "trade-basic": {
       "request": {
@@ -15,6 +15,23 @@
       "request": {
         "stepIn": {
           "oldCounterpartyName": "ACACSUPRIANI SUP*JBA"
+        }
+      }
+    }
+  },
+  "setup": {
+    "API-SETUP-TRADE-CREATE": {
+      "_comment": "Body of POST /trades/create?tradeAction=SUBMIT (part 'trade'), as copied; productId is set from the product",
+      "productPath": "basic.productId",
+      "request": {
+        "basic": {
+          "counterpartyFmId": "300036958",
+          "counterpartyName": "10 AM NY",
+          "portfolioId": "ABS_EQF",
+          "productId": "FX_TRF",
+          "direction": "Buy",
+          "premiumAmount": 10000,
+          "premiumCurrency": "USD"
         }
       }
     }

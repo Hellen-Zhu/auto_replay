@@ -1,0 +1,14 @@
+{
+  "_comment": "Unit test fixture only: shows setup changes of a feature and a case",
+  "shared": {
+    "trade-basic": { "request": { "basic": { "counterpartyName": "10 AM NY", "direction": "Buy" } } }
+  },
+  "setup": {
+    "API-SETUP-TRADE-CREATE": {
+      "use": ["trade-basic"],
+      "productPath": "basic.productId",
+      "request": { "basic": { "notional": "1,000" } },
+      "byProduct": { "FX_FSB": { "request": { "basic": { "notional": "2,000" } } } }
+    }
+  }
+}

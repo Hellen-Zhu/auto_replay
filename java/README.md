@@ -22,12 +22,13 @@ src/main/java/com/oreo/uat/testdata/
 src/test/java/com/oreo/uat/
   hooks/ScenarioLifecycleHooks.java   same ctx keys as today (_tc.key, _tc.request, _tc.request.<field>, basic.xxx)
   steps/TradeCreationSteps.java       data-only stand-ins for the trade creation snippets
-  testdata/TestDataLoaderTest.java    the 9 trade creation cases resolve to exactly the old YAML's data
+  testdata/TestDataLoaderTest.java    the 9 trade creation cases and API-SETUP-TRADE-CREATE resolve to exactly the old YAML's data
 src/test/resources/
-  data/common.json                    shared blocks
+  data/common.json                    shared blocks and setup data (forKey)
   data/ui/trade_creation.json         the feature's data (replaces 93 lines of YAML)
   features/ui/trade_creation.feature  unchanged feature
-  legacy-data/ui/trade_creation.yml   the old file, only for the equivalence test
+  legacy-data/{ui,api}/trade_creation.yml   the old files, only for the equivalence tests
+  fixture-data/                       unit test fixture for setup changes of a feature and a case
 ```
 
 ## Data files
@@ -73,6 +74,42 @@ Rules:
 - Keys starting with `_` at these levels are comments; any other unknown key fails, so typos do not pass silently.
 - A data variation is not a new case entry when an Examples column or `byProduct` can express it.
 
+## Setup data for API steps (`forKey`)
+
+A step that creates what a case needs through the API (`a live '<P>' trade is provisioned via playwright api`) loads
+named data, not case data: `TestDataLoader.forKey("API-SETUP-TRADE-CREATE").request()`. Its entry is in the `setup`
+section of `common.json`, the request body as copied:
+
+```json
+"setup": {
+  "API-SETUP-TRADE-CREATE": {
+    "productPath": "basic.productId",
+    "request": { "basic": { "counterpartyFmId": "...", "portfolioId": "ABS_EQF", "productId": "FX_TRF", "direction": "Buy", "premiumAmount": 10000, "premiumCurrency": "USD" } },
+    "byProduct": { "FX_FSB": { "request": {} } }
+  }
+}
+```
+
+- `forKey(key)` keeps the old signature. The product comes from the running case's ID; `forKey(key, product)` takes
+  the product the step was given (`provisionLiveTradeByProduct(product)`). Either way the product ID goes to
+  `productPath`, so the setup data has no entry per product.
+- A case that needs its setup trade a little different (a notional for partial novation) changes it in its own
+  feature file, not with a new setup key: `setup.<KEY>` at the top of the file (every case of the feature) or in a
+  case entry, each with an optional `byProduct`. The hook tells the loader which case is running
+  (`setCurrentCase` / `clearCurrentCase`).
+- Merge order: the entry's `use` blocks, its `request` / `response`, the product ID, its `byProduct`, the feature's
+  `setup.<KEY>` (+ `byProduct`), the case entry's `setup.<KEY>` (+ `byProduct`).
+- A key `common.json` does not have is looked up in the old YAML as before (`requestRef` -> `REQ-TPL-...`).
+
+In the step, only the call changes if the product should come from the step's argument:
+
+```java
+String tradeJson = TestDataLoader.forKey(testDataKey, product).request();
+```
+
+Not known from the E2E project: how its step puts the product into `productId` today (the old template says
+`FX_TRF`). If the step sets it itself after `forKey`, drop `productPath` from the entry or remove that code.
+
 ## What changes for each task
 
 | Task | Old | New |
@@ -81,13 +118,16 @@ Rules:
 | Change the default counterparty | every template of every feature | one block in `common.json` |
 | A new feature | a template + one entry per case and product | a file with `use` and its own `defaults` |
 | A case without data | warning, ctx empty, a later step fails | the feature's defaults |
+| A setup trade a case needs different | a new setup key and template | `setup.<KEY>` in the case's own entry |
 
 ## Porting into the E2E project
 
 1. Copy `TestDataLoader`, `TestDataRecord`, `JsonMerge` and `Products` next to the existing classes (rename the
-   package). Keep the static API the hook calls: `tcKeyFromName(name)`, `getByTcId(tcId)` throwing `AssertionError`.
+   package). Keep the static API the hook and the steps call: `tcKeyFromName(name)`, `getByTcId(tcId)` throwing
+   `AssertionError`, `forKey(key)` (plus the new `forKey(key, product)`).
    If the existing `TestDataRecord.flattenRequest()` builds array paths another way, keep that one.
-2. `ScenarioLifecycleHooks`: nothing to change but the imports. Its `GenieScenario.setAttribute` calls stay; the
+2. `ScenarioLifecycleHooks`: add `TestDataLoader.setCurrentCase(tcId)` before the lookup and an `@After` that calls
+   `clearCurrentCase()` (both in the version here); nothing else changes. Its `GenieScenario.setAttribute` calls stay; the
    version here writes to `ScenarioContext` only because Genie is not available.
 3. The data root is `data/` on the classpath (or `-Doreo.testdata.dir=...`). Old YAML files under it keep working:
    a case whose feature has no `.json` file is looked up there (`requestRef` template deep-merged with the entry's

@@ -3,6 +3,7 @@ package com.oreo.uat.hooks;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.oreo.uat.testdata.TestDataLoader;
 import com.oreo.uat.testdata.TestDataRecord;
+import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import io.cucumber.java.Scenario;
 import java.util.Map;
@@ -29,6 +30,8 @@ public class ScenarioLifecycleHooks {
         if (tcId == null) {
             return; // no [TC-...] token: background-only or infrastructure scenario
         }
+        // TestDataLoader.forKey(...) in an API setup step then applies this case's setup changes and product
+        TestDataLoader.setCurrentCase(tcId);
 
         TestDataRecord record;
         try {
@@ -57,5 +60,10 @@ public class ScenarioLifecycleHooks {
         // Flattened leaves for snippets: 'basic.counterpartyName'
         Map<String, String> fields = record.flattenRequest();
         fields.forEach(ctx::setAttribute);
+    }
+
+    @After(order = 1)
+    public void clearCurrentCase() {
+        TestDataLoader.clearCurrentCase();
     }
 }

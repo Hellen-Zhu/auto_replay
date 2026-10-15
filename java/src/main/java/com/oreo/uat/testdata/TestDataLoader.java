@@ -24,10 +24,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Resolves the test data of a case from layered JSON files, so a case needs an entry only when its data differs.
+ * Resolves test data from layered JSON files, so a case needs an entry only when its data differs. Two kinds of
+ * data: a case's own data ({@link #getByTcId}, injected by the hook) and named setup data that a step sends to the
+ * API to create what the case needs ({@link #forKey}, e.g. {@code API-SETUP-TRADE-CREATE}).
  *
  * <pre>
- * data/common.json              shared blocks:  { "shared": { "&lt;block&gt;": { "request": {...}, "response": {...} } } }
+ * data/common.json
+ *   "shared": { "&lt;block&gt;": { "request": {...}, "response": {...} } }       blocks a feature or setup entry uses
+ *   "setup":  { "&lt;KEY&gt;": { "use", "productPath", "request", "byProduct" } }  data for API setup steps
  * data/&lt;layer&gt;/&lt;feature&gt;.json   one per feature, found from the case ID:
  *                               TC-TRADE-CREATION-FX_FSB-UI-002 -> data/ui/trade_creation.json
  * </pre>
@@ -40,32 +44,44 @@ import java.util.stream.Stream;
  *   "productPath": "basic.productId",             where the case's product ID goes in the request (optional)
  *   "defaults": { "request": {...} },             the feature's own values
  *   "byProduct": { "FX_FSB": { "request": {...} } },
+ *   "setup": { "API-SETUP-TRADE-CREATE": { "request": {...}, "byProduct": {...} } },   this feature's setup changes
  *   "cases": {                                    only cases that differ; key = case ID without the product
- *     "TC-TRADE-CREATION-UI-002": { "use": ["step-in"], "request": {...}, "byProduct": {...} }
+ *     "TC-TRADE-CREATION-UI-002": { "use": ["step-in"], "request": {...}, "byProduct": {...}, "setup": {...} }
  *   }
  * }
  * </pre>
  *
- * Merge order, later wins, objects merged key by key: file {@code use} blocks, {@code defaults}, case {@code use}
+ * Case data, later wins, objects merged key by key: file {@code use} blocks, {@code defaults}, case {@code use}
  * blocks, case values, the product ID at {@code productPath}, file {@code byProduct}, case {@code byProduct}.
- * Keys starting with {@code _} at these levels are comments. A request is plain JSON, so a body copied from the
- * browser's Network tab pastes in as it is.
  *
- * <p>While migrating: a case whose feature has no JSON file is looked up in the old {@code data/**}{@code /*.yml}
- * files ({@code requestRef} template deep-merged with the entry's {@code request}).
+ * <p>Setup data: the entry's {@code use} blocks, its values, the product ID at its {@code productPath}, its
+ * {@code byProduct}; then, while a scenario runs (the hook calls {@link #setCurrentCase}), the {@code setup.<KEY>} of
+ * the scenario's feature file and of its case entry, each with its own {@code byProduct}. So a case that needs its
+ * setup trade a little different says so in its own data, not in a new setup key.
+ *
+ * <p>Keys starting with {@code _} are comments; any other unknown key fails. A request is plain JSON, so a body
+ * copied from the browser's Network tab pastes in as it is.
+ *
+ * <p>While migrating: a case whose feature has no JSON file, and a setup key that common.json does not have, are
+ * looked up in the old {@code data/**}{@code /*.yml} files ({@code requestRef} template deep-merged with the entry's
+ * {@code request}), exactly as before.
  */
 public final class TestDataLoader {
 
     private static final Pattern TC_TOKEN = Pattern.compile("\\[(TC-[^\\]]+)]");
     private static final Pattern TC_ID = Pattern.compile("^TC-(.+)-(UI|API)-(\\d+)$");
-    private static final Set<String> FILE_KEYS = Set.of("use", "productPath", "defaults", "byProduct", "cases");
-    private static final Set<String> CASE_KEYS = Set.of("use", "request", "response", "byProduct");
+
+    private static final Set<String> FILE_KEYS = Set.of("use", "productPath", "defaults", "byProduct", "setup", "cases");
+    private static final Set<String> CASE_KEYS = Set.of("use", "request", "response", "byProduct", "setup");
+    private static final Set<String> SETUP_KEYS = Set.of("use", "productPath", "request", "response", "byProduct");
+    private static final Set<String> SETUP_CHANGE_KEYS = Set.of("request", "response", "byProduct");
     private static final Set<String> BLOCK_KEYS = Set.of("request", "response");
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
     private static volatile TestDataLoader defaultLoader;
+    private static final ThreadLocal<String> CURRENT_CASE = new ThreadLocal<>();
 
     private final Path root;
     private final Map<Path, JsonNode> files = new ConcurrentHashMap<>();
@@ -87,6 +103,29 @@ public final class TestDataLoader {
     /** Test data of a case; {@link AssertionError} when neither a feature file nor an old YAML entry has it. */
     public static TestDataRecord getByTcId(String tcId) {
         return defaultLoader().resolve(tcId);
+    }
+
+    /**
+     * Setup data by its key ({@code API-SETUP-TRADE-CREATE}), for a step that creates data through the API. The
+     * product is the running case's (from its ID), if it has one.
+     */
+    public static TestDataRecord forKey(String key) {
+        return defaultLoader().resolveKey(key, null, CURRENT_CASE.get());
+    }
+
+    /** Setup data for a product the step was given ({@code a live 'FX_FSB' trade is provisioned via playwright api}). */
+    public static TestDataRecord forKey(String key, String product) {
+        return defaultLoader().resolveKey(key, product, CURRENT_CASE.get());
+    }
+
+    /** Called by the hook before a scenario: {@link #forKey} then applies that case's setup changes. */
+    public static void setCurrentCase(String tcId) {
+        CURRENT_CASE.set(tcId);
+    }
+
+    /** Called by the hook after a scenario. */
+    public static void clearCurrentCase() {
+        CURRENT_CASE.remove();
     }
 
     /** Data root: system property {@code oreo.testdata.dir}, otherwise {@code data/} on the classpath. */
@@ -118,12 +157,13 @@ public final class TestDataLoader {
     }
 
     // ------------------------------------------------------------------------------------------------------------
+    // Case data
 
     public TestDataRecord resolve(String tcId) {
         CaseId id = CaseId.parse(tcId);
-        Path file = root.resolve(id.layer).resolve(id.feature + ".json");
+        Path file = featureFile(id);
         if (Files.isRegularFile(file)) {
-            return resolveLayered(id, file);
+            return resolveCase(id, file);
         }
         JsonNode legacy = legacyEntries().get(tcId);
         if (legacy != null) {
@@ -133,68 +173,140 @@ public final class TestDataLoader {
             + " does not exist and no old YAML file under " + root + " has the key");
     }
 
-    private TestDataRecord resolveLayered(CaseId id, Path file) {
-        JsonNode feature = read(file);
-        checkKeys(feature, FILE_KEYS, file.getFileName().toString());
+    private TestDataRecord resolveCase(CaseId id, Path file) {
         String where = root.relativize(file).toString();
+        JsonNode feature = readChecked(file, FILE_KEYS, where);
+        JsonNode row = caseRow(feature, id, where);
+        String rowWhere = where + " cases." + id.caseKey;
 
         JsonNode record = JsonNodeFactory.instance.objectNode();
         record = applyUse(record, feature.get("use"), where);
         record = applyBlock(record, feature.get("defaults"), where + " defaults");
-
-        JsonNode row = feature.path("cases").get(id.caseKey);
         if (row != null) {
-            String rowWhere = where + " cases." + id.caseKey;
-            checkKeys(row, CASE_KEYS, rowWhere);
             record = applyUse(record, row.get("use"), rowWhere);
             record = applyBlock(record, row, rowWhere);
         }
-
         if (id.product != null) {
-            JsonNode productPath = feature.get("productPath");
-            if (productPath != null) {
-                record = JsonMerge.merge(record,
-                    nested("request." + productPath.asText(), Products.productId(id.product)));
-            }
-            record = applyBlock(record, feature.path("byProduct").get(id.product), where + " byProduct." + id.product);
+            record = applyProductId(record, feature.get("productPath"), id.product);
+            record = applyByProduct(record, feature, id.product, where);
             if (row != null) {
-                record = applyBlock(record, row.path("byProduct").get(id.product),
-                    where + " cases." + id.caseKey + ".byProduct." + id.product);
+                record = applyByProduct(record, row, id.product, rowWhere);
             }
         }
         return new TestDataRecord(id.tcId, record.get("request"), record.get("response"));
     }
 
+    // ------------------------------------------------------------------------------------------------------------
+    // Setup data (forKey)
+
+    /**
+     * Setup data {@code key} for {@code product} (null: the product of {@code tcId}, if any), with the setup changes
+     * of the case {@code tcId} (null: none).
+     */
+    public TestDataRecord resolveKey(String key, String product, String tcId) {
+        CaseId id = tcId == null ? null : CaseId.parse(tcId);
+        String forProduct = product != null ? product : id == null ? null : id.product;
+
+        JsonNode entry = commonJson().path("setup").get(key);
+        if (entry == null) {
+            JsonNode legacy = legacyEntries().get(key);
+            if (legacy != null) {
+                return resolveLegacy(key, legacy);
+            }
+            throw new AssertionError("No setup data '" + key + "': common.json has no setup." + key
+                + " and no old YAML file under " + root + " has the key");
+        }
+
+        String where = "common.json setup." + key;
+        checkKeys(entry, SETUP_KEYS, where);
+        JsonNode record = JsonNodeFactory.instance.objectNode();
+        record = applyUse(record, entry.get("use"), where);
+        record = applyBlock(record, entry, where);
+        if (forProduct != null) {
+            record = applyProductId(record, entry.get("productPath"), forProduct);
+            record = applyByProduct(record, entry, forProduct, where);
+        }
+
+        // The running case's changes: its feature file's setup.<key>, then its case entry's
+        if (id != null && Files.isRegularFile(featureFile(id))) {
+            String fileWhere = root.relativize(featureFile(id)).toString();
+            JsonNode feature = readChecked(featureFile(id), FILE_KEYS, fileWhere);
+            record = applySetupChange(record, feature.path("setup").get(key), forProduct, fileWhere + " setup." + key);
+            JsonNode row = caseRow(feature, id, fileWhere);
+            if (row != null) {
+                record = applySetupChange(record, row.path("setup").get(key), forProduct,
+                    fileWhere + " cases." + id.caseKey + ".setup." + key);
+            }
+        }
+        return new TestDataRecord(key, record.get("request"), record.get("response"));
+    }
+
+    private JsonNode applySetupChange(JsonNode record, JsonNode change, String product, String where) {
+        if (change == null) {
+            return record;
+        }
+        checkKeys(change, SETUP_CHANGE_KEYS, where);
+        record = applyBlock(record, change, where);
+        return product == null ? record : applyByProduct(record, change, product, where);
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // Merge steps
+
     private JsonNode applyUse(JsonNode record, JsonNode use, String where) {
         if (use == null) {
             return record;
         }
-        JsonNode shared = read(root.resolve("common.json")).path("shared");
+        JsonNode shared = commonJson().path("shared");
         for (JsonNode name : use) {
             JsonNode block = shared.get(name.asText());
             if (block == null) {
                 throw new AssertionError(where + " uses '" + name.asText() + "', which common.json does not have");
             }
-            record = applyBlock(record, block, "common.json shared." + name.asText());
+            String blockWhere = "common.json shared." + name.asText();
+            checkKeys(block, BLOCK_KEYS, blockWhere);
+            record = applyBlock(record, block, blockWhere);
         }
         return record;
     }
 
+    /** Merges the {@code request} and {@code response} of {@code block}; its other keys are structure, not data. */
     private static JsonNode applyBlock(JsonNode record, JsonNode block, String where) {
         if (block == null) {
             return record;
         }
         ObjectNode values = JsonNodeFactory.instance.objectNode();
-        Iterator<Map.Entry<String, JsonNode>> fields = block.fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> e = fields.next();
-            if (BLOCK_KEYS.contains(e.getKey())) {
-                values.set(e.getKey(), e.getValue());
-            } else if (!CASE_KEYS.contains(e.getKey()) && !e.getKey().startsWith("_")) {
-                throw new AssertionError(where + ": unknown key '" + e.getKey() + "' (expected request / response)");
+        for (String k : BLOCK_KEYS) {
+            if (block.has(k)) {
+                values.set(k, block.get(k));
             }
         }
         return JsonMerge.merge(record, values);
+    }
+
+    private static JsonNode applyProductId(JsonNode record, JsonNode productPath, String product) {
+        if (productPath == null) {
+            return record;
+        }
+        return JsonMerge.merge(record, nested("request." + productPath.asText(), Products.productId(product)));
+    }
+
+    private static JsonNode applyByProduct(JsonNode record, JsonNode owner, String product, String where) {
+        JsonNode block = owner.path("byProduct").get(product);
+        if (block == null) {
+            return record;
+        }
+        String blockWhere = where + " byProduct." + product;
+        checkKeys(block, BLOCK_KEYS, blockWhere);
+        return applyBlock(record, block, blockWhere);
+    }
+
+    private static JsonNode caseRow(JsonNode feature, CaseId id, String where) {
+        JsonNode row = feature.path("cases").get(id.caseKey);
+        if (row != null) {
+            checkKeys(row, CASE_KEYS, where + " cases." + id.caseKey);
+        }
+        return row;
     }
 
     private static void checkKeys(JsonNode node, Set<String> allowed, String where) {
@@ -215,6 +327,24 @@ public final class TestDataLoader {
         return node;
     }
 
+    // ------------------------------------------------------------------------------------------------------------
+    // Files
+
+    private Path featureFile(CaseId id) {
+        return root.resolve(id.layer).resolve(id.feature + ".json");
+    }
+
+    private JsonNode commonJson() {
+        Path file = root.resolve("common.json");
+        return Files.isRegularFile(file) ? read(file) : JsonNodeFactory.instance.objectNode();
+    }
+
+    private JsonNode readChecked(Path file, Set<String> allowed, String where) {
+        JsonNode node = read(file);
+        checkKeys(node, allowed, where);
+        return node;
+    }
+
     private JsonNode read(Path file) {
         return files.computeIfAbsent(file, f -> {
             try {
@@ -226,28 +356,35 @@ public final class TestDataLoader {
     }
 
     // ------------------------------------------------------------------------------------------------------------
-    // Old format: data/**/*.yml, a template (REQ-TPL-...) and one entry per case with requestRef and a request text
+    // Old format: data/**/*.yml, a template (REQ-TPL-...) and an entry per case or setup key with requestRef and a
+    // request given as JSON text or as YAML
 
-    private TestDataRecord resolveLegacy(String tcId, JsonNode entry) {
-        JsonNode request = parseText(entry.get("request"), tcId);
-        JsonNode response = parseText(entry.get("response"), tcId);
+    private TestDataRecord resolveLegacy(String key, JsonNode entry) {
+        JsonNode request = legacyJson(entry.get("request"), key);
+        JsonNode response = legacyJson(entry.get("response"), key);
         JsonNode ref = entry.get("requestRef");
         if (ref != null) {
             JsonNode template = legacyEntries().get(ref.asText());
             if (template == null) {
-                throw new AssertionError(tcId + ": requestRef " + ref.asText() + " not found");
+                throw new AssertionError(key + ": requestRef " + ref.asText() + " not found");
             }
-            request = JsonMerge.merge(parseText(template.get("request"), ref.asText()), request);
+            request = JsonMerge.merge(legacyJson(template.get("request"), ref.asText()), request);
         }
-        return new TestDataRecord(tcId, request, response);
+        return new TestDataRecord(key, request, response);
     }
 
-    private static JsonNode parseText(JsonNode text, String key) {
-        if (text == null || text.isNull() || text.asText().isBlank()) {
+    private static JsonNode legacyJson(JsonNode value, String key) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isTextual()) {
+            return value; // written as YAML / inline JSON instead of a | block
+        }
+        if (value.asText().isBlank()) {
             return null;
         }
         try {
-            return JSON.readTree(text.asText());
+            return JSON.readTree(value.asText());
         } catch (IOException e) {
             throw new AssertionError(key + ": request / response is not valid JSON: " + e.getMessage(), e);
         }

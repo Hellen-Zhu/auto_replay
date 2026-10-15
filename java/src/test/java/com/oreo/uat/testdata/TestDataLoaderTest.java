@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -75,5 +76,55 @@ class TestDataLoaderTest {
         assertEquals("ui", id.layer);
         assertEquals("TC-TRADE-PARTIAL-NOVATION-UI-002", id.caseKey);
         assertNull(TestDataLoader.CaseId.parse("TC-LOGIN-API-001").product);
+    }
+
+    // ---- forKey: setup data for API steps
+
+    @Test
+    void setupKeyMatchesTheOldYaml() throws Exception {
+        TestDataRecord layered = new TestDataLoader(resource("data")).resolveKey("API-SETUP-TRADE-CREATE", null, null);
+        TestDataRecord legacy = new TestDataLoader(resource("legacy-data")).resolveKey("API-SETUP-TRADE-CREATE", null, null);
+        assertEquals(legacy.requestNode(), layered.requestNode());
+    }
+
+    @Test
+    void setupKeyTakesTheProductGivenOrTheCasesOwn() throws Exception {
+        TestDataLoader loader = new TestDataLoader(resource("data"));
+        assertEquals("FX_PSCRIPT_FSKO", loader.resolveKey("API-SETUP-TRADE-CREATE", "FX_FSB", null)
+            .flattenRequest().get("basic.productId"));
+        assertEquals("FX_PSCRIPT", loader.resolveKey("API-SETUP-TRADE-CREATE", null, "TC-TRADE-CREATION-FX_CO-UI-001")
+            .flattenRequest().get("basic.productId"));
+        assertEquals("ABS_EQF", loader.resolveKey("API-SETUP-TRADE-CREATE", "FX_FSB", null)
+            .flattenRequest().get("basic.portfolioId"));
+    }
+
+    @Test
+    void setupKeyAppliesTheChangesOfTheRunningCase() throws Exception {
+        TestDataLoader loader = new TestDataLoader(resource("fixture-data"));
+
+        // No running case: the entry with its byProduct
+        Map<String, String> plain = loader.resolveKey("API-SETUP-TRADE-CREATE", "FX_FSB", null).flattenRequest();
+        assertEquals("2,000", plain.get("basic.notional"));
+        assertEquals("Buy", plain.get("basic.direction"));
+
+        // A case of the feature without its own entry: the feature's setup change
+        Map<String, String> feature = loader.resolveKey("API-SETUP-TRADE-CREATE", null, "TC-TRADE-EXAMPLE-FX_FSB-UI-001")
+            .flattenRequest();
+        assertEquals("Sell", feature.get("basic.direction"));
+        assertEquals("2,000", feature.get("basic.notional"));
+        assertEquals("FX_PSCRIPT_FSKO", feature.get("basic.productId"));
+
+        // A case with its own setup change, and its byProduct
+        assertEquals("5,000", loader.resolveKey("API-SETUP-TRADE-CREATE", null, "TC-TRADE-EXAMPLE-FX_FSB-UI-002")
+            .flattenRequest().get("basic.notional"));
+        assertEquals("7,000", loader.resolveKey("API-SETUP-TRADE-CREATE", null, "TC-TRADE-EXAMPLE-FX_TRF-UI-002")
+            .flattenRequest().get("basic.notional"));
+    }
+
+    @Test
+    void anUnknownSetupKeyFails() throws Exception {
+        AssertionError e = assertThrows(AssertionError.class,
+            () -> new TestDataLoader(resource("data")).resolveKey("API-SETUP-NOTHING", null, null));
+        assertTrue(e.getMessage().contains("setup.API-SETUP-NOTHING"), e.getMessage());
     }
 }

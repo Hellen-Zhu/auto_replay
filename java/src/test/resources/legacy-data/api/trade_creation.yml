@@ -1,0 +1,8 @@
+# The old format, as in the E2E project: kept only to prove the new files resolve to the same data
+API-SETUP-TRADE-CREATE:
+  requestRef: REQ-TPL-TRADE-CREATION-API-001
+
+REQ-TPL-TRADE-CREATION-API-001:
+  request:
+    { "basic": { "counterpartyFmId": "300036958", "counterpartyName": "10 AM NY", "portfolioId": "ABS_EQF",
+                 "productId": "FX_TRF", "direction": "Buy", "premiumAmount": 10000, "premiumCurrency": "USD" } }
