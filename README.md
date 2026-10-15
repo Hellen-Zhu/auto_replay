@@ -39,6 +39,7 @@ This file is the guide for using the project. Design decisions, the case file fo
 | `mock-oreo/` | Mock OREO, for local tries only |
 | `.claude/skills/porting-java-e2e-cases/` | Claude Code skill that ports a case of the E2E project |
 | `.claude/skills/onboarding-product/`, `onboarding-lifecycle-event/` | Claude Code skills that cover a new product or a new lifecycle event and report what QA still has to provide |
+| `.claude/skills/converting-po-recording/` | Claude Code skill that turns a PO's recording (`record-session.bat`) into a case, or into the case data to change in an existing one |
 
 ## QA: setup and running
 
@@ -286,7 +287,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
 3. Press Enter in the console window (or close the browser). A report opens, with the Full replay link.
 4. Send the `evidence/recording_<time>/` folder to QA.
 
-A recording is evidence, not a case: it cannot be replayed. Password fields are masked in the report, but **`trace.zip` contains what was typed, the passwords included**: share the folder inside the team only, never on a public site.
+A recording is evidence, not a case: it cannot be replayed. QA can turn it into a case (or into the case data to change in an existing one) with the `converting-po-recording` skill: `/converting-po-recording <folder>`. Password fields are masked in the report, but **`trace.zip` contains what was typed, the passwords included**: share the folder inside the team only, never on a public site.
 
 ## Known limitations
 

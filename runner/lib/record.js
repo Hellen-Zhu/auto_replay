@@ -31,6 +31,8 @@ function watchUserActions() {
     return {
       el,
       testId: holder ? holder.getAttribute('data-testid') : '',
+      // e.g. menuitem: the entries of a dropdown have no testid, only their role and text
+      role: control.getAttribute('role') || '',
       // a button inside a shadow root has no text of its own (it is slotted), so fall back to the host
       text: clean(control.innerText) || clean(holder && holder.innerText) || clean(el.getAttribute('aria-label') || el.getAttribute('placeholder')),
       tag: el.tagName.toLowerCase(),
@@ -38,7 +40,7 @@ function watchUserActions() {
   };
   const send = (kind, d, extra) => {
     if (!d || typeof window.__oreoRecord !== 'function') return;
-    window.__oreoRecord({ kind, testId: d.testId, text: d.text, tag: d.tag, path: location.pathname, ...extra });
+    window.__oreoRecord({ kind, testId: d.testId, role: d.role, text: d.text, tag: d.tag, path: location.pathname, ...extra });
   };
   // Typed text: "change" does not leave a shadow root, so the field being edited is remembered from "input"
   // (which does) and reported once, before the next thing the user does.
@@ -71,8 +73,21 @@ function watchUserActions() {
     send('click', describe(ev));
   }, true);
   document.addEventListener('click', (ev) => { if (ev.detail === 0 && ev.isTrusted) send('click', describe(ev)); }, true);
+  // A right click opens a row's action menu: its text is the cell's, e.g. the trade ID
+  document.addEventListener('contextmenu', (ev) => {
+    if (editing && !ev.composedPath().includes(editing.el)) flush();
+    send('rightClick', describe(ev));
+  }, true);
   // report what was typed before the Enter that submits it
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { flush(); send('press', describe(ev), { value: 'Enter', text: '' }); } }, true);
+}
+
+// What was done, as data, for QA to turn a recording into a case (the converting-po-recording skill). A password
+// typed into a field that is not a password field is masked too
+function userActionOf(a, secrets) {
+  const action = { kind: a.kind, testId: a.testId || '', role: a.role || '', text: a.text || '', tag: a.tag || '' };
+  if (a.kind !== 'click' && a.kind !== 'rightClick') action.value = secrets.includes(a.value) ? '******' : a.value;
+  return action;
 }
 
 function describeUserAction(a, secrets) {
@@ -81,6 +96,7 @@ function describeUserAction(a, secrets) {
   // a password typed into a field that is not a password field must not reach the report either
   const value = secrets.includes(a.value) ? '******' : a.value;
   if (a.kind === 'click') return `Click${quoted} (${where})`;
+  if (a.kind === 'rightClick') return `Right-click${quoted} (${where})`;
   if (a.kind === 'press') return `Press ${value} in ${where}`;
   return `Enter "${String(value).slice(0, 80)}" in ${where}`;
 }
@@ -138,7 +154,7 @@ async function recordSession(config) {
     const desc = describeUserAction(a, secrets);
     queue = queue.then(async () => {
       const no = run.steps.length + 1;
-      const rec = { desc, time: new Date().toLocaleTimeString(), page: a.path || '' };
+      const rec = { desc, time: new Date().toLocaleTimeString(), page: a.path || '', action: userActionOf(a, secrets) };
       run.steps.push(rec);
       console.log(`    [${no}] ${desc}`);
       try {
