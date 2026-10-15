@@ -54,6 +54,27 @@
   .feat li::marker { color: #C2551D; }
   .feat b { color: #C2551D; font-weight: 700; }
   .feat.dark b { color: #F2A65A; }
+  /* PO quick start */
+  .cols { flex: 1; display: grid; grid-template-columns: 1.05fr 1fr 1.15fr; gap: 20px; margin-bottom: 18px; }
+  .steps { display: flex; flex-direction: column; gap: 14px; background: #14213D; padding: 28px; border-radius: 16px; }
+  .steps .n, .gets .n, .faq .n { font-size: 20px; font-weight: 700; letter-spacing: 2px; color: #F2A65A; }
+  .gets .n, .faq .n { color: #C2551D; }
+  .steps h3, .gets h3, .faq h3 { font-size: 30px; font-weight: 700; color: #F7F6F2; }
+  .gets h3, .faq h3 { color: #14213D; }
+  .step { display: flex; gap: 18px; align-items: flex-start; background: #22335A; border-radius: 12px; padding: 16px 18px; }
+  .step .num { flex: none; width: 44px; height: 44px; border-radius: 50%; background: #C2551D; color: #FFF8F1; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .step p { font-size: 23px; line-height: 1.45; color: #C9D3E3; }
+  .step b { color: #F7F6F2; }
+  .gets, .faq { display: flex; flex-direction: column; gap: 14px; background: #FDFCFA; padding: 28px; border: 1px solid #DEDACF; border-radius: 16px; }
+  .get { border-left: 4px solid #C2551D; padding: 4px 0 4px 16px; }
+  .get h4 { margin: 0 0 4px; font-size: 25px; color: #14213D; }
+  .get p { font-size: 22px; line-height: 1.45; color: #2D3748; }
+  .qa { display: flex; flex-direction: column; gap: 2px; }
+  .qa .q { font-size: 22px; font-weight: 700; color: #14213D; }
+  .qa .a { font-size: 21px; line-height: 1.4; color: #4A5568; }
+  .step-more { margin-top: auto; font-size: 21px; line-height: 1.4; color: #8FA0BF; }
+  .tip { font-size: 22px; color: #4A5568; margin-bottom: 18px; }
+  .tip b { color: #C2551D; }
   kbd { font-family: Menlo, Consolas, monospace; font-size: 19px; padding: 1px 7px; border: 1px solid #C9C3B5; border-bottom-width: 2px; border-radius: 6px; background: #FFFFFF; color: #14213D; }
   .feat.dark kbd { background: #22335A; border-color: #3A4D78; color: #F7F6F2; }
 </style>
@@ -114,7 +135,7 @@
 <p>事件所需的交易由 API 步骤创建，浏览器里只演示被测的操作和结果</p>
 </div>
 </div>
-<p class="page">1 / 2</p>
+<p class="page">1 / 3</p>
 </section>
 
 <section id="runner">
@@ -185,7 +206,44 @@
 </ul>
 </div>
 </div>
-<p class="page">2 / 2</p>
+<p class="page">2 / 3</p>
+</section>
+
+<section id="po">
+<div class="head">
+<p class="eyebrow">OREO UAT REPLAY · 给 PO 的快速上手</p>
+<h2>点一下，看系统在你面前把流程真实走一遍</h2>
+<p class="sub">QA 已把每个 product 的每个 lifecycle event 做成可回放的用例：在你的 Edge 里逐步操作，跑完就有带截图的报告</p>
+</div>
+<div class="cols">
+<div class="steps">
+<p class="n">怎么用 · 三步</p>
+<h3>不用安装，不用写代码</h3>
+<div class="step"><span class="num">1</span><p>打开文件夹，双击 <b>run-case.bat</b></p></div>
+<div class="step"><span class="num">2</span><p>用 <kbd>↑</kbd><kbd>↓</kbd> 选一条用例，按 <kbd>Enter</kbd>；要跑多条就按 <kbd>Space</kbd> 勾选或 <kbd>Ctrl</kbd>+<kbd>A</kbd> 全选</p></div>
+<div class="step"><span class="num">3</span><p>输入<b>自己的密码</b>，看着它跑；跑完<b>报告自动打开</b></p></div>
+<p class="step-more">改数据、用已有交易、暂停、单步：用到时再看第 2 页</p>
+</div>
+<div class="gets">
+<p class="n">你能得到什么</p>
+<h3>看得到、查得清、留得下</h3>
+<div class="get"><h4>亲眼看到</h4><p>真实 UAT 上自动操作，每一步用橙框标出正在点哪里</p></div>
+<div class="get"><h4>覆盖清楚</h4><p>按 event 分文件夹、每个 product 一条，如 Cancellation – FX_TRF</p></div>
+<div class="get"><h4>结果留证</h4><p>每步截图、失败停在哪一步，可逐张回放，可附到 UAT sign-off</p></div>
+<div class="get"><h4>换数据自己试</h4><p>运行前改 product、comments 等值，不用找 QA</p></div>
+</div>
+<div class="faq">
+<p class="n">常见问题</p>
+<h3>你可能想问</h3>
+<div class="qa"><p class="q">要装什么吗？</p><p class="a">不用。文件夹拷过去就能用，用电脑上的 Edge</p></div>
+<div class="qa"><p class="q">会动到真实数据吗？</p><p class="a">只在 UAT 跑，每次自己新建一笔测试交易</p></div>
+<div class="qa"><p class="q">密码安全吗？</p><p class="a">运行时现场输入，只在内存里，不写进任何文件</p></div>
+<div class="qa"><p class="q">跑失败了怎么办？</p><p class="a">把报告文件夹发给 QA，里面有截图和完整回放</p></div>
+<div class="qa"><p class="q">发现没覆盖的场景？</p><p class="a">双击 record-session.bat 手动操作一遍，录制发给 QA 转成用例</p></div>
+</div>
+</div>
+<p class="tip">只想看结果？<b>不用碰工具</b>：QA 跑完把报告发给你即可</p>
+<p class="page">3 / 3</p>
 </section>
 </div>
 <script>
