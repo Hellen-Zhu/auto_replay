@@ -37,11 +37,30 @@
   .card { flex: 1; display: flex; flex-direction: column; gap: 10px; background: #FDFCFA; padding: 26px 28px; border: 1px solid #DEDACF; border-radius: 16px; }
   .card h3 { font-size: 28px; font-weight: 700; line-height: 1.25; color: #C2551D; }
   .card p { font-size: 24px; line-height: 1.45; color: #2D3748; }
+  /* slides: one shown at a time; Left / Right, PageUp / PageDown, Space or a click switch */
+  #stage > section { position: absolute; left: 0; top: 0; display: none; }
+  #stage > section.active { display: flex; }
+  .page { position: absolute; right: 112px; bottom: 26px; font-size: 20px; color: #8A94A6; letter-spacing: 2px; }
+  /* runner features */
+  .grid { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 20px; margin-bottom: 18px; }
+  .feat { display: flex; flex-direction: column; gap: 12px; background: #FDFCFA; padding: 24px 28px; border: 1px solid #DEDACF; border-radius: 16px; }
+  .feat.dark { background: #14213D; border-color: #14213D; }
+  .feat .n { font-size: 20px; font-weight: 700; letter-spacing: 2px; color: #C2551D; }
+  .feat.dark .n { color: #F2A65A; }
+  .feat h3 { font-size: 30px; font-weight: 700; line-height: 1.2; color: #14213D; }
+  .feat.dark h3 { color: #F7F6F2; }
+  .feat ul { display: flex; flex-direction: column; gap: 8px; font-size: 22px; line-height: 1.4; color: #2D3748; }
+  .feat.dark ul { color: #C9D3E3; }
+  .feat li::marker { color: #C2551D; }
+  .feat b { color: #C2551D; font-weight: 700; }
+  .feat.dark b { color: #F2A65A; }
+  kbd { font-family: Menlo, Consolas, monospace; font-size: 19px; padding: 1px 7px; border: 1px solid #C9C3B5; border-bottom-width: 2px; border-radius: 6px; background: #FFFFFF; color: #14213D; }
+  .feat.dark kbd { background: #22335A; border-color: #3A4D78; color: #F7F6F2; }
 </style>
 </head>
 <body>
 <div id="stage">
-<section id="how-it-works">
+<section id="how-it-works" class="active">
 <div class="head">
 <p class="eyebrow">OREO UAT REPLAY · 原理</p>
 <h2>录的是“动作”，不是鼠标点击</h2>
@@ -95,6 +114,78 @@
 <p>事件所需的交易由 API 步骤创建，浏览器里只演示被测的操作和结果</p>
 </div>
 </div>
+<p class="page">1 / 2</p>
+</section>
+
+<section id="runner">
+<div class="head">
+<p class="eyebrow">OREO UAT REPLAY · RUNNER 功能</p>
+<h2>PO 双击即用：选用例、确认数据、看着它跑、拿到证据</h2>
+<p class="sub">按 PO 的使用顺序：启动 → 选择 → 运行前确认 → 运行中 → 运行后 → 其他模式</p>
+</div>
+<div class="grid">
+<div class="feat dark">
+<p class="n">01 · 启动</p>
+<h3>免安装，双击就跑</h3>
+<ul>
+<li>便携文件夹自带 Node 和 Playwright，用本机 <b>Edge</b></li>
+<li><b>run-case.bat</b>：回放用例</li>
+<li><b>record-session.bat</b>：手动操作录制</li>
+<li><b>view-trace.bat</b>：查看历史报告</li>
+</ul>
+</div>
+<div class="feat">
+<p class="n">02 · 选择用例</p>
+<h3>键盘用例树</h3>
+<ul>
+<li>按事件分文件夹，<kbd>↑</kbd><kbd>↓</kbd> 移动，<kbd>→</kbd><kbd>←</kbd> 展开</li>
+<li>直接输入即搜索，<kbd>Esc</kbd> 清除</li>
+<li><kbd>Space</kbd> 勾选多条或整个文件夹，批量运行</li>
+<li>把 case 文件或文件夹<b>拖进窗口</b>即运行</li>
+</ul>
+</div>
+<div class="feat">
+<p class="n">03 · 运行前确认</p>
+<h3>数据可改，不改文件</h3>
+<ul>
+<li>设置和 case 数据列成编号清单，<b>输入编号</b>改值</li>
+<li>只对本次生效，case 文件不变</li>
+<li>Trade ID 留空则新建交易，填入则用已有交易</li>
+<li>密码<b>现场输入</b>，只存在内存里</li>
+</ul>
+</div>
+<div class="feat">
+<p class="n">04 · 运行中</p>
+<h3>看得见、停得下</h3>
+<ul>
+<li>每个动作前用<b>橙框</b>标出要操作的元素</li>
+<li><kbd>P</kbd> 暂停，<kbd>Enter</kbd> 继续；<kbd>S</kbd> 单步执行</li>
+<li>批量最多 <b>8 条并行</b></li>
+<li>始终使用真实 risk engine</li>
+</ul>
+</div>
+<div class="feat">
+<p class="n">05 · 运行后</p>
+<h3>每次运行都留证据</h3>
+<ul>
+<li>单条跑完<b>浏览器保持打开</b>，可继续查看</li>
+<li><b>report.html</b>：按步骤的结果和截图，失败步骤自动展开</li>
+<li>截图播放器逐步回看；<b>trace</b> 回看每步页面、网络</li>
+<li>批量运行生成汇总报告；同一窗口可连续跑</li>
+</ul>
+</div>
+<div class="feat dark">
+<p class="n">06 · 其他模式</p>
+<h3>录制问题，回看历史</h3>
+<ul>
+<li><b>录制</b>：PO 手动操作，自动记下点击、输入和截图</li>
+<li>生成报告和 trace，整个文件夹<b>发给 QA</b> 复现</li>
+<li><b>查看</b>：本机打开所有历史报告和 trace</li>
+<li>只在本机 127.0.0.1 提供，不上传</li>
+</ul>
+</div>
+</div>
+<p class="page">2 / 2</p>
 </section>
 </div>
 <script>
@@ -104,6 +195,20 @@
   }
   window.addEventListener('resize', fit);
   fit();
+
+  var slides = document.querySelectorAll('#stage > section');
+  var current = Math.max(0, Array.prototype.findIndex.call(slides, function (s) { return '#' + s.id === location.hash; }));
+  function show(i) {
+    current = Math.max(0, Math.min(slides.length - 1, i));
+    for (var k = 0; k < slides.length; k++) slides[k].classList.toggle('active', k === current);
+    history.replaceState(null, '', '#' + slides[current].id);
+  }
+  show(current);
+  document.addEventListener('keydown', function (e) {
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].indexOf(e.key) >= 0) { show(current + 1); e.preventDefault(); }
+    if (['ArrowLeft', 'ArrowUp', 'PageUp'].indexOf(e.key) >= 0) { show(current - 1); e.preventDefault(); }
+  });
+  document.addEventListener('click', function (e) { show(e.clientX < window.innerWidth / 3 ? current - 1 : current + 1); });
 </script>
 </body>
 </html>
