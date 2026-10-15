@@ -122,6 +122,7 @@ function pickCases(cases) {
       !st.filter && 'Right/Left: open or close a folder',
       ticked ? `Enter: run the ${plural(ticked)} you ticked` : 'Enter: run the case',
       'Space: tick a case or a whole folder, to run several',
+      st.filter ? 'Ctrl+A: tick all that match' : 'Ctrl+A: tick all',
       st.filter ? 'Esc: clear the search' : 'Type: search',
       !st.filter && 'Drop a case file into this window: run it',
       !st.filter && ticked && 'Esc: untick all',
@@ -203,6 +204,12 @@ function pickCases(cases) {
       const row = rows[cur];
       if (key.ctrl) {
         if (key.name === 'c') done(QUIT);
+        // Ctrl+A ticks every case listed (all of them, or those the search matches); when they all are ticked, unticks them
+        if (key.name === 'a' && shown.length) {
+          const all = shown.every((c) => st.ticked.has(c.file));
+          for (const c of shown) { if (all) st.ticked.delete(c.file); else st.ticked.add(c.file); }
+          paint();
+        }
         return;
       }
       let toFirstCase = false;

@@ -254,6 +254,7 @@ This produces `dist/UAT-Runner.zip`. Afterwards only newly exported case files h
    | Enter | Open a folder, or run the case |
    | Typing | Search (a product, part of a case ID); Backspace deletes, Esc clears |
    | Space | Tick a case, or every case of a folder |
+   | Ctrl+A | Tick every case listed (with a search: every case that matches); again: untick them |
    | Ctrl+C | Close the window |
 
    In a very small window the runner shows a plain numbered list instead (also with the environment variable `OREO_PLAIN_MENU=1`).
