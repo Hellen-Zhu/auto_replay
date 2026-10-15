@@ -17,7 +17,7 @@ type Data = TradeProvisioningData & TradeAllocationData & ProductData;
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade allocation', () => {
   for (const forProduct of productsWith('allocation')) {
-    test(`[TC-TRADE-ALLOCATION-${forProduct}-UI-001] Live trade splits into sub-trades after allocation`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-ALLOCATION-${forProduct}-UI-001] Live ${forProduct} trade splits into sub-trades after allocation`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker allocates it to the number of subtrades in the case data (2, 3 or 4) from the trade portal and the trade is Dead', forProduct);
       givenTrade(flows, data);
 

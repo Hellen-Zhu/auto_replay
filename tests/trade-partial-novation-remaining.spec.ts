@@ -21,7 +21,7 @@ type Data = TradeProvisioningData & TradePartialNovationRemainingData & ProductD
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade partial novation remaining', () => {
   for (const forProduct of productsWith('partialNovationRemaining')) {
-    test(`[TC-TRADE-PARTIAL-NOVATION-REMAINING-${forProduct}-UI-001] should able to perform Partial Novation event for a trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-PARTIAL-NOVATION-REMAINING-${forProduct}-UI-001] should able to perform Partial Novation event for a ${forProduct} trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker novates a part of it to another counterparty from the trade portal; the original trade is Live with the remaining notional and a new Live trade holds the rest for the new counterparty', forProduct);
       givenTrade(flows, data);
 

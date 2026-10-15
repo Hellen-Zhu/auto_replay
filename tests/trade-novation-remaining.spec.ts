@@ -20,7 +20,7 @@ type Data = TradeProvisioningData & TradeNovationRemainingData & ProductData;
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade novation remaining', () => {
   for (const forProduct of productsWith('novationRemaining')) {
-    test(`[TC-TRADE-NOVATION-REMAINING-${forProduct}-UI-001] should able to perform Novation Remaining event for a trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-NOVATION-REMAINING-${forProduct}-UI-001] should able to perform Novation Remaining event for a ${forProduct} trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker novates the remaining trade to another counterparty from the trade portal and the original trade is Dead with the event status Novated', forProduct);
       givenTrade(flows, data);
 

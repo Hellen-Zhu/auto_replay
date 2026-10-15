@@ -19,7 +19,7 @@ type Data = TradeProvisioningData & TradePortfolioReassignmentData & ProductData
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade portfolio reassignment', () => {
   for (const forProduct of productsWith('portfolioReassignment')) {
-    test(`[TC-TRADE-PORTFOLIO-REASSIGNMENT-${forProduct}-UI-001] Updated portfolio is displayed for a trade after maker triggers Portfolio Reassignment`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-PORTFOLIO-REASSIGNMENT-${forProduct}-UI-001] Updated portfolio is displayed for a ${forProduct} trade after maker triggers Portfolio Reassignment`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker moves it to another portfolio from the trade portal; the trade is still Live with the event status Amended and its trade details show the new portfolio', forProduct);
       givenTrade(flows, data);
 

@@ -16,7 +16,7 @@ type Data = TradeProvisioningData & TradeStepOutData & ProductData;
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade step out full', () => {
   for (const forProduct of productsWith('stepOutFull')) {
-    test(`[TC-TRADE-STEP-OUT-FULL-${forProduct}-UI-001] should able to perform Step Out Full event for a trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-STEP-OUT-FULL-${forProduct}-UI-001] should able to perform Step Out Full event for a ${forProduct} trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker steps out of it fully from the trade portal and the trade is Dead with the event status Novated', forProduct);
       givenTrade(flows, data);
 

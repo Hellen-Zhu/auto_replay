@@ -25,7 +25,7 @@ type Data = TradeProvisioningData & TradeAmendmentData & ProductData;
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade amendment', () => {
   for (const forProduct of productsWith('amendment')) {
-    test(`[TC-TRADE-AMENDMENT-${forProduct}-UI-002] Amendment of a Live trade is pending checker approval after Maker submits it`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-AMENDMENT-${forProduct}-UI-002] Amendment of a Live ${forProduct} trade is pending checker approval after Maker submits it`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker changes the field named by the case data amendmentField (Counterparty or Risk Portfolio) in the trade details and the amendment is pending checker approval', forProduct);
       givenTrade(flows, data);
 

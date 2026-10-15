@@ -16,7 +16,7 @@ import { givenProduct, givenTrade, type GivenTradeData, type ProductData } from 
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade cancellation', () => {
   for (const forProduct of productsWith('cancellation')) {
-    test(`[TC-TRADE-CANCELLATION-${forProduct}-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-CANCELLATION-${forProduct}-UI-001] Cancellation of a Live ${forProduct} trade is pending checker approval after Maker submits it`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<TradeProvisioningData & TradeCancellationData & ProductData & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker cancels it from the trade portal and the cancellation is pending checker approval', forProduct);
       givenTrade(flows, data);
 

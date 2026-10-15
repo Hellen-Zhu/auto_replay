@@ -159,7 +159,7 @@ Three layers, each calling only the one below:
 
 ```ts
 // tests/trade-cancellation.spec.ts (shortened)
-test(`[TC-TRADE-CANCELLATION-${forProduct}-UI-001] Cancellation of a Live trade is pending checker approval after Maker submits it`,
+test(`[TC-TRADE-CANCELLATION-${forProduct}-UI-001] Cancellation of a Live ${forProduct} trade is pending checker approval after Maker submits it`,
   async ({ flows, testData, Given, When, Then, And }) => {
     const { product, data } = givenProduct(flows, testData<TradeCancellationData>(), '...', forProduct);
     const tradeId = await Given(`a Live '${product}' trade exists in the blotter`, () => flows.tradeProvisioning.provisionLiveTrade(product, data));

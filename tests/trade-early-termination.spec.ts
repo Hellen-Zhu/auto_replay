@@ -16,7 +16,7 @@ type Data = TradeProvisioningData & TradeEarlyTerminationData & ProductData;
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade early termination', () => {
   for (const forProduct of productsWith('earlyTermination')) {
-    test(`[TC-TRADE-EARLY-TERMINATION-${forProduct}-UI-001] should able to perform EarlyTermination event for a trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-EARLY-TERMINATION-${forProduct}-UI-001] should able to perform EarlyTermination event for a ${forProduct} trade successfully`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker terminates it early from the trade portal and the trade is Dead with the event status Terminated', forProduct);
       givenTrade(flows, data);
 

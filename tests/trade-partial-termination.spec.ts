@@ -17,7 +17,7 @@ type Data = TradeProvisioningData & TradePartialTerminationData & ProductData;
 // Values that differ for a product go under "byProduct" in the test data.
 test.describe('Trade partial termination', () => {
   for (const forProduct of productsWith('partialTermination')) {
-    test(`[TC-TRADE-PARTIAL-TERMINATION-${forProduct}-UI-001] Updated trade position is reflected accurately for a trade after maker triggers Partial Termination`, async ({ Given, When, Then, And, flows, testData }) => {
+    test(`[TC-TRADE-PARTIAL-TERMINATION-${forProduct}-UI-001] Updated trade position is reflected accurately for a ${forProduct} trade after maker triggers Partial Termination`, async ({ Given, When, Then, And, flows, testData }) => {
       const { product, data } = givenProduct(flows, testData<Data & GivenTradeData>(), 'A live trade of the product in the case data is created through the API from the dat file of the case data; maker reduces its notional with a partial termination from the trade portal and the trade details show the new notional, the trade still Live', forProduct);
       givenTrade(flows, data);
 
