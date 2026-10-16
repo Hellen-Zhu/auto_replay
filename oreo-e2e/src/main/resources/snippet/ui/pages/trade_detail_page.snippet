@@ -105,10 +105,10 @@
 @Then "^page trade detail normal schedule first fixing value is shown from stored variable '([^']*)'$"
     Then assert that 'trade_detail.schedule_single_fixing_row_schedule_0_fixing' eventually contains from stored variable '$1'
 
-@Then "^page trade detail FX_CO schedule fixing column 1 value is shown from stored variable '([^']*)'$"
+@Then "^page trade detail FX_PSCRIPT schedule fixing column 1 value is shown from stored variable '([^']*)'$"
     Then assert that 'trade_detail.schedule_multi_fixings_row_schedule_0_fixing_1' eventually contains from stored variable '$1'
 
-@Then "^page trade detail FX_CO schedule fixing column 2 value is shown from stored variable '([^']*)'$"
+@Then "^page trade detail FX_PSCRIPT schedule fixing column 2 value is shown from stored variable '([^']*)'$"
     Then assert that 'trade_detail.schedule_multi_fixings_row_schedule_0_fixing_2' eventually contains from stored variable '$1'
 
 @Then "^page trade detail history events card is visible$"

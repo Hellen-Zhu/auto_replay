@@ -189,6 +189,9 @@ public class ApiRequestSteps {
     }
 
     private void setRequestBody(String requestBody, String sourceLabel) {
+        ctx.helper().request().body(requestBody);
+        ctx.write("[request:body] source=" + sourceLabel + "\n" + requestBody);
+        log.info("[ApiRequestSteps] set request body from {}: {}", sourceLabel, requestBody);
     }
 
     private String currentScenarioLabel() {

@@ -36,6 +36,7 @@ public class ApiResponseAssertionSteps {
     @Then("^response body contains a key '(.+)' with stored variable '(.+)'$")
     public void responseBodyContainsKeyWithStoredVariable(String jsonPath, String varName) {
         String expected = ctx.get(varName);
+        assertResponseFieldEquals(jsonPath, expected);
     }
 
     @Then("^response body contains a non-empty value at key '(.+)'$")
@@ -70,6 +71,8 @@ public class ApiResponseAssertionSteps {
     public void responseMatchesExpectedFromTestData(String key) {
         assertResponseMatches(
                 expectedResponseFromTestData(key),
+                "test data '" + key + "'"
+        );
     }
 
     @Then("^response matches current scenario$")
@@ -104,6 +107,9 @@ public class ApiResponseAssertionSteps {
     }
 
     private void assertResponseMatches(String expected, String sourceLabel) {
+        String actual = ctx.helper().response().extract().asString();
+        log.info("[ApiResponseAssertionSteps] comparing response snapshot for {}", sourceLabel);
+        JsonAssert.assertJsonEquals(expected, actual);
     }
 
     private void assertResponseFieldEquals(String jsonPath, String expected) {
