@@ -1,82 +1,208 @@
 package com.example.module.oreo.glue.ui;
 
-import com.example.module.oreo.OreoModule;
-import com.example.module.oreo.glue.ScenarioContext;
-import com.example.module.oreo.utils.pages.DynamicActionComponent;
-import com.example.module.oreo.utils.pages.Toast;
-import com.example.module.oreo.utils.pages.TradeChangeConfirmation;
-import com.example.module.oreo.utils.pages.TradePortalPage;
-import io.cucumber.java.en.Then;
-import io.cucumber.java.en.When;
+import com.example.module.oreo.OreoModuleConfiguration;
+import com.example.module.oreo.testdata.TestDataLoader;
+import cucumber.api.Scenario;
+import cucumber.api.java.Before;
+import cucumber.api.java.en.When;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * lifecycle_event.snippet and common_trade_action.snippet: what every event started from a row's action menu
- * shares. An event's steps open its action, fill the dialog with its own component calls, then submit.
- *
- * <p>Early termination (trade_early_termination.snippet): the values come from the case data
- * ({@code earlyTermination.direction}, {@code .amount}, {@code .ccy}, from data/ui/trade_early_termination.json).
- */
 public class TradeLifecycleEventSteps {
 
-    private final OreoModule session;
-    private final TradePortalPage portal;
-    private final DynamicActionComponent dynamicAction;
+    private static final Logger log = LoggerFactory.getLogger(TradeLifecycleEventSteps.class);
+    private PlaywrightServiceResolver.Context ctx;
 
-    public TradeLifecycleEventSteps(OreoModule session) {
-        this.session = session;
-        this.portal = new TradePortalPage(session.ui());
-        this.dynamicAction = new DynamicActionComponent(session.ui());
+    @Before({"@playwright"})
+    public void beforeScenario(Scenario scenario) { this.ctx = PlaywrightServiceResolver.from(scenario); }
+
+    // ── Amendment steps ─────────────────────────────────────────────
+
+    /**
+     * React controlled {@code <input type="date">} ignores Playwright {@code fill()} — the save
+     * button's {@code hasChanges} state stays false. {@link PlaywrightServiceResolver.Context#fillDateInput}
+     * handles the workaround.
+     */
+    @When("^fill date field '([^']*)' with stored variable '([^']*)'$")
+    public void fillDateFieldWithStoredVariable(String elementKey, String ctxKey) {
+        String value = ctx.get(ctxKey);
+        log.info("[TradeLifecycleEventSteps] Filling date field '{}' with ctx['{}'] = '{}'", elementKey, ctxKey, value);
+        ctx.fillDateInput(elementKey, value);
     }
 
-    public DynamicActionComponent dynamicAction() {
-        return dynamicAction;
+    @When("^click amend using configured risk engine mode for trade stored as '([^']*)' from trade details page$")
+    public void clickAmendUsingConfiguredRiskEngineModeFromTradeDetails(String ctxKey) {
+        switch (resolveRiskEngineMode()) {
+            case MOCK:
+                clickAmendAndMockSuccessfulRiskCalculationFromTradeDetails(ctxKey);
+                return;
+            case REAL:
+                clickAmendAndWaitForRealRiskCalculationFromTradeDetails(ctxKey);
+                return;
+            default:
+                throw new IllegalStateException("Unhandled risk engine mode");
+        }
     }
 
-    /** "opens lifecycle action '<action>' for current trade" */
-    public void opensLifecycleAction(String action) {
-        portal.searchAndOpenActionMenu(tradeId());
-        portal.expectActionVisible(action);
-        portal.clickAction(action);
-        dynamicAction.expectVisible();
+    @When("^click amend and wait for real risk calculation response for trade stored as '([^']*)' from trade details page$")
+    public void clickAmendAndWaitForRealRiskCalculationFromTradeDetails(String ctxKey) {
+        String tradeId = ctx.get(ctxKey);
+        ctx.runAndWaitForResponse(
+                () -> ctx.service().getLocator("trade_detail.amend_btn").click(),
+                tradeRiskCalculationUrl(tradeId),
+                "POST"
+        );
     }
 
-    /** "submits lifecycle event and waits for page ready" */
-    public void submitsLifecycleEvent() {
-        dynamicAction.confirm(session.config().riskEngineMode(), tradeId());
-        TradeChangeConfirmation confirmation = new TradeChangeConfirmation(session.ui());
-        confirmation.expectVisible();
-        confirmation.confirmLifecycleEvent();
+    @When("^click amend and mock successful risk calculation for trade stored as '([^']*)' from trade details page$")
+    public void clickAmendAndMockSuccessfulRiskCalculationFromTradeDetails(String ctxKey) {
+        String tradeId = ctx.get(ctxKey);
+        String responseBody = TestDataLoader.forKey("UI-SETUP-RISK-CALC-NEW-SUCCESS").response();
+        String urlFragment = tradeRiskCalculationUrl(tradeId);
+        ctx.clickWithMockedResponse(
+                "trade_detail.amend_btn",
+                urlFragment,
+                "POST",
+                200,
+                responseBody
+        );
+    }
+    /**
+     * Clicks the Confirm button in the TradeChangeConfirmation dialog and waits for
+     * {@code POST /trades/{tradeId}/update} to complete.
+     */
+    @When("^click amendment confirm and wait for trade update for trade stored as '([^']*)'$")
+    public void clickAmendmentConfirmAndWaitForUpdate(String ctxKey) {
+        String tradeId = ctx.get(ctxKey);
+        log.info("[TradeLifecycleEventSteps] Clicking amendment confirm and waiting for update for trade='{}'", tradeId);
+        ctx.clickAndWaitForResponse("trade_change_confirmation.confirm_btn", "/trades/" + tradeId + "/update", "POST");
     }
 
-    /** "the trade has status '<status>' and event status '<eventStatus>' in the blotter" */
-    public void tradeHasStatusInBlotter(String status, String eventStatus) {
-        portal.navigate();
-        portal.search(tradeId());
-        portal.expectColumn(tradeId(), "status", status);
-        portal.expectColumn(tradeId(), "eventStatus", eventStatus);
+    @When("^confirm checker action on trade detail and wait for page ready$")
+    public void confirmCheckerActionAndWait() {
+        log.info("[TradeLifecycleEventSteps] Confirming checker action on trade detail; waiting for /checker/tasks/ response");
+        ctx.clickAndWaitForResponse("trade_detail.checker_confirm_btn", "/checker/tasks/", "POST");
     }
 
-    @When("perform the Early Termination event on the {string} trade")
-    public void performEarlyTermination(String product) {
-        ScenarioContext ctx = session.ctx();
-        opensLifecycleAction("early termination");
-        dynamicAction.selectDirection(ctx.text("earlyTermination.direction"));
-        dynamicAction.typeAmount(ctx.text("earlyTermination.amount"));
-        dynamicAction.typeCurrency(ctx.text("earlyTermination.ccy"));
-        submitsLifecycleEvent();
+    // ── Lifecycle event steps ───────────────────────────────────────
+
+    /**
+     * Clicks Confirm in any dynamic-action event form dialog and waits for the
+     * calculate-risk POST to complete. Applies to PartialTermination, EarlyTermination,
+     * PortfolioReassignment, or any other event that uses the dynamic-action dialog.
+     * On success the TradeChangeConfirmation dialog opens automatically.
+     */
+    @When("^confirm dynamic action form using configured risk engine mode for trade stored as '([^']*)'$")
+    public void confirmDynamicActionFormUsingConfiguredRiskEngineMode(String ctxKey) {
+        switch (resolveRiskEngineMode()) {
+            case MOCK:
+                clickSaveAndMockSuccessfulRiskCalculationResponseForEvent(ctxKey);
+                return;
+            case REAL:
+                confirmDynamicActionFormAndWaitForRealRiskCalculationResponse(ctxKey);
+                return;
+            default:
+                throw new IllegalStateException("Unhandled risk engine mode");
+        }
     }
 
-    @Then("the early termination is completed successfully")
-    public void earlyTerminationCompleted() {
-        new Toast(session.ui()).expectMessage("success", Toast.EARLY_TERMINATION_COMPLETED);
+    @When("^confirm dynamic action form and wait for real risk calculation response for trade stored as '([^']*)'$")
+    public void confirmDynamicActionFormAndWaitForRealRiskCalculationResponse(String ctxKey) {
+        String tradeId = ctx.get(ctxKey);
+        ctx.runAndWaitForResponse(
+                () -> ctx.service().getLocator("dynamic_action.confirm_btn").click(),
+                tradeRiskCalculationUrl(tradeId),
+                "POST"
+        );
     }
 
-    @Then("the trade is closed as Terminated")
-    public void tradeIsClosedAsTerminated() {
-        tradeHasStatusInBlotter(TradePortalPage.DEAD, TradePortalPage.TERMINATED);
+    @When("^confirm dynamic action form and mock successful risk calculation response for trade stored as '([^']*)'$")
+    public void clickSaveAndMockSuccessfulRiskCalculationResponseForEvent(String ctxKey) {
+        String tradeId = ctx.get(ctxKey);
+        String responseBody = TestDataLoader.forKey("UI-SETUP-RISK-CALC-NEW-SUCCESS").response();
+        String urlFragment = tradeRiskCalculationUrl(tradeId);
+        ctx.clickWithMockedResponse(
+                "dynamic_action.confirm_btn",
+                urlFragment,
+                "POST",
+                200,
+                responseBody
+        );
     }
 
-    private String tradeId() {
-        return session.ctx().text("createdTradeId");
+
+    @When("^confirm dynamic action form using configured partial risk engine mode for trade stored as '([^']*)'$")
+    public void confirmDynamicActionFormUsingConfiguredPartialRiskEngineMode(String ctxKey) {
+        switch (resolveRiskEngineMode()) {
+            case MOCK:
+                clickSaveAndMockSuccessfulPartialRiskCalculationResponseForEvent(ctxKey);
+                return;
+            case REAL:
+                confirmDynamicActionFormAndWaitForRealPartialRiskCalculationResponse(ctxKey);
+                return;
+            default:
+                throw new IllegalStateException("Unhandled risk engine mode");
+        }
+    }
+
+    @When("^confirm dynamic action form and wait for real partial risk calculation response for trade stored as '([^']*)'$")
+    public void confirmDynamicActionFormAndWaitForRealPartialRiskCalculationResponse(String ctxKey) {
+        String tradeId = ctx.get(ctxKey);
+        ctx.runAndWaitForResponse(
+                () -> ctx.service().getLocator("dynamic_action.confirm_btn").click(),
+                tradePartialRiskCalculationUrl(tradeId),
+                "POST"
+        );
+    }
+
+    @When("^confirm dynamic action form and mock successful partial risk calculation response for trade stored as '([^']*)'$")
+    public void clickSaveAndMockSuccessfulPartialRiskCalculationResponseForEvent(String ctxKey) {
+        String tradeId = ctx.get(ctxKey);
+        String responseBody = TestDataLoader.forKey("UI-SETUP-RISK-CALC-PARTIAL-SUCCESS").response();
+        String urlFragment = tradePartialRiskCalculationUrl(tradeId);
+        log.info("[TradeLifecycleEventSteps] Mocking successful partial risk calculation response for trade='{}' with response body '{}'", tradeId, responseBody);
+        ctx.clickWithMockedResponse(
+                "dynamic_action.confirm_btn",
+                urlFragment,
+                "POST",
+                200,
+                responseBody
+        );
+    }
+    /**
+     * Clicks Confirm & Save in the TradeChangeConfirmation dialog and waits for the
+     * trigger-event POST to complete. Used by any lifecycle event routed through
+     * POST /trades/trigger-event (PartialTermination, EarlyTermination, PortfolioReassignment, etc.).
+     */
+    @When("^confirm lifecycle event trade change and wait for page ready$")
+    public void confirmLifecycleEventTradeChangeAndWait() {
+        log.info("[TradeLifecycleEventSteps] Confirming trade change confirmation; waiting for trigger-event response");
+        ctx.clickAndWaitForResponse("trade_change_confirmation.confirm_btn", "/trades/trigger-event", "POST");
+    }
+
+    /**
+     * Clicks Confirm & Save in the TradeChangeConfirmation dialog, waits for
+     * {@code POST /trades/trigger-event} to complete, and stores the response body
+     * in scenario context under {@code responseCtxKey}.
+     */
+    @When("^confirm lifecycle event trade change and capture response as '([^']*)'$")
+    public void confirmLifecycleEventTradeChangeAndCaptureResponse(String responseCtxKey) {
+        log.info("[TradeLifecycleEventSteps] Confirming trade change confirmation; capturing trigger-event response as '{}'", responseCtxKey);
+        String responseBody = ctx.clickAndCaptureResponse(
+                "trade_change_confirmation.confirm_btn",
+                "/trades/trigger-event",
+                "POST"
+        );
+        ctx.set(responseCtxKey, responseBody);
+    }
+
+
+    private OreoModuleConfiguration.Mode resolveRiskEngineMode() { return ctx.riskEngineMode(); }
+
+
+    private String tradeRiskCalculationUrl(String tradeId) { return "/trades/" + tradeId + "/calculate-risk"; }
+
+    private String tradePartialRiskCalculationUrl(String tradeId) {
+        return "/trades/" + tradeId + "/calculate-partial-novation-risk";
     }
 }
