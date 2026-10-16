@@ -64,7 +64,7 @@ Details of each point: `docs/handover-notes.md` section 3.
 | `portable/*.bat` | PO entry points (**CRLF, ASCII only**) |
 | `scripts/build-portable.js`, `scripts/sync-elements.js` | Package build; element sync and check |
 | `mock-oreo/server.js` | Mock OREO for local verification (its header lists what is real vs. mock-only: never copy mock-only testids into `framework/`) |
-| `java/` | Separate Maven module, not part of the replay: the layered test data mechanism ported to the Java + Cucumber E2E project (`TestDataLoader`, trade creation migrated); see `java/README.md` |
+| `oreo-e2e/` | Separate Maven project in the Java E2E project's layout, not part of the replay: the layered test data mechanism (`TestDataLoader`) with trade creation and early termination written on it; see `oreo-e2e/README.md` |
 | `cases/`, `requests/` | Exported case files and their API requests |
 | `.claude/skills/porting-java-e2e-cases/` | Skill to port a Java + Cucumber E2E case |
 | `.claude/skills/onboarding-product/`, `onboarding-lifecycle-event/` | Skills to cover a new product (a registry row) or a new lifecycle event (a new spec) from this project's code: ask QA for the inputs, report the coverage matrix and go-live checklist |
