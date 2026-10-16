@@ -62,7 +62,3 @@ API-SETUP-STEPIN-PARTIAL-TRADE-CREATE:
 
 API-SETUP-STEPIN-FULL-TRADE-CREATE:
   requestRef: REQ-TPL-TRADE-CREATION-STEPIN-FULL-API-001
-
-RESP-TPL-TRADE-CREATION-API-001:
-  response: |
-    # [not in the photos: the rest of the file from line 68]
