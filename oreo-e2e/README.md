@@ -22,8 +22,8 @@ entry only logs a warning.
 
 **Current stage: transcription.** The E2E project's files are typed in from the user's photos as they are, without
 guessing missing code and without making the project compile; only the company package prefix is written `com.example`
-and the accounts' e-mail domain `example.com`, since this repository is public. Lines the photos do not show are
-marked `[not in the photos]`. Until all files are in, `mvn test` is not expected to pass.
+and the accounts' e-mail domain `example.com`, since this repository is public. Comments the user did not photograph are
+left out (only comments are left out). Until all files are in, `mvn test` is not expected to pass.
 
 The folders follow the E2E project. Files marked *placeholder* hold only a comment (Java: an empty class) and are
 there so the tree matches; copy the real file over them from the E2E project.

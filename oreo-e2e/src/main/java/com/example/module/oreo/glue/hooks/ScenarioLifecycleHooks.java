@@ -74,7 +74,6 @@ public class ScenarioLifecycleHooks {
 
     /**
      * Flattens the YAML {@code request:} JSON for the current scenario's TC-ID and
-     * [not in the photos: the rest of this Javadoc]
      */
     @Before(order = 1)
     public void injectTestDataIntoContext(Scenario scenario) {
@@ -182,7 +181,6 @@ public class ScenarioLifecycleHooks {
     // -------------------------------------------------------------------------
 
     /**
-     * [not in the photos: the start of this Javadoc]
      * not just Genie's CucumberException wrapper.
      * GenieScenario inherits getError() from cucumber.runtime.ScenarioImpl.
      */

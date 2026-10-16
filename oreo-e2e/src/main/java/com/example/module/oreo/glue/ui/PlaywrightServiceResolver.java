@@ -41,7 +41,6 @@ public final class PlaywrightServiceResolver {
         return new Context(genieScenario, service);
     }
 
-    // [not in the photos: the Javadoc of Context]
     public static final class Context extends ScenarioContext {
 
         private static final long DEFAULT_TIMEOUT_MILLIS = 50_000L;
@@ -83,7 +82,6 @@ public final class PlaywrightServiceResolver {
             return configuredTimeout > 0 ? configuredTimeout : DEFAULT_TIMEOUT_MILLIS;
         }
 
-        // [not in the photos: the code between timeoutMillis() and the end of the Javadoc of navigateToPath]
         public void navigateToPath(String path) {
             if (path == null || path.isBlank()) {
                 throw new IllegalArgumentException("path must not be null/blank");
@@ -337,7 +335,6 @@ public final class PlaywrightServiceResolver {
             return response.text();
         }
 
-        // [not in the photos: the code between navigateAndCaptureResponse and the end of the Javadoc of clickAndCaptureRequest]
         public Request clickAndCaptureRequest(String locatorKey, String urlFragment, String httpMethod) {
             return service.getPage().waitForRequest(
                     r -> r.url().contains(urlFragment) && r.method().equals(httpMethod),
@@ -378,7 +375,6 @@ public final class PlaywrightServiceResolver {
 
         /**
          * Registers a mock route with an explicit {@code contentType}.
-         * [not in the photos: the middle of this Javadoc]
          * @param contentType  value for the {@code Content-Type} header
          */
         public void mockRoute(String urlFragment, int status, String responseBody, String contentType) {
@@ -459,10 +455,7 @@ public final class PlaywrightServiceResolver {
             }
         }
 
-        // [not in the photos: the code between clickWithMockedResponse and the Javadoc of assertEventuallyVisible]
         /**
-         * [not in the photos: the start of this Javadoc]
-         *
          * <p>Unlike the framework's synchronous {@code assert that 'x' is visible} step,
          * this polls repeatedly until the condition is met or the timeout expires —
          * safe for async UI transitions and animations.
