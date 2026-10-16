@@ -1,9 +1,40 @@
 [
-  {
-    "name": "trade_detail.header_card",
-    "lookupDetails": {
-      "findBy": "testId",
-      "value": "trade-detail-header-card"
-    }
-  }
+  {"name": "trade_detail.approve_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-approve-btn"}},
+  {"name": "trade_detail.reject_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-reject-btn"}},
+  {"name": "trade_detail.confirm_checker_dialog","lookupDetails": {"findBy": "testId","value": "trade-detail-confirm-checker-action-dialog"}},
+  {"name": "trade_detail.checker_confirm_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-checker-confirm-btn"}},
+  {"name": "trade_detail.cancel_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-more-actions-cancellation-btn"}},
+  {"name": "trade_detail.partialnovationremaining_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-more-actions-partialnovationremaining-btn"}},
+  {"name": "trade_detail.more_actions_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-more-actions-btn"}},
+  {"name": "trade_detail.status_badge","lookupDetails": {"findBy": "testId","value": "trade-detail-status-badge"}},
+  {"name": "trade_detail.actions_container","lookupDetails": {"findBy": "testId","value": "trade-detail-actions"}},
+  {"name": "trade_detail.save_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-save-btn"}},
+  {"name": "trade_detail.amend_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-amend-btn"}},
+  {"name": "trade_detail.deal_date_input","lookupDetails": {"findBy": "testId","value": "trade-detail-deal-date-input"}},
+  {"name": "trade_detail.counterparty_combobox","lookupDetails": {"findBy": "testId","value": "trade-detail-counterparty-combobox"}},
+  {"name": "trade_detail.portfolio_combobox","lookupDetails": {"findBy": "testId","value": "trade-detail-portfolio-combobox"}},
+  {"name": "trade_detail.basic_notional_amount","lookupDetails": {"findBy": "testId","value": "trade-detail-notional-amount-input"}},
+  {"name": "trade_detail.instrument_trade_type","lookupDetails": {"findBy": "testId","value": "instrument-trade-type"}},
+  {"name": "trade_detail.container","lookupDetails": {"findBy": "testId","value": "trade-detail-container"}},
+  {"name": "trade_detail.header_card","lookupDetails": {"findBy": "testId","value": "trade-detail-header-card"}},
+  {"name": "trade_detail.cancel_dialog","lookupDetails": {"findBy": "testId","value": "trade-detail-cancel-dialog"}},
+  {"name": "trade_detail.cancel_effective_date_input","lookupDetails": {"findBy": "testId","value": "trade-detail-effective-date-input"}},
+  {"name": "trade_detail.cancel_reason_select","lookupDetails": {"findBy": "testId","value": "trade-detail-cancel-reason-select"}},
+  {"name": "trade_detail.cancel_comments_textarea","lookupDetails": {"findBy": "testId","value": "trade-detail-cancel-comments-textarea"}},
+  {"name": "trade_detail.cancel_dialog_confirm_btn","lookupDetails": {"findBy": "testId","value": "trade-detail-cancel-dialog-confirm-btn"}},
+  {"name": "trade_detail.basic_info_card","lookupDetails": {"findBy": "testId","value": "trade-detail-basic-info-card"}},
+  {"name": "trade_detail.instrument_section","lookupDetails": {"findBy": "testId","value": "trade-detail-instrument-section"}},
+  {"name": "trade_detail.risk_metrics_section","lookupDetails": {"findBy": "testId","value": "trade-detail-risk-metrics-section"}},
+  {"name": "trade_detail.instrument_details_panel","lookupDetails": {"findBy": "testId","value": "trade-detail-instrument-details-panel"}},
+  {"name": "trade_detail.schedule_row_zero_notional","lookupDetails": {"findBy": "testId","value": "trade-detail-schedule-row-event-0-notional-input"}},
+  {"name": "trade_detail.schedule_section","lookupDetails": {"findBy": "testId","value": "trade-detail-schedule-section"}},
+  {"name": "trade_detail.schedule_single_fixing_row_event_0_fixing","lookupDetails": {"findBy": "testId","value": "trade-detail-schedule-row-event-0-fixing-input"}},
+  {"name": "trade_detail.schedule_single_fixing_row_schedule_0_fixing","lookupDetails": {"findBy": "testId","value": "trade-detail-schedule-row-schedule-0-fixing-input"}},
+  {"name": "trade_detail.schedule_multi_fixings_row_schedule_0_fixing_1","lookupDetails": {"findBy": "testId","value": "trade-detail-schedule-row-schedule-0-fixing-1-input"}},
+  {"name": "trade_detail.schedule_multi_fixings_row_schedule_0_fixing_2","lookupDetails": {"findBy": "testId","value": "trade-detail-schedule-row-schedule-0-fixing-2-input"}},
+  {"name": "trade_detail.trf_td_bf","lookupDetails": {"findBy": "testId","value": "instrument-tree-TRF.targetCGain.TD_BigFigure.td_bf-input"}},
+  {"name": "trade_detail.schedule_row_zero_date","lookupDetails": {"findBy": "testId","value": "trade-detail-schedule-row-event-0-date-input"}},
+  {"name": "trade_detail.history_events_card","lookupDetails": {"findBy": "testId","value": "trade-detail-history-events-card"}},
+  {"name": "trade_detail.history_event_rows","lookupDetails": {"findBy": "testId","value": "history-event-row"}},
+  {"name": "trade_detail.audit_trail_card","lookupDetails": {"findBy": "testId","value": "trade-detail-audit-trail-card"}}
 ]

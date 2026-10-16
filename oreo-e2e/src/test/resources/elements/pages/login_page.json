@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "name": "login.email",
+    "lookupDetails": { "findBy": "testId", "value": "login-email-input" }
+  },
+  {
+    "name": "login.password",
+    "lookupDetails": { "findBy": "testId", "value": "login-password-input" }
+  },
+  {
+    "name": "login.submit",
+    "lookupDetails": { "findBy": "testId", "value": "login-sign-in-to-portal-btn" }
+  }
+]
