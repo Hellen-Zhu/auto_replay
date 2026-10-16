@@ -67,7 +67,8 @@ public final class ExpectedResponses {
 
     /**
      * The full form of the case's expected response: a full file as it is, a patch applied to its base's file.
-     * Empty only when the case has no file; a patch that cannot be resolved is an {@link IllegalStateException}.
+     * Empty only when the case has no file; a patch that cannot be resolved is an {@link IllegalStateException}
+     * that says how to record the case again.
      */
     public Optional<Resolved> resolve(CaseId id) {
         Optional<String> text = read(id);
@@ -79,7 +80,7 @@ public final class ExpectedResponses {
         }
         if (!json.get("_base").isTextual() || !json.get("_patch").isArray()) {
             throw new IllegalStateException("[ExpectedResponses] " + file
-                    + " is not a patch file: _base must be text and _patch an array");
+                    + " is not a patch file: _base must be text and _patch an array. To fix: " + recordAgain(id));
         }
         String base = json.get("_base").asText();
         CaseId baseId;
@@ -87,22 +88,35 @@ public final class ExpectedResponses {
             baseId = CaseId.parse(base);
         } catch (IllegalArgumentException e) {
             throw new IllegalStateException("[ExpectedResponses] " + file + " builds on " + base
-                    + ", which is not a case ID: " + e.getMessage(), e);
+                    + ", which is not a case ID: " + e.getMessage() + ". To fix: " + recordAgain(id), e);
         }
         if (!baseId.eventFile().equals(id.eventFile()) || !baseId.channel().equals(id.channel())) {
             throw new IllegalStateException("[ExpectedResponses] " + file + " builds on " + base
-                    + ", a case of another event or channel");
+                    + ", a case of another event or channel. To fix: " + recordAgain(id));
         }
         Path baseFile = fileFor(baseId);
         String baseText = read(baseId).orElseThrow(() -> new IllegalStateException("[ExpectedResponses] " + file
-                + " builds on " + base + ", which has no file " + baseFile));
+                + " builds on " + base + ", which has no file " + baseFile + ". To fix: run " + base
+                + " to record it, or " + recordAgain(id)));
         JsonNode baseJson = parse(baseText, baseFile);
         if (isPatch(baseJson)) {
             throw new IllegalStateException("[ExpectedResponses] " + file + " builds on " + base
-                    + ", which is itself a patch: run CompactExpectedFiles");
+                    + ", which is itself a patch. To fix: " + recordAgain(id));
         }
-        JsonNode full = JsonPatch.apply(baseJson, json.get("_patch"), file.getFileName().toString());
+        JsonNode full;
+        try {
+            full = JsonPatch.apply(baseJson, json.get("_patch"), file.getFileName().toString());
+        } catch (IllegalStateException e) {
+            throw new IllegalStateException(e.getMessage() + ". The patch does not fit " + base
+                    + " as that file is now. To fix: " + recordAgain(id), e);
+        }
         return Optional.of(new Resolved(Json.pretty(full), file, base));
+    }
+
+    /** The way out of a patch that cannot be resolved: update mode does not read the file. */
+    private static String recordAgain(CaseId id) {
+        return "record " + id.raw() + " again with OREO_EXPECTED=update (update mode does not read this file),"
+                + " then compact with mvn test -Dtest=CompactExpectedFiles -Doreo.compact=" + id.eventFile();
     }
 
     private static JsonNode parse(String text, Path file) {

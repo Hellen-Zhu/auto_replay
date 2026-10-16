@@ -82,12 +82,14 @@ public class ExpectedResponsesTest {
         return "{\"_base\":\"" + base + "\",\"_patch\":" + ops + "}";
     }
 
-    private void assertResolveFails(CaseId caseId, String messagePart) {
+    private void assertResolveFails(CaseId caseId, String... messageParts) {
         try {
             expected.resolve(caseId);
             fail("expected an IllegalStateException");
         } catch (IllegalStateException e) {
-            assertTrue(e.getMessage(), e.getMessage().contains(messagePart));
+            for (String part : messageParts) {
+                assertTrue(e.getMessage(), e.getMessage().contains(part));
+            }
         }
     }
 
@@ -113,7 +115,7 @@ public class ExpectedResponsesTest {
     @Test
     public void patchOnAMissingBaseFails() {
         expected.write(variant, patchOn(id.raw(), "[]"));
-        assertResolveFails(variant, expected.fileFor(id).toString());
+        assertResolveFails(variant, expected.fileFor(id).toString(), "OREO_EXPECTED=update");
     }
 
     @Test
@@ -121,7 +123,14 @@ public class ExpectedResponsesTest {
         expected.write(id, "{\"a\":1}");
         expected.write(variant, patchOn(id.raw(), "[]"));
         expected.write(third, patchOn(variant.raw(), "[]"));
-        assertResolveFails(third, "is itself a patch");
+        assertResolveFails(third, "is itself a patch", "record " + third.raw() + " again with OREO_EXPECTED=update");
+    }
+
+    @Test
+    public void patchThatDoesNotApplySaysHowToRecordAgain() {
+        expected.write(id, "{\"a\":1}");
+        expected.write(variant, patchOn(id.raw(), "[{\"op\":\"add\",\"path\":\"/a\",\"value\":2}]"));
+        assertResolveFails(variant, "op 0 (add /a)", "record " + variant.raw() + " again with OREO_EXPECTED=update");
     }
 
     @Test(expected = IllegalStateException.class)

@@ -196,6 +196,10 @@ are replaced whole; a patch that is not shorter than the full response is not wr
 file, a patch that does not apply) stops it before a file is written, and a second run changes nothing. Then review
 `git diff` and commit. A change every variant shares (a new response field) shows in the base files only.
 
+Re-record a base together with its variants. A base recorded alone can leave a variant's patch that no longer fits
+(an `add` on a key the base now has); that case then fails with an error naming the op. The way out is in the error:
+record the case again with `OREO_EXPECTED=update` (update mode does not read the file), then compact.
+
 ### Commands
 
 ```bash
