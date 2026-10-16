@@ -1,7 +1,10 @@
 package com.example.module.oreo.glue.api;
 
-import com.example.module.oreo.testdata.TestDataLoader;
-import com.example.module.oreo.testdata.TestDataRecord;
+import com.example.module.oreo.testdata.CaseId;
+import com.example.module.oreo.testdata.ExpectedResponses;
+import com.example.module.oreo.testdata.ResponseMasker;
+import com.example.module.oreo.testdata.SetupData;
+import com.example.module.oreo.testdata.TestData;
 import cucumber.api.Scenario;
 import cucumber.api.java.Before;
 import cucumber.api.java.en.Then;
@@ -11,8 +14,10 @@ import org.hamcrest.Matchers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Framework-level API response assertions.
@@ -67,43 +72,55 @@ public class ApiResponseAssertionSteps {
         assertResponseArrayContainsElementWithKey(arrayPath, key, expected);
     }
 
+    /** Strict comparison with the {@code response} of setup file {@code data/setup/<key>.json}; never records. */
     @Then("^response matches expected from test data '([^']*)'$")
     public void responseMatchesExpectedFromTestData(String key) {
-        assertResponseMatches(
-                expectedResponseFromTestData(key),
-                "test data '" + key + "'"
-        );
+        SetupData setup = TestData.setup(key);
+        if (!setup.hasResponse()) {
+            throw new AssertionError("[ApiResponseAssertionSteps] Setup data '" + key + "' has no response.");
+        }
+        assertResponseMatches(setup.response(), "setup data '" + key + "'");
     }
 
+    /**
+     * Strict comparison with the recorded response of the case, {@code data/api/expected/<event>/<caseId>.json}.
+     * A missing file is recorded (the actual response with the case's {@code dynamicFields} masked) and the
+     * scenario fails once, so the recording is reviewed; with {@code OREO_EXPECTED=update} (or
+     * {@code -Doreo.expected=update}) the file is rewritten and the step passes.
+     */
     @Then("^response matches current scenario$")
     public void responseMatchesCurrentScenario() {
-        String tcKey = ctx.get("_tc.key");
-        assertResponseMatches(
-                expectedResponseFromCurrentScenario(),
-                "current scenario (TC-ID='" + tcKey + "')"
-        );
-    }
-
-    private String expectedResponseFromTestData(String key) {
-        TestDataRecord record = TestDataLoader.forKey(key);
-        if (!record.hasResponse()) {
-            throw new AssertionError(
-                    "[ApiResponseAssertionSteps] Test data '" + key + "' has no 'response:' node.");
+        String tcKey = ctx.find("_tc.key");
+        if (tcKey == null) {
+            throw new AssertionError("[ApiResponseAssertionSteps] No [TC-...] case ID in the scenario name");
         }
-        return requireExpectedResponse(record.response(), "test data '" + key + "'");
-    }
+        CaseId id = CaseId.parse(tcKey);
+        ExpectedResponses expectedResponses = ExpectedResponses.standard();
+        Path file = expectedResponses.fileFor(id);
+        String actual = ctx.helper().response().extract().asString();
+        Optional<String> recorded = expectedResponses.read(id);
+        boolean update = ExpectedResponses.updateMode();
 
-    private String expectedResponseFromCurrentScenario() {
-        String expected = ctx.get("_tc.response");
-        return requireExpectedResponse(expected, currentScenarioLabel());
-    }
-
-    private String requireExpectedResponse(String expected, String sourceLabel) {
-        if (expected == null || expected.trim().isEmpty()) {
-            throw new AssertionError(
-                    "[ApiResponseAssertionSteps] No expected response found from " + sourceLabel + ".");
+        if (update || recorded.isEmpty()) {
+            String masked = ResponseMasker.mask(actual, TestData.forCase(tcKey).dynamicFields(), tcKey);
+            expectedResponses.write(id, masked);
+            if (recorded.isEmpty() && !update) {
+                ctx.write("[expected:recorded] " + file + "\n" + masked);
+                throw new AssertionError("Expected response recorded to " + file
+                        + ": review it against the requirement, commit it, run again.");
+            }
+            ctx.write("[expected:updated] " + file + "\n" + masked);
+            log.info("[ApiResponseAssertionSteps] expected response of {} updated: {}", tcKey, file);
+            return;
         }
-        return expected;
+
+        log.info("[ApiResponseAssertionSteps] comparing the response of {} with {}", tcKey, file);
+        try {
+            JsonAssert.assertJsonEquals(recorded.get(), actual);
+        } catch (AssertionError e) {
+            throw new AssertionError(e.getMessage() + "\nExpected file: " + file
+                    + "\nIf the change is intended, run again with OREO_EXPECTED=update and review the diff.", e);
+        }
     }
 
     private void assertResponseMatches(String expected, String sourceLabel) {
@@ -142,9 +159,5 @@ public class ApiResponseAssertionSteps {
         }
 
         log.info("[ApiResponseAssertionSteps] asserted array '{}' contains key '{}' = '{}'", arrayPath, key, expected);
-    }
-
-    private String currentScenarioLabel() {
-        return "current scenario (TC-ID='" + ctx.get("_tc.key") + "')";
     }
 }

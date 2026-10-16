@@ -1,7 +1,7 @@
 package com.example.module.oreo.glue.ui;
 
 import com.example.module.oreo.OreoModuleConfiguration;
-import com.example.module.oreo.testdata.TestDataLoader;
+import com.example.module.oreo.testdata.TestData;
 import cucumber.api.Scenario;
 import cucumber.api.java.Before;
 import cucumber.api.java.en.When;
@@ -57,7 +57,7 @@ public class TradeLifecycleEventSteps {
     @When("^click amend and mock successful risk calculation for trade stored as '([^']*)' from trade details page$")
     public void clickAmendAndMockSuccessfulRiskCalculationFromTradeDetails(String ctxKey) {
         String tradeId = ctx.get(ctxKey);
-        String responseBody = TestDataLoader.forKey("UI-SETUP-RISK-CALC-NEW-SUCCESS").response();
+        String responseBody = TestData.setup("risk-calc-success-mock").response();
         String urlFragment = tradeRiskCalculationUrl(tradeId);
         ctx.clickWithMockedResponse(
                 "trade_detail.amend_btn",
@@ -119,7 +119,7 @@ public class TradeLifecycleEventSteps {
     @When("^confirm dynamic action form and mock successful risk calculation response for trade stored as '([^']*)'$")
     public void clickSaveAndMockSuccessfulRiskCalculationResponseForEvent(String ctxKey) {
         String tradeId = ctx.get(ctxKey);
-        String responseBody = TestDataLoader.forKey("UI-SETUP-RISK-CALC-NEW-SUCCESS").response();
+        String responseBody = TestData.setup("risk-calc-success-mock").response();
         String urlFragment = tradeRiskCalculationUrl(tradeId);
         ctx.clickWithMockedResponse(
                 "dynamic_action.confirm_btn",
@@ -158,7 +158,7 @@ public class TradeLifecycleEventSteps {
     @When("^confirm dynamic action form and mock successful partial risk calculation response for trade stored as '([^']*)'$")
     public void clickSaveAndMockSuccessfulPartialRiskCalculationResponseForEvent(String ctxKey) {
         String tradeId = ctx.get(ctxKey);
-        String responseBody = TestDataLoader.forKey("UI-SETUP-RISK-CALC-PARTIAL-SUCCESS").response();
+        String responseBody = TestData.setup("risk-calc-partial-success-mock").response();
         String urlFragment = tradePartialRiskCalculationUrl(tradeId);
         log.info("[TradeLifecycleEventSteps] Mocking successful partial risk calculation response for trade='{}' with response body '{}'", tradeId, responseBody);
         ctx.clickWithMockedResponse(

@@ -2,7 +2,7 @@ package com.example.module.oreo.glue.ui;
 
 import com.example.module.oreo.OreoModuleConfiguration;
 import com.example.module.oreo.testdata.ProductDatFiles;
-import com.example.module.oreo.testdata.TestDataLoader;
+import com.example.module.oreo.testdata.TestData;
 import cucumber.api.Scenario;
 import cucumber.api.java.Before;
 import cucumber.api.java.en.When;
@@ -64,7 +64,7 @@ public class NewTradeSteps {
     }
 
     private void clickSaveAndMockSuccessfulRiskCalculationResponseForNewTrade(String buttonLocator) {
-        String responseBody = TestDataLoader.forKey("UI-SETUP-RISK-CALC-NEW-SUCCESS").response();
+        String responseBody = TestData.setup("risk-calc-success-mock").response();
         ctx.mockRoute(NEW_TRADE_RISK_URL, 200, responseBody);
         try {
             ctx.runAndWaitForResponse(

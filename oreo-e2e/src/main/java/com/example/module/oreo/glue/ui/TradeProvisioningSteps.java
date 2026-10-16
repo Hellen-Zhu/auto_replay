@@ -6,7 +6,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.example.genie.module.rest.service.RequestResponseHelper;
 import com.example.module.oreo.testdata.ProductDatFiles;
-import com.example.module.oreo.testdata.TestDataLoader;
+import com.example.module.oreo.testdata.TestData;
+import com.example.module.oreo.testdata.TradeRequests;
 import com.example.module.oreo.utils.RestApiUtil;
 import cucumber.api.java.Before;
 import cucumber.api.java.en.Given;
@@ -34,56 +35,56 @@ public class TradeProvisioningSteps {
 
     @Given("^a draft pending approval '([^']*)' trade is provisioned via playwright api$")
     public void provisionPendingTrade(String product) throws Exception {
-        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE",
+        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "trade-create",
                 ProductDatFiles.valueOf(product));
     }
 
     @Given("^a draft pending approval '([^']*)' stepin full trade is provisioned via playwright api$")
     public void provisionPendingStepInFullTrade(String product) throws Exception {
-        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "API-SETUP-STEPIN-FULL-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "trade-create-stepin-full", ProductDatFiles.valueOf(product));
     }
 
     @Given("^a draft pending approval '([^']*)' stepin partial trade is provisioned via playwright api$")
     public void provisionPendingStepInPartialTrade(String product) throws Exception {
-        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "API-SETUP-STEPIN-PARTIAL-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "trade-create-stepin-partial", ProductDatFiles.valueOf(product));
     }
 
     @Given("^a live '([^']*)' trade is provisioned via playwright api$")
     public void provisionLiveTradeByProduct(String product) throws Exception {
-        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "trade-create", ProductDatFiles.valueOf(product));
     }
 
     @Given("^a '([^']*)' trade with pending cancellation is provisioned via playwright api$")
     public void provisionPendingCancellation(String product) throws Exception {
-        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
-        provisionLifecycleEvent("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CANCELLATION");
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "trade-create", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId", "createdTaskId", "trade-cancellation");
     }
 
     @Given("^multiple '([^']*)' trades with pending cancellation are provisioned via playwright api$")
     public void provisionMultiplePendingCancellation(String product) throws Exception {
-        provisionLiveTradeAs("createdTradeId1", "createdTaskId1", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
-        provisionLifecycleEvent("createdTradeId1", "createdTaskId1", "API-SETUP-TRADE-CANCELLATION");
-        provisionLiveTradeAs("createdTradeId2", "createdTaskId2", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
-        provisionLifecycleEvent("createdTradeId2", "createdTaskId2", "API-SETUP-TRADE-CANCELLATION");
+        provisionLiveTradeAs("createdTradeId1", "createdTaskId1", "trade-create", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId1", "createdTaskId1", "trade-cancellation");
+        provisionLiveTradeAs("createdTradeId2", "createdTaskId2", "trade-create", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId2", "createdTaskId2", "trade-cancellation");
     }
 
     @Given("^a dead '([^']*)' trade is provisioned via playwright api$")
     public void provisionDeadTrade(String product) throws Exception {
-        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
-        provisionLifecycleEvent("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CANCELLATION");
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "trade-create", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId", "createdTaskId", "trade-cancellation");
         approveTask(ctx.get("createdTaskId"), "checker@example.com");
     }
 
     @Given("^a draft '([^']*)' trade is provisioned via playwright api$")
     public void provisionDraftTrade(String product) throws Exception {
-        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
-        provisionLifecycleEvent("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CANCELLATION");
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "trade-create", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId", "createdTaskId", "trade-cancellation");
         rejectTask(ctx.get("createdTaskId"), "checker@example.com");
     }
 
     @Given("^amendment for stored trade is submitted as maker via playwright api$")
     public void submitAmendmentForStoredTrade() {
-        submitAmendment("createdTradeId", "UI-SETUP-AMENDMENT", "maker@example.com");
+        submitAmendment("createdTradeId", "trade-amendment", "maker@example.com");
     }
 
     private void provisionLiveTradeAs(String tradeIdVar, String taskIdVar, String testDataKey, ProductDatFiles datFile) throws Exception {
@@ -126,7 +127,8 @@ public class TradeProvisioningSteps {
     }
 
     private JsonNode submitTrade(String userId, String testDataKey, ProductDatFiles datFile) throws Exception {
-        String tradeJson = TestDataLoader.forKey(testDataKey).request();
+        // The setup body carries no product: it is set from the dat file's product
+        String tradeJson = TradeRequests.withProductId(setupRequest(testDataKey), datFile.name());
         URL resource = getClass().getClassLoader().getResource(datFile.path());
 
         log.info("[TradeProvisioningSteps] submitTrade: userId='{}', testDataKey='{}', datFile='{}', endpoint='{}'",
@@ -150,7 +152,7 @@ public class TradeProvisioningSteps {
 
     private void submitAmendment(String tradeIdVar, String testDataKey, String userId) {
         String tradeId = ctx.get(tradeIdVar);
-        String payload = TestDataLoader.forKey(testDataKey).request();
+        String payload = setupRequest(testDataKey);
 
         log.info("[TradeProvisioningSteps] submitAmendment: tradeIdVar='{}', tradeId='{}', testDataKey='{}', userId='{}', endpoint='{}'",
                 tradeIdVar, tradeId, testDataKey, userId, "/trades/" + tradeId + "/update");
@@ -161,7 +163,7 @@ public class TradeProvisioningSteps {
     }
 
     private JsonNode triggerEvent(List<String> tradeIds, String userId, String testDataKey) throws Exception {
-        String raw = TestDataLoader.forKey(testDataKey).request();
+        String raw = setupRequest(testDataKey);
         ObjectNode body = (ObjectNode) OBJECT_MAPPER.readTree(raw);
         ArrayNode arr = OBJECT_MAPPER.createArrayNode();
         tradeIds.forEach(arr::add);
@@ -179,6 +181,15 @@ public class TradeProvisioningSteps {
 
         log.info("[TradeProvisioningSteps] triggerEvent completed for tradeIds='{}'", tradeIds);
         return response;
+    }
+
+    /** The {@code request} of setup file {@code data/setup/<name>.json}. */
+    private static String setupRequest(String name) {
+        String request = TestData.setup(name).request();
+        if (request == null) {
+            throw new AssertionError("[TradeProvisioningSteps] Setup data '" + name + "' has no request.");
+        }
+        return request;
     }
 
     private JsonNode approveTask(String taskId, String userId) {

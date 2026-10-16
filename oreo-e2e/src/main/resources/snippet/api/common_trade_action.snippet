@@ -1,7 +1,7 @@
 # ── Provisioning ────────────────────────────────────────────────────
 
 @Given "^a '([^']*)' trade is submitted to pending approval and trade stored as '([^']*)'$"
-    Given build multipart request with parameter 'trade' from test data 'API-SETUP-TRADE-CREATE' for product '$1' as user 'maker@example.com'
+    Given build multipart request with parameter 'trade' from test data 'trade-create' for product '$1' as user 'maker@example.com'
     When post to path '/trades/create?tradeAction=SUBMIT'
     Then response status code is '200'
     And store response field 'data.trade.id' as '$2'

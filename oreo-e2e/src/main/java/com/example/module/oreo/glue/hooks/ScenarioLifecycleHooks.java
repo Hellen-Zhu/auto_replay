@@ -1,10 +1,10 @@
 package com.example.module.oreo.glue.hooks;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.genie.model.GenieScenario;
-import com.example.module.oreo.testdata.TestDataLoader;
-import com.example.module.oreo.testdata.TestDataRecord;
+import com.example.module.oreo.testdata.CaseData;
+import com.example.module.oreo.testdata.CaseId;
+import com.example.module.oreo.testdata.Json;
+import com.example.module.oreo.testdata.TestData;
 import com.example.module.oreo.utils.DateUtil;
 import cucumber.api.Scenario;
 import cucumber.api.java.After;
@@ -29,7 +29,6 @@ import java.util.Set;
 public class ScenarioLifecycleHooks {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioLifecycleHooks.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /**
      * Absolute path to failed-scenarios.log, resolved once at class-load time via
@@ -69,69 +68,46 @@ public class ScenarioLifecycleHooks {
     }
 
     // -------------------------------------------------------------------------
-    // Before — order 1: auto-inject YAML test data into scenario ctx
+    // Before — order 1: inject the case's test data into scenario ctx
     // -------------------------------------------------------------------------
 
     /**
-     * Flattens the YAML {@code request:} JSON for the current scenario's TC-ID and
+     * Loads the merged data of the scenario's case ({@code data/<api|ui>/<event>.json}, see {@link TestData})
+     * and stores it in ctx: {@code _tc.key}; when the case has a request, {@code _tc.request}, each top-level
+     * field as {@code _tc.request.<field>} and every leaf by its dot path ({@code basic.counterpartyName}).
+     * A broken data file fails the scenario.
      */
     @Before(order = 1)
     public void injectTestDataIntoContext(Scenario scenario) {
         GenieScenario genieScenario = asGenieScenario(scenario);
         logScenarioContext(genieScenario, "before test-data injection");
 
-        String tcId = TestDataLoader.tcKeyFromName(scenario.getName());
+        String tcId = CaseId.fromScenarioName(scenario.getName());
         if (tcId == null) {
             log.debug("[ScenarioLifecycleHooks] No [TC-...] token found in scenario name for '{}' — skipping data injection",
                     scenario.getName());
             return;
         }
 
-        TestDataRecord record;
-        try {
-            record = TestDataLoader.getByTcId(tcId);
-        } catch (AssertionError e) {
-            // Scenario name contains a TC-ID but no matching YAML entry was found.
-            log.warn("[ScenarioLifecycleHooks] TC-ID '{}' from scenario name has no YAML entry — ctx injection skipped for '{}'. "
-                            + "If this scenario reads from ctx, check data/**/*.yml for a matching key.",
-                    tcId, scenario.getName());
+        CaseData data = TestData.forCase(tcId);
+        genieScenario.setAttribute("_tc.key", tcId);
+        genieScenario.write("[test-data:layers] "
+                + (data.layers().isEmpty() ? "(none)" : String.join(" -> ", data.layers())));
+
+        if (!data.hasRequest()) {
+            log.debug("[ScenarioLifecycleHooks] No request data for '{}'", tcId);
             return;
         }
+        String request = data.request();
+        genieScenario.setAttribute("_tc.request", request);
+        genieScenario.write("[test-data:request] source=current scenario (TC-ID='" + tcId + "')\n" + request);
 
-        // Always store framework keys for step-class access
-        genieScenario.setAttribute("_tc.key",      tcId);
-        genieScenario.setAttribute("_tc.request",  record.request());
-        genieScenario.setAttribute("_tc.response", record.response());
+        // Each top-level request field as a JsonNode, e.g. ctx.get("_tc.request.subTrades")
+        Json.parse(request).properties().forEach(e ->
+                genieScenario.setAttribute("_tc.request." + e.getKey(), e.getValue()));
 
-        if (record.request() != null && !record.request().isBlank()) {
-            genieScenario.write("[test-data:request] source=current scenario (TC-ID='" + tcId + "')\n"
-                    + record.request());
-        }
-        if (record.response() != null && !record.response().isBlank()) {
-            genieScenario.write("[test-data:response] source=current scenario (TC-ID='" + tcId + "')\n"
-                    + record.response());
-        }
-
-        // Store each top-level request field as a JsonNode so step classes can do
-        // ctx.get("_tc.request.subTrades") without going back to TestDataLoader
-        if (record.request() != null) {
-            try {
-                JsonNode reqNode = OBJECT_MAPPER.readTree(record.request());
-                reqNode.properties().forEach(e ->
-                        genieScenario.setAttribute("_tc.request." + e.getKey(), e.getValue()));
-            } catch (Exception e) {
-                log.warn("[ScenarioLifecycleHooks] Failed to parse request JSON for '{}': {}",
-                        tcId, e.getMessage());
-            }
-        }
-
-        // Flatten leaf strings for snippet access (e.g. 'basic.counterpartyName')
-        Map<String, String> fields = record.flattenRequest();
-        if (fields.isEmpty()) {
-            log.debug("[ScenarioLifecycleHooks] No request fields to inject for '{}'",
-                    scenario.getName());
-            return;
-        }
+        // Leaf values by dot path for snippet access (e.g. 'basic.counterpartyName')
+        Map<String, String> fields = data.flattenRequest();
         fields.forEach((key, value) -> {
             genieScenario.setAttribute(key, value);
             log.debug("[ScenarioLifecycleHooks] ctx[{}] = {}", key, value);
@@ -217,7 +193,7 @@ public class ScenarioLifecycleHooks {
     /**
      * Dumps ctx attributes into two groups:
      * - runtime variables: keys set by step classes during execution (no _tc. prefix)
-     * - test data: injected YAML fields (_tc.* prefix, excluding raw JSON _tc.request/_tc.response)
+     * - test data: injected test-data fields (_tc.* prefix, excluding the raw JSON _tc.request)
      */
     private static String dumpCtx(GenieScenario gs) {
         try {
@@ -230,9 +206,7 @@ public class ScenarioLifecycleHooks {
                     .toList();
 
             List<String> testDataKeys = names.stream()
-                    .filter(n -> n.startsWith("_tc.")
-                            && !n.equals("_tc.request")
-                            && !n.equals("_tc.response"))
+                    .filter(n -> n.startsWith("_tc.") && !n.equals("_tc.request"))
                     .sorted()
                     .toList();
 

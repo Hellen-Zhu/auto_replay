@@ -1,11 +1,9 @@
 package com.example.module.oreo.glue.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.example.module.oreo.testdata.ProductDatFiles;
-import com.example.module.oreo.testdata.TestDataLoader;
-import com.example.module.oreo.testdata.TestDataRecord;
+import com.example.module.oreo.testdata.SetupData;
+import com.example.module.oreo.testdata.TestData;
+import com.example.module.oreo.testdata.TradeRequests;
 import cucumber.api.Scenario;
 import cucumber.api.java.Before;
 import cucumber.api.java.en.Given;
@@ -17,7 +15,6 @@ import java.nio.file.Paths;
 public class TradeApiSteps {
 
     private static final Logger log = LoggerFactory.getLogger(TradeApiSteps.class);
-    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
     private RestServiceResolver.Context ctx;
 
     @Before
@@ -27,12 +24,11 @@ public class TradeApiSteps {
 
     @Given("^set multi-part form parameter '(.+)' for product '([^']*)' from test data '([^']*)'$")
     public void setMultiPartFormParameterFromTestData(String partName, String product, String key) {
-        TestDataRecord record = TestDataLoader.forKey(key);
-        if (!record.hasRequest()) {
-            throw new AssertionError(
-                    "[TradeApiSteps] Test data '" + key + "' has no 'request:' node.");
+        SetupData setup = TestData.setup(key);
+        if (!setup.hasRequest()) {
+            throw new AssertionError("[TradeApiSteps] Setup data '" + key + "' has no request.");
         }
-        String requestWithProductId = setBasicProductId(record.request(), product, key);
+        String requestWithProductId = setBasicProductId(setup.request(), product, key);
         ctx.helper().request().multiPart(partName, requestWithProductId, "application/json");
         log.info("[TradeApiSteps] set multi-part form parameter '{}' from test data '{}' as '{}'", partName, key,requestWithProductId);
     }
@@ -43,7 +39,11 @@ public class TradeApiSteps {
      */
     @Given("^set multi-part form parameter '(.+)' for product '([^']*)' from current scenario$")
     public void setMultiPartFormParameterFromCurrentScenario(String partName, String product) {
-        String requestBody = ctx.get("_tc.request");
+        String requestBody = ctx.find("_tc.request");
+        if (requestBody == null) {
+            throw new AssertionError("[TradeApiSteps] Case '" + ctx.get("_tc.key")
+                    + "' has no request in its test data (data/api/<event>.json).");
+        }
         String requestWithProductId = setBasicProductId(requestBody, product, ctx.get("_tc.key"));
         ctx.helper().request().multiPart(partName, requestWithProductId, "application/json");
         log.info("[TradeApiSteps] set multi-part form parameter '{}' from current scenario ('{}') as '{}'",
@@ -101,27 +101,9 @@ public class TradeApiSteps {
 
     private String setBasicProductId(String requestJson, String productId, String key) {
         try {
-            JsonNode rootNode = JSON_MAPPER.readTree(requestJson);
-            if (!(rootNode instanceof ObjectNode rootObject)) {
-                throw new AssertionError("[TradeApiSteps] request for key '" + key + "' must be a JSON object.");
-            }
-
-            ObjectNode basicNode;
-            JsonNode existingBasicNode = rootObject.get("basic");
-            if (existingBasicNode == null || existingBasicNode.isNull()) {
-                basicNode = rootObject.putObject("basic");
-            } else if (existingBasicNode instanceof ObjectNode objNode) {
-                basicNode = objNode;
-            } else {
-                throw new AssertionError(
-                        "[TradeApiSteps] request.basic for key '" + key + "' must be a JSON object.");
-            }
-
-            basicNode.put("productId", productId);
-            return JSON_MAPPER.writeValueAsString(rootObject);
-        } catch (Exception e) {
-            throw new AssertionError(
-                    "[TradeApiSteps] Failed to inject basic.productId for key '" + key + "': " + e.getMessage(), e);
+            return TradeRequests.withProductId(requestJson, productId);
+        } catch (AssertionError e) {
+            throw new AssertionError("[TradeApiSteps] request for key '" + key + "': " + e.getMessage(), e);
         }
     }
 }

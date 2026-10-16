@@ -2,8 +2,8 @@ package com.example.module.oreo.glue.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.example.module.oreo.testdata.TestDataLoader;
-import com.example.module.oreo.testdata.TestDataRecord;
+import com.example.module.oreo.testdata.SetupData;
+import com.example.module.oreo.testdata.TestData;
 import cucumber.api.Scenario;
 import cucumber.api.java.Before;
 import cucumber.api.java.en.Given;
@@ -127,7 +127,7 @@ public class ApiRequestSteps {
 
     @Given("^set json request body from current scenario with task ids from stored variables '([^']*)' and '([^']*)'$")
     public void setJsonRequestBodyFromCurrentScenarioWithTaskIds(String varName1, String varName2) {
-        String requestBody = ctx.get("_tc.request");
+        String requestBody = requestBodyFromCurrentScenario();
         String taskId1 = ctx.get(varName1);
         String taskId2 = ctx.get(varName2);
         try {
@@ -165,18 +165,19 @@ public class ApiRequestSteps {
         log.info("[ApiRequestSteps] set query param '{}' = '{}'", paramName, value);
     }
 
+    /** The {@code request} of setup file {@code data/setup/<key>.json}. */
     private String requestBodyFromTestData(String key) {
-        TestDataRecord record = TestDataLoader.forKey(key);
-        if (!record.hasRequest()) {
-            throw new AssertionError(
-                    "[ApiRequestSteps] Test data '" + key + "' has no 'request:' node.");
+        SetupData setup = TestData.setup(key);
+        if (!setup.hasRequest()) {
+            throw new AssertionError("[ApiRequestSteps] Setup data '" + key + "' has no request.");
         }
-        return requireRequestBody(record.request(), "test data '" + key + "'");
+        return requireRequestBody(setup.request(), "setup data '" + key + "'");
     }
 
+    /** The merged request of the case ({@code _tc.request}, set by the hook only when the case has one). */
     private String requestBodyFromCurrentScenario() {
         String tcKey = ctx.get("_tc.key");
-        String requestBody = ctx.get("_tc.request");
+        String requestBody = ctx.find("_tc.request");
         return requireRequestBody(requestBody, "current scenario (TC-ID='" + tcKey + "')");
     }
 
