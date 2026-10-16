@@ -225,7 +225,7 @@ without the vintage engine), add `org.junit.vintage:junit-vintage-engine` in tes
 
 | Task | What to change |
 |---|---|
-| New product | `ProductDatFiles` constant and `data/<P>.dat`; the product in each feature's Examples; `byProduct` only where its data or dynamic fields differ; run the API cases, compact, review the recorded files, commit (no base to declare: `defaults` covers every product) |
+| New product | `ProductDatFiles` constant and `data/<P>.dat`; the product in each feature's Examples; `byProduct` only where its data or dynamic fields differ; run the API cases, compact, review the recorded files, commit (no base to declare: `defaults` covers every product). The skill `.claude/skills/onboarding-e2e-product` walks through it |
 | New positive case | nothing when it runs on the defaults; otherwise a row with the feature's ID; after the recording, compact |
 | New negative case | a row with the `request` change and `"dynamicFields": null` |
 | New event | `data/<channel>/<event>.json`, named after the feature file; shared blocks through `use` |
