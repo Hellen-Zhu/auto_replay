@@ -1,6 +1,6 @@
 # oreo-e2e test data: design
 
-Status: draft for review. Branch: `feature/testdata-refactor`.
+Status: approved by the user on 2026-10-16. Branch: `feature/testdata-refactor`.
 Scope: the Java + Cucumber (Genie) project in `oreo-e2e/` only. The Playwright side is not touched.
 
 ## 1. Goals and constraints
@@ -143,7 +143,7 @@ The case ID comes from the scenario name, as today (`TestDataLoader.tcKeyFromNam
 
 API-001 has no row: its four cases run on the defaults.
 
-The `dynamicFields` above show the shape. The initial entries are derived in migration step 2 from the old responses: a rule wherever the old data had a value-level placeholder for that case, `ignore` changed to `type-tree` (approved by the user). They are confirmed or corrected at the first recording on the real system (section 9, step 6).
+The `dynamicFields` above are the initial rules. They cover only what changes from run to run in the old data: generated IDs, dates, the task ID in `msg`, and the instrument subtrees the old data ignored (`ignore` -> `type-tree`, approved by the user). Placeholders in the old data that only stood for a value the template could not know (`tradeType`, `currencyPair`, `rate`, `marketers`, the echoed `udf` ...) get no rule: they are the warnings of check 5 (section 10) and become exact values at the first recording on the real system (section 9, step 6).
 
 ### 5.2 Keys
 
@@ -361,7 +361,7 @@ Verification here: Genie's artifacts are not reachable outside the company netwo
 2. Every case ID expanded from every feature file (scenario names, Examples column `product_type`) resolves without error, and no case matches two rows.
 3. Every row matches at least one case ID; every event file has a feature file of the same name in its channel.
 4. Every API case has an expected file; every expected file belongs to a case. (So a product just added to the Examples fails this check until its files are recorded and committed.)
-5. Rules and expected files agree (catches a rule changed without recording again). For every rule of a case, its path exists in the expected file and holds: a placeholder for `type`, `regex:`, `ignore`; a placeholder or a tree whose leaves are all placeholders for `type-tree`. Placeholders where no rule exists are listed as warnings: they come from the converted old data, are weaker than a recording, and are the checklist of migration step 6.
+5. Rules and expected files agree (catches a rule changed without recording again). For every rule of a case, its path exists in the expected file and holds: a placeholder for `type`, `regex:`, `ignore`; a placeholder or a tree whose leaves are all placeholders for `type-tree`. A path whose ancestor is a placeholder (the converted old data ignored a whole `instrument`) passes with a warning. Placeholders where no rule exists are warnings too. Both come from the converted old data, are weaker than a recording, and are the checklist of migration step 6.
 6. Every setup name used in `src/main/java` (`TestData.setup("...")`) and in snippets (`from test data '...'`) exists. `trade-cancellation` and `trade-amendment` are listed in the test as known missing until their bodies arrive.
 
 Lookup: `mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002` prints the applied layers, the final request, the `dynamicFields` and the expected file path.
@@ -387,6 +387,6 @@ Lookup: `mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT
 
 ## 13. Open items for the user
 
-1. Bodies of `trade-cancellation` (`API-SETUP-TRADE-CANCELLATION`) and `trade-amendment` (`UI-SETUP-AMENDMENT`).
-2. Step 6 of the migration (first recording) needs the real system.
-3. Confirm the `basic.productId` fix in `TradeProvisioningSteps` (section 8).
+1. Step 6 of the migration (first recording) needs the real system.
+
+Decided on 2026-10-16: the `basic.productId` fix in `TradeProvisioningSteps` is approved; cancellation and amendment are not covered for now, so `trade-cancellation` and `trade-amendment` stay without a file (listed as known missing by check 6).
