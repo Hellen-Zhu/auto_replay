@@ -416,3 +416,355 @@ TC-TRADE-CREATION-FX_PSCRIPT_FSKO-API-002:
         }
       }
     }
+
+TC-TRADE-CREATION-FX_TRF-API-003:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-FULL-API-001
+  responseRef: RESP-TPL-TRADE-CREATION-STEPIN-FULL-API-001
+  response: |
+    {
+      "data": {
+        "trade": {
+          "basic": {
+            "tradeType": "FX_TRF",
+            "productId": "FX_TRF",
+            "currencyPair": "USDJPY",
+            "notionalAmount": 70000.0,
+            "udf": [
+              {
+                "key": "stepInType",
+                "value": "StepInFull",
+                "type": "Text"
+              },
+              {
+                "key": "oldCptyName",
+                "value": "10 AM JAK",
+                "type": "Text"
+              },
+              {
+                "key": "oldCptyFmId",
+                "value": "300036957",
+                "type": "Text"
+              },
+              {
+                "key": "novationDate",
+                "value": "${json-unit.any-string}",
+                "type": "Date"
+              }
+            ],
+            "direction": "Buy"
+          }
+        }
+      }
+    }
+
+TC-TRADE-CREATION-FX_PSCRIPT-API-003:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-FULL-API-001
+  responseRef: RESP-TPL-TRADE-CREATION-STEPIN-FULL-API-001
+  response: |
+    {
+      "data": {
+        "trade": {
+          "basic": {
+            "tradeType": "FX_CO",
+            "productId": "FX_CO",
+            "currencyPair": "EURSGD",
+            "notionalAmount": 6937.5,
+            "rate": 0.6425,
+            "udf": [
+              {
+                "key": "stepInType",
+                "value": "StepInFull",
+                "type": "Text"
+              },
+              {
+                "key": "oldCptyName",
+                "value": "10 AM JAK",
+                "type": "Text"
+              },
+              {
+                "key": "oldCptyFmId",
+                "value": "300036957",
+                "type": "Text"
+              },
+              {
+                "key": "novationDate",
+                "value": "${json-unit.any-string}",
+                "type": "Date"
+              }
+            ],
+            "direction": "Buy"
+          }
+        }
+      }
+    }
+
+TC-TRADE-CREATION-FX_PSCRIPT_FSKO-API-003:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-FULL-API-001
+  responseRef: RESP-TPL-TRADE-CREATION-STEPIN-FULL-API-001
+  response: |
+    {
+      "data": {
+        "trade": {
+          "basic": {
+            "tradeType": "FX_FSB",
+            "productId": "FX_FSB",
+            "currencyPair": "USDCNH",
+            "notionalAmount": "${json-unit.any-number}"
+          }
+        }
+      }
+    }
+
+TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-001:
+  request: |
+    {
+      "basic": {
+        "portfolioId":       "ABS_EQF",
+        "counterpartyFmId": "300036958",
+        "counterpartyName": "10 AM NY",
+        "productId":         "FX_PSCRIPT_TRF",
+        "direction":         "Sell"
+      }
+    }
+  response: |
+    {
+      "code": 200,
+      "status": "PENDING APPROVAL",
+      "msg": "${json-unit.any-string}",
+      "data": {
+        "trade": {
+          "id": "${json-unit.any-string}",
+          "basic": {
+            "dealDate": "${json-unit.any-string}",
+            "valueDate": "${json-unit.any-string}",
+            "tradeType": "FX_PSCRIPT_TRF",
+            "productId": "FX_PSCRIPT_TRF",
+            "currencyPair": "${json-unit.any-string}",
+            "notionalAmount": "${json-unit.any-number}",
+            "notionalCurrency": "CNH",
+            "rate": "${json-unit.any-number}",
+            "counterpartyName": "10 AM NY",
+            "counterpartyFmId": "300036958",
+            "portfolioId": "ABS_EQF",
+            "status": "Pending Approval Draft",
+            "eventStatus": "${json-unit.any-string}",
+            "trader": "system",
+            "scbEntity": "LONDON",
+            "source": "OREO",
+            "ci": 0,
+            "hardMargin": 0,
+            "cva": 0,
+            "fva": 0,
+            "marketers": [
+              {
+                "marketerId": "system",
+                "revenueShare": 100.0,
+                "marketerType": "COVERAGE"
+              }
+            ],
+            "structuringInvolved": false,
+            "vmc": 0,
+            "premiumAmount": "${json-unit.any-number}",
+            "premiumCurrency": "USD",
+            "premiumDate": "${json-unit.any-string}",
+            "version": "${json-unit.any-number}",
+            "direction": "Sell"
+          },
+          "instrument": "${json-unit.ignore}",
+          "trace": "${json-unit.ignore}"
+        },
+        "checkerContext": {
+          "taskId": "${json-unit.any-string}",
+          "submittedBy": "maker@example.com",
+          "eventType": "SUBMIT"
+        }
+      }
+    }
+
+TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002:
+  request: |
+    {
+      "basic": {
+        "portfolioId":       "ABS_EQF",
+        "counterpartyFmId": "300036958",
+        "counterpartyName": "10 AM NY",
+        "productId":         "FX_PSCRIPT_TRF",
+        "direction":         "Sell",
+        "notionalCurrency": "",
+      "udf": [
+        {"key": "stepInType",   "value": "StepInPartial", "type": "Text"},
+        {"key": "oldCptyName",  "value": "10 AM JAK",    "type": "Text"},
+        {"key": "oldCptyFmId",  "value": "300036957",    "type": "Text"},
+        {"key": "novationDate", "value": "2026-06-10",   "type": "Date"}
+      ]
+      }
+    }
+  response: |
+    {
+      "code": 200,
+      "status": "PENDING APPROVAL",
+      "msg": "${json-unit.any-string}",
+      "data": {
+        "trade": {
+          "id": "${json-unit.any-string}",
+          "basic": {
+            "dealDate": "${json-unit.any-string}",
+            "valueDate": "${json-unit.any-string}",
+            "tradeType": "FX_PSCRIPT_TRF",
+            "productId": "FX_PSCRIPT_TRF",
+            "currencyPair": "${json-unit.any-string}",
+            "notionalAmount": "${json-unit.any-number}",
+            "notionalCurrency": "CNH",
+            "rate": "${json-unit.any-number}",
+            "counterpartyName": "10 AM NY",
+            "counterpartyFmId": "300036958",
+            "portfolioId": "ABS_EQF",
+            "status": "Pending Approval Draft",
+            "eventStatus": "${json-unit.any-string}",
+            "trader": "system",
+            "scbEntity": "LONDON",
+            "source": "OREO",
+            "ci": 0,
+            "hardMargin": 0,
+            "cva": 0,
+            "fva": 0,
+            "marketers": [
+              {
+                "marketerId": "system",
+                "revenueShare": 100.0,
+                "marketerType": "COVERAGE"
+              }
+            ],
+            "structuringInvolved": false,
+            "vmc": 0,
+            "premiumAmount": "${json-unit.any-number}",
+            "premiumCurrency": "USD",
+            "premiumDate": "${json-unit.any-string}",
+            "version": "${json-unit.any-number}",
+            "direction": "Sell",
+            "udf": "${json-unit.ignore}"
+          },
+          "instrument": "${json-unit.ignore}",
+          "trace": "${json-unit.ignore}"
+        },
+        "checkerContext": {
+          "taskId": "${json-unit.any-string}",
+          "submittedBy": "maker@example.com",
+          "eventType": "SUBMIT"
+        }
+      }
+    }
+
+TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-003:
+  request: |
+    {
+      "basic": {
+        "portfolioId":       "ABS_EQF",
+        "counterpartyFmId": "300036958",
+        "counterpartyName": "10 AM NY",
+        "productId":         "FX_PSCRIPT_TRF",
+        "direction":         "Buy",
+        "notionalCurrency": "CNH",
+      "udf": [
+        {"key": "stepInType",   "value": "StepInFull", "type": "Text"},
+        {"key": "oldCptyName",  "value": "10 AM JAK",    "type": "Text"},
+        {"key": "oldCptyFmId",  "value": "300036957",    "type": "Text"},
+        {"key": "novationDate", "value": "2026-06-10",   "type": "Date"}
+      ]
+      }
+    }
+  response: |
+    {
+      "code": 200,
+      "status": "PENDING APPROVAL",
+      "msg": "${json-unit.any-string}",
+      "data": {
+        "trade": {
+          "id": "${json-unit.any-string}",
+          "basic": {
+            "dealDate": "${json-unit.any-string}",
+            "valueDate": "${json-unit.any-string}",
+            "tradeType": "FX_PSCRIPT_TRF",
+            "productId": "FX_PSCRIPT_TRF",
+            "currencyPair": "${json-unit.any-string}",
+            "notionalAmount": "${json-unit.any-number}",
+            "notionalCurrency": "CNH",
+            "rate": "${json-unit.any-number}",
+            "counterpartyName": "10 AM NY",
+            "counterpartyFmId": "300036958",
+            "portfolioId": "ABS_EQF",
+            "status": "Pending Approval Draft",
+            "eventStatus": "${json-unit.any-string}",
+            "trader": "system",
+            "scbEntity": "LONDON",
+            "source": "OREO",
+            "ci": 0,
+            "hardMargin": 0,
+            "cva": 0,
+            "fva": 0,
+            "marketers": [
+              {
+                "marketerId": "system",
+                "revenueShare": 100.0,
+                "marketerType": "COVERAGE"
+              }
+            ],
+            "structuringInvolved": false,
+            "vmc": 0,
+            "premiumAmount": "${json-unit.any-number}",
+            "premiumCurrency": "USD",
+            "premiumDate": "${json-unit.any-string}",
+            "version": "${json-unit.any-number}",
+            "direction": "Buy",
+            "udf": "${json-unit.ignore}"
+          },
+          "instrument": "${json-unit.ignore}",
+          "trace": "${json-unit.ignore}"
+        },
+        "checkerContext": {
+          "taskId": "${json-unit.any-string}",
+          "submittedBy": "maker@example.com",
+          "eventType": "SUBMIT"
+        }
+      }
+    }
+
+TC-TRADE-CREATION-API-004:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-PARTIAL-API-001
+  request: |
+    {
+      "basic": {
+        "counterpartyFmId": "300036957",
+        "counterpartyName": ""
+      }
+    }
+  response: |
+    {
+      "code": 400,
+      "status": "ERROR",
+      "msg": "Failed to create trade: Failed to populate trade from .dat file: Counterparty name is required"
+    }
+
+TC-TRADE-CREATION-API-005:
+  requestRef: REQ-TPL-TRADE-CREATION-STEPIN-FULL-API-001
+  request: |
+    {
+      "basic": {
+        "portfolioId": ""
+      }
+    }
+  response: |
+    {
+      "code": 400,
+      "status": "ERROR",
+      "msg":    "Failed to create trade: Failed to populate trade from .dat file: Portfolio ID is required"
+    }
+
+TC-TRADE-CREATION-API-006:
+  requestRef: REQ-TPL-TRADE-CREATION-API-001
+  response: |
+    {
+      "code": 403,
+      "status": "ERROR",
+      "msg":    "Access denied"
+    }
