@@ -7,7 +7,7 @@ no Genie, no browser. The browser and the API are two interfaces (`OreoUi`, `Ore
 stand-ins that log each action, in the E2E project they are backed by Genie.
 
 The folders follow the E2E project's layout (`glue`, `testdata`, `utils`, `OreoModule`, `OreoModuleConfiguration`
-in `src/main`; `OreoTest`, `data`, `features/ui/trading`, `genie.properties`, `uat.properties` in `src/test`). The
+in `src/main`; `OreoTest`, `data`, `features/ui/trading`, `genie.properties`, `log4j2.xml` in `src/test`). The
 package is `com.example.module.oreo` because this repository is public: rename it to the E2E project's package when
 copying. Not created, as they need Genie or were not seen: `META-INF/services`, `snippet/`, `cucumber.xml`,
 `elements/`, `log4j2.xml`, the other environments' properties.
@@ -64,7 +64,7 @@ src/test/resources/
   data/<PRODUCT ID>.dat           placeholders: FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF, FX_TRF
   elements/components|pages/*.json       the files the replay project has (../elements/) copied; the others []
   features/ui/trading/            trade_creation.feature, trade_early_termination.feature, as in the E2E project
-  genie.properties, uat.properties       settings without accounts or addresses
+  genie.properties, log4j2.xml          settings (addresses and accounts are placeholders)
   enrich, pt, sit .properties, log4j2.xml   placeholders
 ```
 
