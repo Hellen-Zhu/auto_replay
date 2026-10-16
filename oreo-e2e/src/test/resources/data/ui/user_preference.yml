@@ -1,0 +1,11 @@
+
+SETUP-USER-PREFERENCE-CONFIG-DEFAULTS:
+  request: |
+    {
+      "theme": "light",
+      "numberFormat": "en-US",
+      "dateFormat": "MM/DD/YYYY",
+      "activeBlotters": [
+        "BLT-DEFAULT-NEW-TODAY"
+      ]
+    }
