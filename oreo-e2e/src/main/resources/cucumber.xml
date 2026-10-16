@@ -1,3 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Placeholder: copy cucumber.xml from the E2E project. -->
-<beans xmlns="http://www.springframework.org/schema/beans"/>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <!-- Scan all framework packages: config, playwright manager, pages, steps, hooks -->
+    <context:component-scan base-package="com.example.module.oreo" />
+    <!-- Single property-placeholder loading all sources in one element.
+         Spring merges all locations into one resolver — no ordering issues.
+         Location order within one element: first file wins for duplicate keys.
+         System properties (-D flags) always win over file-based values.
+         ignore-resource-not-found: silently skip absent env files (e.g. sit.properties on local dev).
+         ignore-unresolvable: fall through to @Value defaults for any unresolved key. -->
+    <context:property-placeholder
+            location="${genie.properties}"
+        ignore-resource-not-found="true"
+        ignore-unresolvable="true"/>
+
+</beans>

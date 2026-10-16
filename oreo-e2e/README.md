@@ -32,8 +32,7 @@ there so the tree matches; copy the real file over them from the E2E project.
 pom.xml, .gitignore
 .gitattributes, .mcp.json, azure-pipelines-maven.yml, .claude/, docs/   placeholders
 src/main/java/com/example/module/oreo/
-  OreoModule.java                 per scenario: ctx, ui, api, config (PicoContainer)
-  OreoModuleConfiguration.java    genie.properties + <env>.properties + -Doreo.<key>; Mode REAL / MOCK
+  OreoModule.java, OreoModuleConfiguration.java   transcribed from the E2E project
   glue/ScenarioContext.java       transcribed from the E2E project
   glue/hooks/ScenarioLifecycleHooks.java, E2EScenarioHooks.java   transcribed from the E2E project
   glue/hooks/PlaywrightTraceHooks          placeholder
@@ -49,7 +48,7 @@ src/main/java/com/example/module/oreo/
 src/main/resources/
   META-INF/services/com.example.genie.module.GenieModule   placeholder (named after the GenieModule interface there)
   snippet/api/, snippet/ui/components|flows|pages/*.snippet placeholders
-  cucumber.xml                    placeholder
+  cucumber.xml                    transcribed from the E2E project
 src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/; glue and report set here)
 src/test/resources/

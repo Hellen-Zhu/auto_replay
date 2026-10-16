@@ -1,94 +1,57 @@
 package com.example.module.oreo;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import com.example.genie.module.GenieModule;
+import com.example.genie.module.configuration.BaseGenieModuleConfiguration;
+import com.example.genie.module.configuration.ConfigurationDescriptor;
+import com.example.genie.module.configuration.DefaultConfigurationDescriptor;
+import com.example.genie.type.ValueConverter;
+
 import java.util.Locale;
-import java.util.Optional;
-import java.util.Properties;
 
-/**
- * Environment settings, never test data: {@code genie.properties} on the classpath, then the environment's file it
- * names ({@code oreo.env=uat} -> {@code uat.properties}), then system properties ({@code -Doreo.<key>=...}), later
- * winning. Accounts and passwords are never in a committed file: pass them as system properties on the machine.
- */
-public final class OreoModuleConfiguration {
+public final class OreoModuleConfiguration extends BaseGenieModuleConfiguration {
 
-    /** How a click that starts a risk calculation is handled (ctx.riskEngineMode() in the E2E project) */
-    public enum Mode { REAL, MOCK }
+    public final ConfigurationDescriptor<Mode> RISK_ENGINE_MODE = new DefaultConfigurationDescriptor<>(
+            getGenieModule(),
+            "risk.engine.mode",
+            Mode.REAL,
+            "Risk engine mode. Use MOCK to call mock APIs.",
+            ValueConverter.createEnum(Mode.class)
+    );
 
-    private final Properties properties;
-    private final boolean placeholders;
+    public final ConfigurationDescriptor<TraceMode> PLAYWRIGHT_TRACE_MODE = new DefaultConfigurationDescriptor<>(
+            getGenieModule(),
+            "playwright.trace.mode",
+            TraceMode.RETAIN_ON_FAILURE,
+            "Playwright trace mode. Use ON, OFF, or RETAIN_ON_FAILURE.",
+            ValueConverter.createEnum(TraceMode.class)
+    );
 
-    private OreoModuleConfiguration(Properties properties, boolean placeholders) {
-        this.properties = properties;
-        this.placeholders = placeholders;
+    public OreoModuleConfiguration(GenieModule genieModule) {
+        super(genieModule);
+        addDescriptor(RISK_ENGINE_MODE);
+        addDescriptor(PLAYWRIGHT_TRACE_MODE);
     }
 
-    /** The settings of the run */
-    public static OreoModuleConfiguration load() {
-        return new OreoModuleConfiguration(read(), false);
-    }
 
-    /**
-     * For the recording stand-ins: a required value that is not set is its own key in angle brackets
-     * ({@code <accounts.maker.email>}), so nothing real is needed to run.
-     */
-    public static OreoModuleConfiguration withPlaceholders() {
-        return new OreoModuleConfiguration(read(), true);
-    }
+    public enum Mode {
+        MOCK,
+        REAL;
 
-    private static Properties read() {
-        Properties p = new Properties();
-        load(p, "genie.properties");
-        String env = System.getProperty("oreo.env", p.getProperty("oreo.env"));
-        if (env != null && !env.isBlank()) {
-            load(p, env + ".properties");
-        }
-        System.getProperties().forEach((k, v) -> {
-            if (k.toString().startsWith("oreo.")) {
-                p.setProperty(k.toString(), v.toString());
-            }
-        });
-        return p;
-    }
-
-    private static void load(Properties p, String resource) {
-        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource)) {
-            if (in != null) {
-                p.load(in);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot read " + resource, e);
+        public static Mode from(String rawValue) {
+            String normalized = rawValue == null ? "" : rawValue.trim().toUpperCase(Locale.ROOT);
+            return switch (normalized) {
+                case "MOCK" -> MOCK;
+                case "REAL" -> REAL;
+                default -> throw new IllegalArgumentException(
+                        "Unsupported risk.engine.mode value '" + rawValue + "'. Expected one of: MOCK, REAL."
+                );
+            };
         }
     }
 
-    public String get(String key) {
-        Optional<String> value = find(key);
-        if (value.isPresent()) {
-            return value.get();
-        }
-        if (placeholders) {
-            return "<" + key + ">";
-        }
-        throw new IllegalStateException("Missing setting oreo." + key + " (pass -Doreo." + key + "=...)");
-    }
-
-    public Optional<String> find(String key) {
-        return Optional.ofNullable(properties.getProperty("oreo." + key)).filter(v -> !v.isBlank());
-    }
-
-    /** The account's e-mail of a role: also its user ID for the API (header X-User-Id) */
-    public String email(String role) {
-        return get("accounts." + role + ".email");
-    }
-
-    public String password(String role) {
-        return get("accounts." + role + ".password");
-    }
-
-    /** {@code oreo.riskEngine} = real (default) or mock */
-    public Mode riskEngineMode() {
-        return Mode.valueOf(find("riskEngine").orElse("real").toUpperCase(Locale.ROOT));
+    public enum TraceMode {
+        OFF,
+        ON,
+        RETAIN_ON_FAILURE
     }
 }

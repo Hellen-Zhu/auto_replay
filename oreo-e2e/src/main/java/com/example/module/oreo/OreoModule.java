@@ -1,51 +1,48 @@
 package com.example.module.oreo;
 
-import com.example.module.oreo.glue.ScenarioContext;
-import com.example.module.oreo.utils.api.OreoApi;
-import com.example.module.oreo.utils.api.RecordingOreoApi;
-import com.example.module.oreo.utils.ui.OreoUi;
-import com.example.module.oreo.utils.ui.RecordingOreoUi;
+// [not in the photos: line 3, presumably the import of GenieRuntime]
+import com.example.genie.module.BaseGenieGlueModule;
+import com.example.genie.module.database.DatabaseModule;
+import com.example.genie.module.jdbc.JdbcModule;
+import com.example.genie.module.rest.RestModule;
+import com.example.genie.module.spring.SpringModule;
+import com.example.genie.module.sql.SqlModule;
+import com.example.genie.type.TopologicalSortable;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * What every step and page object of a scenario shares: the ctx, the browser, the API and the config. One per
- * scenario (PicoContainer). Here the browser and the API are recording stand-ins that log each action; in the E2E
- * project they are backed by Genie.
- */
-public class OreoModule {
+public class OreoModule extends BaseGenieGlueModule {
+    private final OreoModuleConfiguration configuration = new OreoModuleConfiguration(this);
 
-    private final ScenarioContext ctx;
-    private final List<String> log = new ArrayList<>();
-    private final OreoUi ui;
-    private final OreoApi api;
-    private final OreoModuleConfiguration config;
-
-    public OreoModule(ScenarioContext ctx) {
-        this.ctx = ctx;
-        this.ui = new RecordingOreoUi(log);
-        this.api = new RecordingOreoApi(log);
-        this.config = OreoModuleConfiguration.withPlaceholders();
+    @Override
+    public String getName() {
+        return "oreo";
     }
 
-    public ScenarioContext ctx() {
-        return ctx;
+    @Override
+    public OreoModuleConfiguration getConfiguration() {
+        return configuration;
     }
 
-    public OreoUi ui() {
-        return ui;
+    @Override
+    public void initialise(GenieRuntime runtime) {  }
+
+    @Override
+    public List<String> getGluePaths() {
+        List<String> gluePaths = new ArrayList<>();
+        gluePaths.add("classpath:com.example.module.oreo.glue");
+        gluePaths.add("classpath:snippet");
+        return gluePaths;
     }
 
-    public OreoApi api() {
-        return api;
-    }
-
-    public OreoModuleConfiguration config() {
-        return config;
-    }
-
-    /** The actions done so far, one line each (recording stand-ins only). */
-    public List<String> log() {
-        return log;
+    @Override
+    public Class<? extends TopologicalSortable>[] getDependencies() {
+        return new Class[]{
+            SpringModule.class,
+            RestModule.class,
+            JdbcModule.class,
+            SqlModule.class,
+            DatabaseModule.class
+        };
     }
 }
