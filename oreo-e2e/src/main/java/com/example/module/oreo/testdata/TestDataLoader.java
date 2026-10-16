@@ -281,14 +281,14 @@ public final class TestDataLoader {
                 values.set(k, block.get(k));
             }
         }
-        return JsonMerge.merge(record, values);
+        return merge(record, values);
     }
 
     private static JsonNode applyProductId(JsonNode record, JsonNode productPath, String product) {
         if (productPath == null) {
             return record;
         }
-        return JsonMerge.merge(record, nested("request." + productPath.asText(), Products.productId(product)));
+        return merge(record, nested("request." + productPath.asText(), Products.productId(product)));
     }
 
     private static JsonNode applyByProduct(JsonNode record, JsonNode owner, String product, String where) {
@@ -368,7 +368,7 @@ public final class TestDataLoader {
             if (template == null) {
                 throw new AssertionError(key + ": requestRef " + ref.asText() + " not found");
             }
-            request = JsonMerge.merge(legacyJson(template.get("request"), ref.asText()), request);
+            request = merge(legacyJson(template.get("request"), ref.asText()), request);
         }
         return new TestDataRecord(key, request, response);
     }
@@ -454,5 +454,22 @@ public final class TestDataLoader {
             return new CaseId(tcId, middle.toLowerCase(Locale.ROOT).replace('-', '_'), product,
                 layer.toLowerCase(Locale.ROOT), "TC-" + middle + "-" + layer + "-" + m.group(3));
         }
+    }
+
+    /** Deep merge: objects merge key by key, anything else (arrays included) is replaced; neither argument changes. */
+    static JsonNode merge(JsonNode base, JsonNode override) {
+        if (override == null || override.isMissingNode()) {
+            return base == null ? null : base.deepCopy();
+        }
+        if (base == null || !base.isObject() || !override.isObject()) {
+            return override.deepCopy();
+        }
+        ObjectNode result = ((ObjectNode) base).deepCopy();
+        Iterator<Map.Entry<String, JsonNode>> fields = override.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> e = fields.next();
+            result.set(e.getKey(), merge(result.get(e.getKey()), e.getValue()));
+        }
+        return result;
     }
 }

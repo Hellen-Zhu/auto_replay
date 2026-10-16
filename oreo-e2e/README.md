@@ -30,22 +30,18 @@ src/main/java/com/example/module/oreo/
   OreoModule.java                 per scenario: ctx, ui, api, config (PicoContainer)
   OreoModuleConfiguration.java    genie.properties + <env>.properties + -Doreo.<key>; Mode REAL / MOCK
   glue/ScenarioContext.java       stand-in for GenieScenario's attributes
-  glue/api/                       placeholder (package-info.java only)
   glue/hooks/ScenarioLifecycleHooks.java   case data into the ctx (_tc.key, _tc.request, basic.xxx), current case for forKey
-  glue/hooks/ActionLogHook.java            the recorded actions into the scenario report (not in the E2E project)
   glue/hooks/E2EScenarioHooks, PlaywrightTraceHooks                placeholders
   glue/ui/LoginSteps.java                  "<role> is logged in to the trade portal" (authentication_login.snippet)
   glue/ui/NewTradeSteps.java               trade_creation.snippet
   glue/ui/TradeProvisioningSteps.java      "a Live '<P>' trade exists in the blotter" (API, forKey API-SETUP-TRADE-CREATE)
   glue/ui/TradeLifecycleEventSteps.java    lifecycle_event / common_trade_action / trade_early_termination snippets
-  glue/ui/AllocationSteps, BlotterSteps, CommonE2EAssertion, CommonE2EInteraction, CommonHelpers,
-          ComposeProductSteps, PlaywrightServiceResolver, ProductSchemaUploadSteps, RiskMetricSteps, ToastSteps,
-          TradeCancellationSteps, TradeDetailSteps, TradeFixingSteps, TradePortalSteps, UserPreferenceSteps,
-          WebsocketNotificationSteps                                placeholders
-  testdata/TestDataLoader.java    case data (getByTcId) and setup data (forKey); new files, old YAML as fallback
+  glue/ui/BlotterSteps, CommonE2EAssertion, CommonE2EInteraction, CommonHelpers, PlaywrightServiceResolver,
+          ToastSteps, TradeDetailSteps, TradePortalSteps            placeholders
+  testdata/TestDataLoader.java    case data (getByTcId) and setup data (forKey); new files, old YAML as fallback;
+                                  deep merge (objects key by key, arrays replaced)
   testdata/TestDataRecord.java    request / response JSON + flattenRequest()
   testdata/ProductDatFiles.java   enum of the dat files; forProduct(name) -> data/<PRODUCT ID>.dat
-  testdata/JsonMerge.java         deep merge (objects key by key, arrays replaced)            (not in the E2E project)
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
   utils/CleanupTestDataUtil, DatabaseSqlUtil, DateUtil, RestApiUtil  placeholders
   utils/ui/OreoUi.java, RecordingOreoUi.java     browser actions by element key (Genie built-ins, ctx.click...)
@@ -58,23 +54,18 @@ src/main/resources/
   snippet/api/, snippet/ui/components|flows|pages/*.snippet placeholders
   cucumber.xml                    placeholder
 src/test/java/com/example/module/oreo/
-  OreoTest.java                   the Cucumber run (features/)
-  glue/ui/ScenarioActionsTest.java       the exact actions of an early termination and a StepIn creation, in order
-  testdata/TestDataLoaderTest.java       the 12 cases and API-SETUP-TRADE-CREATE resolve to exactly the old YAML's data
+  OreoTest.java                   the Cucumber run (features/; glue and report set here)
 src/test/resources/
   data/common.json                shared blocks; setup data API-SETUP-TRADE-CREATE, UI-SETUP-RISK-CALC-NEW-SUCCESS
   data/ui/trade_creation.json     replaces 93 lines of YAML
   data/ui/trade_early_termination.json   replaces the template and its 3 entries
-  data/api/                       placeholder
   data/<PRODUCT ID>.dat           placeholders: FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF, FX_TRF
   elements/components|pages/*.json       the files the replay project has (../elements/) copied; the others []
   features/ui/trading/            trade_creation.feature, trade_early_termination.feature, as in the E2E project
-  features/api/, features/ui/<area>/     placeholders (empty folders or a comment-only feature)
+  features/ui/<area>/             placeholders (empty folders or a comment-only feature)
   genie.properties, uat.properties       settings without accounts or addresses
   enrich, pt, sit .properties, log4j2.xml   placeholders
-  junit-platform.properties       Cucumber glue and report
-  legacy-data/                    the old YAML files, only for the equivalence tests
-  fixture-data/                   unit test fixture for setup changes of a feature and a case
+  legacy-data/                    the old YAML files (examples of the YAML fallback)
 ```
 
 ## How a step maps to the E2E project
@@ -200,5 +191,5 @@ Assumed, to confirm against the E2E project's loader (its source was not availab
 merge is a deep merge (the per-product overrides only set `basic.productId`, so a shallow merge would lose the rest of
 `basic`), and `response` is not taken from the template.
 
-To check: `cd oreo-e2e && mvn test` (the equivalence tests, the action sequences, and both features run through Cucumber against the
-recording stand-ins; the actions of each scenario are in `target/cucumber-report.html`).
+To check: `cd oreo-e2e && mvn test` (both features run through Cucumber against the recording stand-ins; report in
+`target/cucumber-report.html`).
