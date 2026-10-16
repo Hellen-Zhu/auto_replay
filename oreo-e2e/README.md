@@ -46,12 +46,6 @@ src/main/java/com/example/module/oreo/
   testdata/TestDataLoader.java, TestDataRecord.java, ProductDatFiles.java   transcribed from the E2E project (YAML loader)
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
   utils/DateUtil.java, RestApiUtil.java   transcribed from the E2E project
-  utils/CleanupTestDataUtil, DatabaseSqlUtil  placeholders
-  utils/ui/OreoUi.java, RecordingOreoUi.java     browser actions by element key (Genie built-ins, ctx.click...)
-  utils/api/OreoApi.java, RecordingOreoApi.java  requests (RestApiUtil there)
-  utils/pages/                    LoginPage, TradePortalPage, NewTradePage, TradeDetailPage,
-                                  DynamicActionComponent, TradeChangeConfirmation, Toast, RiskCalculation
-                                  (the page and component snippets written in Java; not in the E2E project)
 src/main/resources/
   META-INF/services/com.example.genie.module.GenieModule   placeholder (named after the GenieModule interface there)
   snippet/api/, snippet/ui/components|flows|pages/*.snippet placeholders
