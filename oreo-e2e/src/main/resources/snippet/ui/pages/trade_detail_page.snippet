@@ -1,1 +1,130 @@
-# Placeholder: copy trade_detail_page.snippet from the E2E project.
+# ── PAGE: TRADE DETAIL ──────────────────────────────────────────────
+
+@And "^page trade detail confirm checker dialog is visible$"
+    And assert that inner '[slot="header"]' property of 'trade_detail.confirm_checker_dialog' is eventually visible
+
+@And "^page trade detail confirm checker dialog is hidden$"
+    And assert that inner '[slot="header"]' property of 'trade_detail.confirm_checker_dialog' is eventually hidden
+
+@And "^page trade detail cancel dialog is visible$"
+    And assert that inner '[slot="header"]' property of 'trade_detail.cancel_dialog' is eventually visible
+
+@And "^page trade detail cancel dialog is hidden$"
+    And assert that inner '[slot="header"]' property of 'trade_detail.cancel_dialog' is eventually hidden
+
+@When "^page trade detail confirms checker action and waits for page ready$"
+    When click 'trade_detail.checker_confirm_btn'
+    And page trade detail confirm checker dialog is hidden
+
+@Then "^page trade detail container is visible$"
+    Then assert that 'trade_detail.container' is eventually visible
+
+@When "^page trade detail clicks approve button$"
+    When click 'trade_detail.approve_btn'
+    And page trade detail confirm checker dialog is visible
+
+@When "^page trade detail clicks reject button$"
+    When click 'trade_detail.reject_btn'
+    And page trade detail confirm checker dialog is visible
+
+@Then "^page trade detail status badge shows '([^']*)'$"
+    Then assert that 'trade_detail.status_badge' eventually contains inner 'sl-badge' property value as '$1'
+
+@Then "^page trade detail fields are disabled for amendment$"
+    Then assert that inner 'input' property of 'trade_detail.deal_date_input' is eventually disabled
+    And assert that inner 'input' property of 'trade_detail.counterparty_combobox' is eventually disabled
+    And assert that inner 'input' property of 'trade_detail.portfolio_combobox' is eventually disabled
+
+@When "^page trade detail navigates back to blotter view$"
+    When click 'trade_portal.nav_trades_tab'
+    And refresh trade blotter and wait for page ready
+
+@Then "^page trade detail original td_bf value is populated correctly$"
+    Then assert that 'trade_detail.trf_td_bf' eventually has inner 'input' property value from stored variable 'expected.original_td_bf'
+
+@Then "^page trade detail td_bf value is calculated correctly based on configured PortfolioReassignment formula$"
+    Then assert that 'trade_detail.trf_td_bf' eventually has inner 'input' property value from stored variable 'expected.increased_td_bf'
+
+@When "^page trade detail clicks more actions button$"
+    When click 'trade_detail.more_actions_btn'
+
+@When "^page trade detail clicks cancel button$"
+    When click 'trade_detail.cancel_btn'
+
+@When "^page trade detail clicks partial novation remaining button$"
+    When click 'trade_detail.partialnovationremaining_btn'
+
+@When "^page trade detail selects cancellation reason option '([^']*)'$"
+    When click 'trade_detail.cancel_reason_select'
+    And click option '$1'
+
+@When "^page trade detail types cancellation comments as '([^']*)'$"
+    When type value '$1' into 'trade_detail.cancel_comments_textarea'
+
+@When "^page trade detail fills deal date from stored variable '([^']*)'$"
+    When fill date field 'trade_detail.deal_date_input' with stored variable '$1'
+
+@When "^page trade detail selects counterparty from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'trade_detail.counterparty_combobox'
+    And click option from stored variable '$1'
+
+@When "^page trade detail selects risk portfolio from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'trade_detail.portfolio_combobox'
+    And click option from stored variable '$1'
+
+@Then "^page trade detail save button is disabled$"
+    Then assert that inner 'button' property of 'trade_detail.save_btn' is eventually disabled
+
+@Then "^page trade detail basic info notional amount field shows value from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.basic_notional_amount' eventually has inner 'input' property value from stored variable '$1'
+
+@Then "^page trade detail deal date field shows value from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.deal_date_input' eventually has inner 'input' property value from stored variable '$1'
+
+@Then "^page trade detail risk portfolio field shows value from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.portfolio_combobox' eventually has inner 'input' property value from stored variable '$1'
+
+@Then "^page trade detail counterparty field shows value from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.counterparty_combobox' eventually has inner 'input' property value from stored variable '$1'
+
+@Then "^page trade detail portfolio combobox contains from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.portfolio_combobox' eventually has inner 'input' property value from stored variable '$1'
+
+@Then "^page trade detail basic info card is visible$"
+    Then assert that 'trade_detail.basic_info_card' is eventually visible
+
+@Then "^page trade detail risk metrics section is visible$"
+    Then assert that 'trade_detail.risk_metrics_section' is eventually visible
+
+@Then "^page trade detail schedule section is visible$"
+    Then assert that 'trade_detail.schedule_section' is eventually visible
+
+@Then "^page trade detail FX_TRF schedule first fixing value is shown from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.schedule_single_fixing_row_event_0_fixing' eventually contains from stored variable '$1'
+
+@Then "^page trade detail normal schedule first fixing value is shown from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.schedule_single_fixing_row_schedule_0_fixing' eventually contains from stored variable '$1'
+
+@Then "^page trade detail FX_CO schedule fixing column 1 value is shown from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.schedule_multi_fixings_row_schedule_0_fixing_1' eventually contains from stored variable '$1'
+
+@Then "^page trade detail FX_CO schedule fixing column 2 value is shown from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.schedule_multi_fixings_row_schedule_0_fixing_2' eventually contains from stored variable '$1'
+
+@Then "^page trade detail history events card is visible$"
+    Then assert that 'trade_detail.history_events_card' is eventually visible
+
+@Then "^page trade detail audit trail card is visible$"
+    Then assert that 'trade_detail.audit_trail_card' is eventually visible
+
+@Then "^page trade detail container contains from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.container' eventually contains from stored variable '$1'
+
+@Then "^page trade detail header card contains from stored variable '([^']*)'$"
+    Then assert that 'trade_detail.header_card' eventually contains from stored variable '$1'
+
+@When "^page trade detail instrument section is visible$"
+    When assert that 'trade_detail.instrument_section' is eventually visible
+
+@When "^page trade detail instrument detail panel is visible$"
+    When assert that 'trade_detail.instrument_details_panel' is eventually visible

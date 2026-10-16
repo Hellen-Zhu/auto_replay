@@ -1,1 +1,239 @@
-# Placeholder: copy trade_portal_page.snippet from the E2E project.
+# ── PAGE: TRADE PORTAL ──────────────────────────────────────────────
+
+@When "^page trade portal closes New Today Blotter view$"
+    When click 'trade_portal.blotter_view_all_close_btn'
+
+@When "^page trade portal clicks New Today Blotter button$"
+    When click 'trade_portal.filter_all_btn'
+
+@When "^page trade portal clicks Validation Blotter button$"
+    When click 'trade_portal.filter_live_btn'
+
+@When "^page trade portal clicks Pending Approval Blotter button$"
+    When click 'trade_portal.filter_pending_btn'
+
+@When "^page trade portal navigates to Trade Portal page$"
+    When click 'trade_portal.nav_trades_tab'
+    And atomic refresh webpage and wait for page ready
+
+@When "^page trade portal clicks new trade button$"
+    When click 'trade_portal.new_trade_btn'
+
+@When "^page trade portal clicks refresh button$"
+    When click 'trade_portal.refresh_btn'
+
+@When "^page trade portal filters trade by product type as '([^']*)'$"
+    When click 'trade_portal.type_filter_select'
+    And click option '$1'
+
+@When "^page trade portal filters trade by trade status as '([^']*)'$"
+    When click 'trade_portal.status_filter_select'
+    And click option '$1'
+
+@When "^page trade portal filters trade by event status as '([^']*)'$"
+    When click 'trade_portal.event_status_filter_select'
+    And click option '$1'
+
+@When "^page trade portal searches and views trade stored as '([^']*)'$"
+    When search for trade stored as '$1' in blotter
+
+@Then "^page trade portal blotter column '([^']*)' is '([^']*)'$"
+    Then blotter row 'trade_portal.all_trades_blotter_row' index 0 column '$1' is '$2'
+
+@Then "^page trade portal blotter row 2 column '([^']*)' is '([^']*)'$"
+    Then blotter row 'trade_portal.all_trades_blotter_row' index 1 column '$1' is '$2'
+
+@Then "^page trade portal blotter column '([^']*)' matches stored variable '([^']*)'$"
+    Then blotter row 'trade_portal.all_trades_blotter_row' index 0 column '$1' matches stored variable '$2'
+
+@Then "^page trade portal blotter column '([^']*)' is today in format '([^']*)'$"
+    Then blotter row 'trade_portal.all_trades_blotter_row' index 0 column '$1' is today in format '$2'
+
+@When "^page trade portal searches and opens action menu for trade stored as '([^']*)'$"
+    When page trade portal searches and views trade stored as '$1'
+    And open action menu item for new today blotter from stored variable '$1'
+
+@When "^page trade portal confirms approval or reject trade and waits for page ready$"
+    When click 'checker_action.confirm_btn'
+    And assert that 'checker_action.dialog' is eventually hidden
+
+@When "^page trade portal selects trade stored as '([^']*)' for bulk action$"
+    When select trade stored as '$1' in blotter for bulk action
+
+@When "^page trade portal clicks bulk approve for selected trades$"
+    When open action menu item for new today blotter from stored variable 'lastBulkSelectedTradeId'
+    And click 'trade_portal.row_bulk_action_approve'
+
+@When "^page trade portal opens action menu item for current trade$"
+    When open action menu item for new today blotter from stored variable 'createdTradeId'
+
+@When "^page trade portal opens action menu item for trade stored as '([^']*)'$"
+    When open action menu item for new today blotter from stored variable '$1'
+
+@Then "^page trade portal approve action button is visible$"
+    Then assert that 'checker_action.approve_btn' is visible
+
+@Then "^page trade portal reject action button is visible$"
+    Then assert that 'checker_action.reject_btn' is visible
+
+@Then "^page trade portal view details action button is visible$"
+    Then assert that 'trade_portal.row_action_view_details' is eventually visible
+
+@When "^page trade portal clicks approve action for current trade$"
+    When click 'checker_action.approve_btn'
+
+@When "^page trade portal clicks reject action for current trade$"
+    When click 'checker_action.reject_btn'
+
+@When "^page trade portal clicks view details action for current trade$"
+    When click 'trade_portal.row_action_view_details'
+
+@Then "^page trade portal cancellation action button is visible$"
+    Then assert that 'trade_portal.row_action_cancel' is eventually visible
+
+@Then "^page trade portal cancellation action button is hidden$"
+    Then assert that 'trade_portal.row_action_cancel' is eventually hidden
+
+@Then "^page trade portal allocation action button is visible$"
+    Then assert that 'trade_portal.row_action_allocation' is eventually visible
+
+@Then "^page trade portal novation remaining action button is visible$"
+    Then assert that 'trade_portal.row_action_novationremaining' is eventually visible
+
+@Then "^page trade portal partial novation remaining action button is visible$"
+    Then assert that 'trade_portal.row_action_partialnovationremaining' is eventually visible
+
+@Then "^page trade portal step out full action button is visible$"
+    Then assert that 'trade_portal.row_action_stepoutfull' is eventually visible
+
+@Then "^page trade portal step out partial action button is visible$"
+    Then assert that 'trade_portal.row_action_stepoutpartial' is eventually visible
+
+@Then "^page trade portal early termination action button is visible$"
+    Then assert that 'trade_portal.row_action_earlytermination' is eventually visible
+
+@Then "^page trade portal partial termination action button is visible$"
+    Then assert that 'trade_portal.row_action_partialtermination' is eventually visible
+
+@Then "^page trade portal portfolio reassignment action button is visible$"
+    Then assert that 'trade_portal.row_action_portfolioreassignment' is eventually visible
+
+@When "^page trade portal clicks cancellation action for current trade$"
+    When click 'trade_portal.row_action_cancel'
+
+@When "^page trade portal clicks allocation action for current trade$"
+    When click 'trade_portal.row_action_allocation'
+
+@When "^page trade portal clicks novation remaining action for current trade$"
+    When click 'trade_portal.row_action_novationremaining'
+
+@When "^page trade portal clicks partial novation remaining action for current trade$"
+    When click 'trade_portal.row_action_partialnovationremaining'
+
+@When "^page trade portal clicks step out full action for current trade$"
+    When click 'trade_portal.row_action_stepoutfull'
+
+@When "^page trade portal clicks step out partial action for current trade$"
+    When click 'trade_portal.row_action_stepoutpartial'
+
+@When "^page trade portal clicks early termination action for current trade$"
+    When click 'trade_portal.row_action_earlytermination'
+
+@When "^page trade portal clicks partial termination action for current trade$"
+    When click 'trade_portal.row_action_partialtermination'
+
+@When "^page trade portal clicks portfolio reassignment action for current trade$"
+    When click 'trade_portal.row_action_portfolioreassignment'
+
+@Then "^page trade portal approve action button is hidden$"
+    Then assert that 'checker_action.approve_btn' is eventually hidden
+
+@Then "^page trade portal reject action button is hidden$"
+    Then assert that 'checker_action.reject_btn' is eventually hidden
+
+@Then "^page trade portal row action menu shows view details$"
+    Then assert that 'trade_portal.row_action_view_details' is eventually visible
+
+@Then "^page trade portal New Today Blotter view is not visible$"
+    Then assert that 'trade_portal.blotter_view_all' is eventually hidden
+
+@Then "^page trade portal Validation Blotter view is not visible$"
+    Then assert that 'trade_portal.blotter_view_live' is eventually hidden
+
+@Then "^page trade portal Pending Approval Blotter view is not visible$"
+    Then assert that 'trade_portal.blotter_view_pending_approval' is eventually hidden
+
+@Then "^page trade portal New Today Blotter view is visible$"
+    Then assert that 'trade_portal.blotter_view_all' is eventually visible
+
+@Then "^page trade portal Validation Blotter view is visible$"
+    Then assert that 'trade_portal.blotter_view_live' is eventually visible
+
+@Then "^page trade portal Pending Approval Blotter view is visible$"
+    Then assert that 'trade_portal.blotter_view_pending_approval' is eventually visible
+
+@Then "^page trade portal is displayed$"
+    Then assert that 'trade_portal.container' is eventually visible
+
+@Then "^page trade portal notification button is visible$"
+    Then assert that 'trade_portal.notification_btn' is eventually visible
+
+@When "^page trade portal opens notification center$"
+    When click 'trade_portal.notification_btn'
+    And page trade portal notification center is visible
+
+@Then "^page trade portal notification center is visible$"
+    Then assert that 'trade_portal.notification_center_container' is eventually visible
+
+@Then "^page trade portal notification center contains from stored variable '([^']*)'$"
+    Then assert that 'trade_portal.notification_center_container' eventually contains from stored variable '$1'
+
+@When "^page trade portal clicks notification action url for stored trade id '([^']*)'$"
+    When click element 'trade_portal.notification_trade_action_url' with dynamic value from stored variable '$1'
+
+@Then "^page trade portal approve action is not available for current trade$"
+    Then assert that 'checker_action.approve_btn' is not visible
+
+@Then "^page trade portal reject action is not available for current trade$"
+    Then assert that 'checker_action.reject_btn' is not visible
+
+@Then "^page trade portal approve action is available for current trade$"
+    Then open action menu item for new today blotter from stored variable 'createdTradeId'
+    And assert that 'checker_action.approve_btn' is eventually visible
+
+@Then "^page trade portal reject action is available for current trade$"
+    # Action menu left open by the preceding assertion step; do not re-click the toggle
+    Then assert that 'checker_action.reject_btn' is eventually visible
+
+@Then "^page trade portal view details action is available for current trade$"
+    Then assert that 'trade_portal.row_action_view_details' is eventually visible
+
+@Then "^page trade portal cancel action is available for current trade$"
+    Then assert that 'trade_portal.row_action_cancel' is eventually visible
+
+@Then "^page trade portal lifecycle event actions are not available for current trade$"
+    Then assert that 'trade_portal.row_action_allocation' is eventually hidden
+    And assert that 'trade_portal.row_action_novationremaining' is eventually hidden
+    And assert that 'trade_portal.row_action_partialnovationremaining' is eventually hidden
+    And assert that 'trade_portal.row_action_portfolioreassignment' is eventually hidden
+    And assert that 'trade_portal.row_action_earlytermination' is eventually hidden
+    And assert that 'trade_portal.row_action_partialtermination' is eventually hidden
+    And assert that 'trade_portal.row_action_stepoutfull' is eventually hidden
+    And assert that 'trade_portal.row_action_stepoutpartial' is eventually hidden
+
+@Then "^page trade portal lifecycle event actions are available for current trade$"
+    Then assert that 'trade_portal.row_action_allocation' is eventually visible
+    And assert that 'trade_portal.row_action_novationremaining' is eventually visible
+    And assert that 'trade_portal.row_action_partialnovationremaining' is eventually visible
+    And assert that 'trade_portal.row_action_portfolioreassignment' is eventually visible
+    And assert that 'trade_portal.row_action_earlytermination' is eventually visible
+    And assert that 'trade_portal.row_action_partialtermination' is eventually visible
+    And assert that 'trade_portal.row_action_stepoutfull' is eventually visible
+    And assert that 'trade_portal.row_action_stepoutpartial' is eventually visible
+    And assert that 'trade_portal.row_action_cancel' is eventually visible
+
+@When "^page trade portal clicks create blotter button$"
+    When click 'trade_portal.create_blotter_btn'
+
+@When "^page trade portal clicks import blotter button$"
+    When click 'trade_portal.import_blotter_btn'
