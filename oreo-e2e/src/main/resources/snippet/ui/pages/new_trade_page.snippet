@@ -19,10 +19,11 @@
     When type inner value '$1' from stored variable into 'new_trade.direction_select'
     And click option from stored variable '$1'
 
-@When "^page new trade selects basic mandatory info$"
+@When "^page new trade selects basic mandatory info for product '([^']*)'$"
     When page new trade selects counterparty from stored variable 'basic.counterpartyName'
     And page new trade selects portfolio from stored variable 'basic.portfolioId'
-    And page new trade selects productId from stored variable 'basic.productId'
+    And store e2e variable value '$1' as 'productId'
+    And page new trade selects productId from stored variable 'productId'
     And page new trade selects direction from stored variable 'basic.direction'
 
 @When "^page new trade (save|book) and captures trade id as '([^']*)'$"

@@ -3,7 +3,7 @@
 @When "^creates a new '([^']*)' trade$"
     When page trade portal clicks new trade button
     And page new trade container is visible
-    And page new trade selects basic mandatory info
+    And page new trade selects basic mandatory info for product '$1'
     And upload '$1' dat file
     And page new trade book and captures trade id as 'createdTradeId'
     And page trade detail header card contains from stored variable 'createdTradeId'
@@ -11,7 +11,7 @@
 @When "^creates a new '([^']*)' StepIn partial trade$"
     When page trade portal clicks new trade button
     And upload '$1' dat file
-    And page new trade selects basic mandatory info
+    And page new trade selects basic mandatory info for product '$1'
     And page new trade enables stepin toggle
     And page new trade selects stepin partial radio
     And page new trade selects old counterparty from stored variable 'stepIn.oldCounterpartyName'
@@ -20,7 +20,7 @@
 @When "^creates a new '([^']*)' StepIn full trade$"
     When page trade portal clicks new trade button
     And upload '$1' dat file
-    And page new trade selects basic mandatory info
+    And page new trade selects basic mandatory info for product '$1'
     And page new trade enables stepin toggle
     And page new trade selects stepin full radio
     And page new trade selects old counterparty from stored variable 'stepIn.oldCounterpartyName'
