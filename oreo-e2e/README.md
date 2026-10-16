@@ -62,7 +62,7 @@ src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/; glue and report set here)
 src/test/resources/
   data/common.json                shared blocks; setup data API-SETUP-TRADE-CREATE, UI-SETUP-RISK-CALC-NEW-SUCCESS
-  data/ui/trade_creation.yml, trade_early_termination.yml, mock_data.yml, user_preference.yml,
+  data/ui/trade_creation.yml, trade_early_termination.yml, mock_data.yml, user_preference_config.yml,
           data/api/trade_creation.yml   the E2E project's YAML test data
   data/<PRODUCT ID>.dat           placeholders: FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF, FX_TRF
   elements/components|pages/*.json       the files the replay project has (../elements/) copied; the others []
