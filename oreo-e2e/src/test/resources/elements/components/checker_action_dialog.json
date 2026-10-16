@@ -1,1 +1,37 @@
-[]
+[
+  {
+    "name": "checker_action.dialog",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "checker-action-dialog"
+    }
+  },
+  {
+    "name": "checker_action.approve_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "trade-row-action-approve"
+    }
+  },
+  {
+    "name": "checker_action.reject_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "trade-row-action-reject"
+    }
+  },
+  {
+    "name": "checker_action.confirm_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "checker-action-dialog-confirm-btn"
+    }
+  },
+  {
+    "name": "checker_action.cancel_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "checker-action-dialog-cancel-btn"
+    }
+  }
+]

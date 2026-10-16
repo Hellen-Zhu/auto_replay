@@ -1,16 +1,22 @@
 [
-  {
-    "name": "trade_change_confirmation.dialog",
-    "lookupDetails": {
-      "findBy": "testId",
-      "value": "trade-change-confirmation-dialog"
-    }
-  },
-  {
-    "name": "trade_change_confirmation.confirm_btn",
-    "lookupDetails": {
-      "findBy": "testId",
-      "value": "trade-change-confirm-btn"
-    }
-  }
+  {"name": "trade_change_confirmation.dialog","lookupDetails": {"findBy": "testId","value": "trade-change-confirmation-dialog"}},
+  {"name": "trade_change_confirmation.confirm_btn","lookupDetails": {"findBy": "testId","value": "trade-change-confirm-btn"}},
+  {"name": "trade_change_confirmation.comments_textarea","lookupDetails": {"findBy": "testId","value": "trade-change-comments-textarea"}},
+  {"name": "trade_change_confirmation.reason_select","lookupDetails": {"findBy": "testId","value": "trade-change-reason-select"}},
+  {"name": "trade_change_confirmation.diff_list","lookupDetails": {"findBy": "testId","value": "trade-change-diff-list"}},
+  {"name": "trade_change_confirmation.diff_item","lookupDetails": {"findBy": "testId","value": "trade-change-diff-item-0"}},
+  {"name": "trade_change_confirmation.cancel_btn","lookupDetails": {"findBy": "testId","value": "trade-change-cancel-btn"}},
+  {"name": "trade_change_confirmation.novation_original_pnl","lookupDetails": {"findBy": "testId","value": "novation-original-pnl"}},
+  {"name": "trade_change_confirmation.novation_combined_pnl","lookupDetails": {"findBy": "testId","value": "novation-combined-pnl"}},
+  {"name": "trade_change_confirmation.novation_delta_pnl","lookupDetails": {"findBy": "testId","value": "novation-delta-pnl"}},
+  {"name": "trade_change_confirmation.novation_original_trade_section","lookupDetails": {"findBy": "testId","value": "novation-original-trade-changes"}},
+  {"name": "trade_change_confirmation.novation_new_trade_section","lookupDetails": {"findBy": "testId","value": "novation-new-trade-changes"}},
+  {"name": "trade_change_confirmation.novation_split_layout","lookupDetails": {"findBy": "testId","value": "novation-split-layout"}},
+  {"name": "trade_change_confirmation.novation_standalone_row","lookupDetails": {"findBy": "testId","value": "novation-standalone-row"}},
+  {"name": "trade_change_confirmation.novation_original_trade_notional_diff","lookupDetails": {"findBy": "testId","value": "novation-original-trade-diff-item-0"}},
+  {"name": "trade_change_confirmation.novation_original_trade_cpty_diff","lookupDetails": {"findBy": "testId","value": "novation-original-trade-diff-item-1"}},
+  {"name": "trade_change_confirmation.novation_original_trade_cpty_fmid_diff","lookupDetails": {"findBy": "testId","value": "novation-original-trade-diff-item-2"}},
+  {"name": "trade_change_confirmation.novation_new_trade_notional_diff","lookupDetails": {"findBy": "testId","value": "novation-new-trade-diff-item-0"}},
+  {"name": "trade_change_confirmation.novation_new_trade_cpty_diff","lookupDetails": {"findBy": "testId","value": "novation-new-trade-diff-item-1"}},
+  {"name": "trade_change_confirmation.novation_new_trade_cpty_fmid_diff","lookupDetails": {"findBy": "testId","value": "novation-new-trade-diff-item-2"}}
 ]
