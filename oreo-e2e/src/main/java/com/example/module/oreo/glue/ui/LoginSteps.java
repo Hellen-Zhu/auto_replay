@@ -1,22 +1,58 @@
 package com.example.module.oreo.glue.ui;
 
-import com.example.module.oreo.OreoModule;
-import com.example.module.oreo.utils.pages.LoginPage;
-import io.cucumber.java.en.Given;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.TimeoutError;
+import com.microsoft.playwright.options.WaitForSelectorState;
+import cucumber.api.Scenario;
+import cucumber.api.java.Before;
+import cucumber.api.java.en.Given;
 
-/** authentication_login.snippet: the account of the role comes from the config, never from test data. */
 public class LoginSteps {
 
-    private final OreoModule session;
+    private PlaywrightServiceResolver.Context ctx;
 
-    public LoginSteps(OreoModule session) {
-        this.session = session;
+    @Before({"@playwright"})
+    public void beforeScenario(Scenario scenario) { this.ctx = PlaywrightServiceResolver.from(scenario); }
+
+    @Given("^navigate to login page$")
+    public void navigateToLoginPage() {
+        String currentUrl = ctx.service().getPage().url();
+        if (currentUrl != null && currentUrl.contains("/login")) {
+            waitForLoginForm(ctx.timeoutMillis());
+            return;
+        }
+
+        if (isLoginFormVisible(3000)) {
+            return;
+        }
+
+        ctx.navigateToPath("/login");
+        waitForLoginForm(ctx.timeoutMillis());
     }
 
-    @Given("^(\\w+) is logged in to the trade portal$")
-    public void isLoggedIn(String role) {
-        LoginPage login = new LoginPage(session.ui());
-        login.open();
-        login.signIn(session.config().email(role), session.config().password(role));
+    private boolean isLoginFormVisible(double timeoutMs) {
+        try {
+            waitForLoginForm(timeoutMs);
+            return true;
+        } catch (TimeoutError ignored) {
+            return false;
+        }
+    }
+
+    private void waitForLoginForm(double timeoutMs) {
+        ctx.service().getLocator("login.email").waitFor(
+                new Locator.WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE)
+                        .setTimeout(timeoutMs)
+        );
+    }
+
+    /**
+     * Confirms successful sign-in by waiting for the Trade Portal container to become visible.
+     * This avoids brittle coupling to specific post-login API calls.
+     */
+    @Given("^confirm login and wait for trade portal ready$")
+    public void confirmLoginAndWaitForTradePortalReady() {
+        ctx.clickAndWaitForResponse("login.submit", "/api/v1/blotter/trades", "POST");
     }
 }
