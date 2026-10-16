@@ -69,14 +69,14 @@
 
 # ── Common Assertions ───────────────────────────────────────────────
 
-# Happy path: HTTP 200 + full schema match against current scenario's YAML response: node.
+# Happy path: HTTP 200 + strict match against the case's recorded response (data/api/expected/<event>/<caseId>.json).
 # Use this as the standard success assertion in every positive scenario.
 # Example: successfully retrieved trade, successfully created reason, successfully approved trade etc.
 @Then "^the '([^']*)' should be '([^']*)' successfully$"
     Then response status code is '200'
     And response matches current scenario
 
-# Failed path: HTTP 400 + full schema match against current scenario's YAML response: node.
+# Failed path: HTTP 400 + strict match against the case's recorded response (data/api/expected/<event>/<caseId>.json).
 # Example: failed to retrieve trade, failed to create reason, failed to approve trade etc.
 @Then "^failed to '([^']*)' '([^']*)'$"
     Then response status code is '400'

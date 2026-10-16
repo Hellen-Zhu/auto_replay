@@ -1,10 +1,8 @@
-# oreo-e2e: layered test data for the Java E2E project
+# oreo-e2e: the Java E2E project with layered test data
 
-Reference implementation of this project's test data mechanism (`testdata/*.json`: shared blocks, feature
-defaults, case rows, `byProduct`) for the Java + Cucumber (Genie) E2E project, with two features written end to end
-on it: trade creation and trade early termination (feature, steps, page objects, data). Self-contained Maven module:
-no Genie, no browser. The browser and the API are two interfaces (`OreoUi`, `OreoApi`); here they are recording
-stand-ins that log each action, in the E2E project they are backed by Genie.
+The Java + Cucumber (Genie) E2E project's file tree, transcribed from the user's photos, with its test data moved
+from YAML to layered JSON case data, setup files and recorded API responses compared strictly (section "Test data").
+Design and reasons: `docs/superpowers/specs/2026-10-16-oreo-e2e-test-data-design.md`.
 
 The folders follow the E2E project's layout (`glue`, `testdata`, `utils`, `OreoModule`, `OreoModuleConfiguration`
 in `src/main`; `OreoTest`, `data`, `features/ui/trading`, `genie.properties`, `log4j2.xml` in `src/test`). The
@@ -14,9 +12,9 @@ copying. Not created, as they need Genie or were not seen: `META-INF/services`, 
 
 ## Problem it solves
 
-The old format (`data/**/*.yml`) needs one entry per case per product, each repeating a `requestRef` and the
-product ID; templates copy each other's whole `basic` block; requests are JSON text inside YAML strings; a missing
-entry only logs a warning.
+The old format (`data/**/*.yml`) needed one entry per case per product, each repeating a `requestRef` and the
+product ID; templates copied each other's whole `basic` block; requests were JSON text inside YAML strings; every API
+case carried a hand-copied full response (770 lines for 15 API cases); a missing entry only logged a warning.
 
 ## Layout
 
@@ -44,11 +42,13 @@ src/main/java/com/example/module/oreo/
   glue/hooks/PlaywrightTraceHooks          placeholder
   glue/ui/LoginSteps.java                  "<role> is logged in to the trade portal" (authentication_login.snippet)
   glue/ui/NewTradeSteps.java               trade_creation.snippet
-  glue/ui/TradeProvisioningSteps.java      "a Live '<P>' trade exists in the blotter" (API, forKey API-SETUP-TRADE-CREATE)
+  glue/ui/TradeProvisioningSteps.java      "a Live '<P>' trade exists in the blotter" (API, setup data trade-create)
   glue/ui/TradeLifecycleEventSteps.java    lifecycle_event / common_trade_action / trade_early_termination snippets
   glue/ui/CommonE2EAssertion, CommonE2EInteraction, CommonHelpers, PlaywrightServiceResolver,
           ToastSteps, TradeDetailSteps, TradePortalSteps            placeholders
-  testdata/TestDataLoader.java, TestDataRecord.java, ProductDatFiles.java   transcribed from the E2E project (YAML loader)
+  testdata/ProductDatFiles.java   transcribed from the E2E project
+  testdata/TestData, TestDataRepository, CaseData, SetupData, CaseId, JsonLayers, Json,
+          ExpectedResponses, ResponseMasker, ProjectPaths, TradeRequests   test data and recording ("Test data")
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
   utils/DateUtil.java, RestApiUtil.java   transcribed from the E2E project
 src/main/resources/
@@ -60,10 +60,11 @@ src/main/resources/
   cucumber.xml                    transcribed from the E2E project
 src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/; glue and report set here)
+  testdata/*Test.java, FeatureCases.java, CaseDataLookup.java   unit tests, offline checks, case lookup
 src/test/resources/
-  data/common.json                shared blocks; setup data API-SETUP-TRADE-CREATE, UI-SETUP-RISK-CALC-NEW-SUCCESS
-  data/ui/trade_creation.yml, trade_early_termination.yml, mock_data.yml, user_preference_config.yml,
-          data/api/trade_creation.yml   the E2E project's YAML test data
+  data/api/, data/ui/, data/setup/   the test data ("Test data")
+  data/common.json                left from an earlier design; nothing reads it (kept on purpose)
+  testdata-fixtures/data/         small data files for the loader's unit tests
   data/<PRODUCT ID>.dat           placeholders: FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF, FX_TRF
   elements/components|pages/*.json       the files the replay project has (../elements/) copied; the others []
   features/ui/trading/            trade_creation.feature, trade_early_termination.feature, as in the E2E project
@@ -87,112 +88,106 @@ with `{}`, `/trades/calculate-risk-for-new` for Book (mocked like the trade's ca
 "trade is created with pending approval status and info" (trade ID and `PARV` on the header card), and the blotter
 check by row and column.
 
-## Data files
+## Test data
 
-`data/common.json` holds named blocks; each is a record part (`request`, `response`). A request is the API body as
-it is: copy it from the browser's Network tab and paste it in.
-
-```json
-{ "shared": {
-    "trade-basic": { "request": { "basic": { "portfolioId": "...", "counterpartyName": "10 AM NY", "direction": "Buy" } } },
-    "step-in":     { "request": { "stepIn": { "oldCounterpartyName": "..." } } } } }
+```
+src/test/resources/data/
+  api/common.json, ui/common.json       shared blocks; they apply only where a file names them in "use"
+  api/<event>.json, ui/<event>.json     one per feature file name: defaults, byProduct, case rows
+  api/expected/<event>/<caseId>.json    recorded API responses, one per case
+  setup/<name>.json                     payloads that prepare a case (trade-create, risk-calc-success-mock ...)
+  <PRODUCT>.dat                         the products' dat files
 ```
 
-`data/<layer>/<feature>.json`, found from the case ID (`TC-TRADE-CREATION-FX_FSB-UI-002` -> `data/ui/trade_creation.json`):
+API and UI data never read each other; only the code is shared.
 
-```json
+### Case data
+
+The case ID in the scenario name selects the file and the product:
+`TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002` -> `data/api/trade_creation.json`, product `FX_PSCRIPT_TRF`. A product is a
+`ProductDatFiles` constant; an ID without one (`TC-TRADE-CREATION-API-004`) is a case without a product.
+
+```jsonc
 {
-  "use": ["trade-basic"],
-  "productPath": "basic.productId",
-  "defaults": { "request": {} },
-  "byProduct": { "FX_FSB": { "request": {} } },
-  "cases": {
-    "TC-TRADE-CREATION-UI-002": { "use": ["step-in"], "byProduct": { "FX_FSB": { "request": { "basic": { "direction": "Sell" } } } } },
-    "TC-TRADE-CREATION-UI-003": { "use": ["step-in"] }
-  }
+  "_comment": "features/api/trading/trade_creation.feature",
+  "defaults":  { "use": ["trade-basic"], "dynamicFields": { "data.trade.id": "type" } },
+  "byProduct": { "FX_PSCRIPT_TRF": { "request": { "basic": { "direction": "Sell", "premiumAmount": null } } } },
+  "cases": [
+    { "id": "TC-TRADE-CREATION-<product_type>-API-002", "_comment": "StepIn Partial", "use": ["stepin-partial"] },
+    { "id": "TC-TRADE-CREATION-API-004", "request": { "basic": { "counterpartyName": "" } }, "dynamicFields": null }
+  ]
 }
 ```
 
-Merge order, later wins, objects merged key by key, arrays replaced:
+- Layers, each optional, later wins: `defaults` -> `byProduct[P]` -> the case's row -> the row's `byProduct[P]`.
+  A layer applies its `use` blocks in order, then its own `request` and `dynamicFields`. A case without a product
+  gets `defaults` and its row only.
+- Objects merge key by key; arrays and values replace; `null` removes a key. `_comment` is a comment at any depth.
+- A row exists only for a case that differs from the defaults. Its `id` is the feature's, as written: an Outline's
+  `TC-TRADE-CREATION-<product_type>-API-002` covers every product; product differences go into the row's `byProduct`.
+  A case matched by two rows is an error.
+- Any other key is a load error. `basic.productId` is never written: the step sets it from the product.
+- The hook puts the request into ctx as before (`_tc.key`, `_tc.request`, `_tc.request.<field>`, flat leaves such as
+  `basic.counterpartyName`) and writes the applied layers to the report (`[test-data:layers]`).
 
-1. the file's `use` blocks
-2. `defaults`
-3. the case entry's `use` blocks (key = case ID without the product)
-4. the case entry's `request` / `response`
-5. the product ID (from `Products`) at `request.<productPath>`
-6. the file's `byProduct.<product>`
-7. the case entry's `byProduct.<product>`
+### Setup data
 
-Rules:
-- A case entry is only for a case whose data differs; without one the case gets the feature's data.
-- A product is never written in a data file: it comes from the case ID (the Examples' `product_type`). A product
-  name has underscores (`FX_TRF`), a feature only dashes.
-- Keys starting with `_` at these levels are comments; any other unknown key fails, so typos do not pass silently.
-- A data variation is not a new case entry when an Examples column or `byProduct` can express it.
+`data/setup/<name>.json`: `request` and / or `response`, `_comment`, and `extends` (another setup file, merged
+under this one). Read by the steps `... from test data '<name>'` and by `TestData.setup("<name>")`. The setup trade
+and the API case blocks hold the same values but are kept apart on purpose: what an API case sends must not change
+how a UI case prepares its trade. `trade-cancellation` and `trade-amendment` have no file yet (not covered).
 
-## Setup data for API steps (`forKey`)
+### Recorded responses
 
-A step that creates what a case needs through the API (`a live '<P>' trade is provisioned via playwright api`) loads
-named data, not case data: `TestDataLoader.forKey("API-SETUP-TRADE-CREATE").request()`. Its entry is in the `setup`
-section of `common.json`, the request body as copied:
+`response matches current scenario` (behind `the '<x>' should be '<y>' successfully` and `failed to ...`, after the
+status code check) compares the response strictly with `data/api/expected/<event>/<caseId>.json`:
 
-```json
-"setup": {
-  "API-SETUP-TRADE-CREATE": {
-    "productPath": "basic.productId",
-    "request": { "basic": { "counterpartyFmId": "...", "portfolioId": "ABS_EQF", "productId": "FX_TRF", "direction": "Buy", "premiumAmount": 10000, "premiumCurrency": "USD" } },
-    "byProduct": { "FX_FSB": { "request": {} } }
-  }
-}
-```
-
-- `forKey(key)` keeps the old signature. The product comes from the running case's ID; `forKey(key, product)` takes
-  the product the step was given (`provisionLiveTradeByProduct(product)`). Either way the product ID goes to
-  `productPath`, so the setup data has no entry per product.
-- A case that needs its setup trade a little different (a notional for partial novation) changes it in its own
-  feature file, not with a new setup key: `setup.<KEY>` at the top of the file (every case of the feature) or in a
-  case entry, each with an optional `byProduct`. The hook tells the loader which case is running
-  (`setCurrentCase` / `clearCurrentCase`).
-- Merge order: the entry's `use` blocks, its `request` / `response`, the product ID, its `byProduct`, the feature's
-  `setup.<KEY>` (+ `byProduct`), the case entry's `setup.<KEY>` (+ `byProduct`).
-- A key `common.json` does not have is looked up in the old YAML as before (`requestRef` -> `REQ-TPL-...`).
-
-In the step, only the call changes if the product should come from the step's argument:
-
-```java
-String tradeJson = TestDataLoader.forKey(testDataKey, product).request();
-```
-
-Not known from the E2E project: how its step puts the product into `productId` today (the old template says
-`FX_TRF`). If the step sets it itself after `forKey`, drop `productPath` from the entry or remove that code.
-
-## What changes for each task
-
-| Task | Old | New |
+| Situation | Run | Result |
 |---|---|---|
-| Add a product | one YAML entry per case of every feature | add an Examples row; register the name in `Products` if it is an old name |
-| Change the default counterparty | every template of every feature | one block in `common.json` |
-| A new feature | a template + one entry per case and product | a file with `use` and its own `defaults` |
-| A case without data | warning, ctx empty, a later step fails | the feature's defaults |
-| A setup trade a case needs different | a new setup key and template | `setup.<KEY>` in the case's own entry |
+| Regression | `mvn test` | strict comparison |
+| New product or case | `mvn test` | its file is recorded and the scenario fails once: review the file against the requirement, commit, run again |
+| The API changed on purpose | `OREO_EXPECTED=update mvn test ...` (or `-Doreo.expected=update`) | the files are rewritten: review `git diff`, commit |
 
-## Porting into the E2E project
+The values that change from run to run are masked by the case's `dynamicFields` (path -> rule) when the file is
+recorded:
 
-1. Copy the `testdata` package into the E2E project's `testdata` package (rename the package). Keep the static API the hook and the steps call: `tcKeyFromName(name)`, `getByTcId(tcId)` throwing
-   `AssertionError`, `forKey(key)` (plus the new `forKey(key, product)`).
-   If the existing `TestDataRecord.flattenRequest()` builds array paths another way, keep that one.
-2. `ScenarioLifecycleHooks`: add `TestDataLoader.setCurrentCase(tcId)` before the lookup and an `@After` that calls
-   `clearCurrentCase()` (both in the version here); nothing else changes. Its `GenieScenario.setAttribute` calls stay; the
-   version here writes to `ScenarioContext` only because Genie is not available.
-3. The data root is `data/` on the classpath (or `-Doreo.testdata.dir=...`). Old YAML files under it keep working:
-   a case whose feature has no `.json` file is looked up there (`requestRef` template deep-merged with the entry's
-   `request`). So features migrate one at a time.
-4. Migrate a feature: write its `.json`, run its scenarios and compare the `[test-data:request]` log lines with the
-   ones before, then delete its YAML entries.
+| Rule | Still checked |
+|---|---|
+| `type` | presence and type of the value |
+| `type-tree` | the whole structure, and the type of every leaf |
+| `regex:<pattern>` | the value matches the pattern |
+| `ignore` | nothing; only when the others cannot work |
 
-Assumed, to confirm against the E2E project's loader (its source was not available here): the old `requestRef`
-merge is a deep merge (the per-product overrides only set `basic.productId`, so a shallow merge would lose the rest of
-`basic`), and `response` is not taken from the template.
+A path is keys joined by `.`, `[n]` for one array element, `[*]` for all. A rule whose path is not in the response
+fails the recording. Never edit an expected file by hand: change the rule and record again.
 
-To check: `cd oreo-e2e && mvn test` (both features run through Cucumber against the recording stand-ins; report in
-`target/cucumber-report.html`).
+### Commands
+
+```bash
+mvn test -Dtest='com.example.module.oreo.testdata.*Test'
+```
+
+The unit tests and the offline checks of `TestDataValidationTest` (no environment needed): every data file loads,
+every case of every feature resolves, every row and event file has its feature, every API case has its expected file
+and every expected file its case, the rules agree with the expected files, every setup name used exists.
+
+```bash
+mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002
+```
+
+Prints the merged data of one case: the applied layers, the request, the `dynamicFields` and the expected file.
+
+The offline tests are JUnit 4. Should `mvn test -Dtest=TestDataValidationTest` report no tests (a JUnit Platform
+without the vintage engine), add `org.junit.vintage:junit-vintage-engine` in test scope.
+
+### Maintenance
+
+| Task | What to change |
+|---|---|
+| New product | `ProductDatFiles` constant and `data/<P>.dat`; the product in each feature's Examples; `byProduct` only where its data or dynamic fields differ; run the API cases, review the recorded files, commit |
+| New positive case | nothing when it runs on the defaults; otherwise a row with the feature's ID |
+| New negative case | a row with the `request` change and `"dynamicFields": null` |
+| New event | `data/<channel>/<event>.json`, named after the feature file; shared blocks through `use` |
+| A field turns out dynamic | its rule in the event file (`defaults` or `byProduct`), then record again |
+| Change the default counterparty | `api/common.json`, `ui/common.json`, `setup/trade-create*.json` (three places, on purpose); record the API cases again |
+| New setup payload | `data/setup/<what-it-prepares>.json`, referenced by that name |
