@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -286,6 +287,23 @@ public final class TestDataRepository {
                 throw error(path, where + ".dynamicFields." + rule.getKey(),
                         "a rule is a string (type, type-tree, regex:<pattern>, ignore) or null");
             }
+        }
+    }
+
+    /**
+     * Loads and validates {@code <root><channelDir>/common.json} and, unless {@code eventFile} is {@code null},
+     * {@code <root><channelDir>/<eventFile>.json}, as {@link #forCase} does (for the offline checks, which list
+     * the files themselves).
+     */
+    void validate(String channelDir, String eventFile) {
+        sharedBlocks(channelDir);
+        if (eventFile == null) return;
+        String channel = channelDir.toUpperCase(Locale.ROOT);
+        String event = eventFile.toUpperCase(Locale.ROOT).replace('_', '-');
+        CaseId any = new CaseId("TC-" + event + "-" + channel + "-000", event, null, channel, "000");
+        String path = root + channelDir + "/" + eventFile + ".json";
+        if (eventFile(any, path).isEmpty()) {
+            throw new IllegalStateException("[TestData] " + path + " not found on the classpath");
         }
     }
 

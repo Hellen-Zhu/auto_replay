@@ -141,8 +141,16 @@ public final class ResponseMasker {
 
     // ── Paths ────────────────────────────────────────────────────────────────
 
-    /** {@code data.trade.udf[*].value} -> {@code ["data", "trade", "udf", ANY, "value"]}; indexes as Integer. */
-    private static List<Object> parsePath(String path, String caseLabel) {
+    /** {@code true} for the {@code [*]} step of a parsed path. */
+    static boolean isAny(Object step) {
+        return step == ANY;
+    }
+
+    /**
+     * {@code data.trade.udf[*].value} -> {@code ["data", "trade", "udf", ANY, "value"]}: keys as String, indexes as
+     * Integer, {@code [*]} as a value {@link #isAny} accepts.
+     */
+    static List<Object> parsePath(String path, String caseLabel) {
         List<Object> steps = new ArrayList<>();
         String[] parts = path == null ? new String[0] : path.split("\\.", -1);
         for (int i = 0; i < parts.length; i++) {
