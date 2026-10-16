@@ -1,0 +1,9 @@
+[
+  {
+    "name": "trade_detail.header_card",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "trade-detail-header-card"
+    }
+  }
+]

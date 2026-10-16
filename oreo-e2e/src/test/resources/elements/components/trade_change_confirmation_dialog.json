@@ -1,0 +1,16 @@
+[
+  {
+    "name": "trade_change_confirmation.dialog",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "trade-change-confirmation-dialog"
+    }
+  },
+  {
+    "name": "trade_change_confirmation.confirm_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "trade-change-confirm-btn"
+    }
+  }
+]

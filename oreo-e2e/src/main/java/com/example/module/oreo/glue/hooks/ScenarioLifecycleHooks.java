@@ -1,8 +1,8 @@
 package com.example.module.oreo.glue.hooks;
 
+import com.example.module.oreo.glue.ScenarioContext;
 import com.example.module.oreo.testdata.TestDataLoader;
 import com.example.module.oreo.testdata.TestDataRecord;
-import com.example.module.oreo.utils.ScenarioContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;

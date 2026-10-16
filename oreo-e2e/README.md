@@ -20,39 +20,58 @@ entry only logs a warning.
 
 ## Layout
 
+The folders follow the E2E project. Files marked *placeholder* hold only a comment (Java: an empty class) and are
+there so the tree matches; copy the real file over them from the E2E project.
+
 ```
-pom.xml
+pom.xml, .gitignore
+.gitattributes, .mcp.json, azure-pipelines-maven.yml, .claude/, docs/   placeholders
 src/main/java/com/example/module/oreo/
   OreoModule.java                 per scenario: ctx, ui, api, config (PicoContainer)
   OreoModuleConfiguration.java    genie.properties + <env>.properties + -Doreo.<key>; Mode REAL / MOCK
+  glue/ScenarioContext.java       stand-in for GenieScenario's attributes
+  glue/api/                       placeholder (package-info.java only)
   glue/hooks/ScenarioLifecycleHooks.java   case data into the ctx (_tc.key, _tc.request, basic.xxx), current case for forKey
-  glue/hooks/ActionLogHook.java            the recorded actions into the scenario report
-  glue/steps/AuthenticationSteps.java      "<role> is logged in to the trade portal"
-  glue/steps/TradeProvisioningSteps.java   "a Live '<P>' trade exists in the blotter" (API, forKey API-SETUP-TRADE-CREATE)
-  glue/steps/TradeCreationSteps.java       trade_creation.snippet
-  glue/steps/TradeLifecycleEventSteps.java lifecycle_event / common_trade_action snippets
-  glue/steps/TradeEarlyTerminationSteps.java  trade_early_termination.snippet
+  glue/hooks/ActionLogHook.java            the recorded actions into the scenario report (not in the E2E project)
+  glue/hooks/E2EScenarioHooks, PlaywrightTraceHooks                placeholders
+  glue/ui/LoginSteps.java                  "<role> is logged in to the trade portal" (authentication_login.snippet)
+  glue/ui/NewTradeSteps.java               trade_creation.snippet
+  glue/ui/TradeProvisioningSteps.java      "a Live '<P>' trade exists in the blotter" (API, forKey API-SETUP-TRADE-CREATE)
+  glue/ui/TradeLifecycleEventSteps.java    lifecycle_event / common_trade_action / trade_early_termination snippets
+  glue/ui/AllocationSteps, BlotterSteps, CommonE2EAssertion, CommonE2EInteraction, CommonHelpers,
+          ComposeProductSteps, PlaywrightServiceResolver, ProductSchemaUploadSteps, RiskMetricSteps, ToastSteps,
+          TradeCancellationSteps, TradeDetailSteps, TradeFixingSteps, TradePortalSteps, UserPreferenceSteps,
+          WebsocketNotificationSteps                                placeholders
   testdata/TestDataLoader.java    case data (getByTcId) and setup data (forKey); new files, old YAML as fallback
   testdata/TestDataRecord.java    request / response JSON + flattenRequest()
-  testdata/JsonMerge.java         deep merge (objects key by key, arrays replaced)
+  testdata/ProductDatFiles.java   enum of the dat files; forProduct(name) -> data/<PRODUCT ID>.dat
+  testdata/JsonMerge.java         deep merge (objects key by key, arrays replaced)            (not in the E2E project)
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
-  testdata/DatFiles.java          data/<PRODUCT ID>.dat (ProductDatFiles there)
-  utils/ScenarioContext.java      stand-in for GenieScenario's attributes
+  utils/CleanupTestDataUtil, DatabaseSqlUtil, DateUtil, RestApiUtil  placeholders
   utils/ui/OreoUi.java, RecordingOreoUi.java     browser actions by element key (Genie built-ins, ctx.click...)
-  utils/api/OreoApi.java, RecordingOreoApi.java  requests (RestApiUtil)
+  utils/api/OreoApi.java, RecordingOreoApi.java  requests (RestApiUtil there)
   utils/pages/                    LoginPage, TradePortalPage, NewTradePage, TradeDetailPage,
                                   DynamicActionComponent, TradeChangeConfirmation, Toast, RiskCalculation
+                                  (the page and component snippets written in Java; not in the E2E project)
+src/main/resources/
+  META-INF/services/com.example.genie.module.GenieModule   placeholder (named after the GenieModule interface there)
+  snippet/api/, snippet/ui/components|flows|pages/*.snippet placeholders
+  cucumber.xml                    placeholder
 src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/)
-  glue/steps/ScenarioActionsTest.java    the exact actions of an early termination and a StepIn creation, in order
+  glue/ui/ScenarioActionsTest.java       the exact actions of an early termination and a StepIn creation, in order
   testdata/TestDataLoaderTest.java       the 12 cases and API-SETUP-TRADE-CREATE resolve to exactly the old YAML's data
 src/test/resources/
   data/common.json                shared blocks; setup data API-SETUP-TRADE-CREATE, UI-SETUP-RISK-CALC-NEW-SUCCESS
   data/ui/trade_creation.json     replaces 93 lines of YAML
   data/ui/trade_early_termination.json   replaces the template and its 3 entries
-  data/<PRODUCT ID>.dat           the dat files (not in this repository: copy them from the E2E project)
+  data/api/                       placeholder
+  data/<PRODUCT ID>.dat           placeholders: FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF, FX_TRF
+  elements/components|pages/*.json       the files the replay project has (../elements/) copied; the others []
   features/ui/trading/            trade_creation.feature, trade_early_termination.feature, as in the E2E project
+  features/api/, features/ui/<area>/     placeholders (empty folders or a comment-only feature)
   genie.properties, uat.properties       settings without accounts or addresses
+  enrich, pt, sit .properties, log4j2.xml   placeholders
   junit-platform.properties       Cucumber glue and report
   legacy-data/                    the old YAML files, only for the equivalence tests
   fixture-data/                   unit test fixture for setup changes of a feature and a case

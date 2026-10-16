@@ -1,0 +1,9 @@
+[
+  {
+    "name": "trade_portal.new_trade_btn",
+    "lookupDetails": {
+      "findBy": "testId",
+      "value": "layout-new-trade-btn"
+    }
+  }
+]

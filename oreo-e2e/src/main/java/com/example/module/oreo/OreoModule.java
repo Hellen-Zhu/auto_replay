@@ -1,6 +1,6 @@
 package com.example.module.oreo;
 
-import com.example.module.oreo.utils.ScenarioContext;
+import com.example.module.oreo.glue.ScenarioContext;
 import com.example.module.oreo.utils.api.OreoApi;
 import com.example.module.oreo.utils.api.RecordingOreoApi;
 import com.example.module.oreo.utils.ui.OreoUi;
