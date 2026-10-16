@@ -1,16 +1,24 @@
 package com.example.module.oreo.testdata;
 
-
+/**
+ *
+ * <h3>Adding a new product type</h3>
+ * <ol>
+ *   <li>Add the corresponding {@code .dat} file under {@code src/test/resources/data/}</li>
+ *   <li>Add a new enum constant here pointing to that file</li>
+ *   <li>Add a new {@code @When} step in {@code NewTradeSteps} for the product</li>
+ * </ol>
+ */
 public enum ProductDatFiles {
 
     /** FX Total Return Forward — uses the standard TRF .dat template. */
     FX_TRF("data/FX_TRF.dat"),
 
     /** CorrOption (FX Correlation Option). */
-    FX_CO("data/FX_CO.dat"),
+    FX_PSCRIPT("data/FX_PSCRIPT.dat"),
 
     /** FX Floating Strike Barrier. */
-    FX_FSB("data/FX_FSB.dat"),
+    FX_PSCRIPT_FSKO("data/FX_PSCRIPT_FSKO.dat"),
 
     /** TRF Generic product — uses dedicated FX_PSCRIPT_TRF template. */
     FX_PSCRIPT_TRF("data/FX_PSCRIPT_TRF.dat"),

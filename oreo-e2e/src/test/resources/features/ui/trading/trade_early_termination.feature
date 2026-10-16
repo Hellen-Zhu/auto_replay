@@ -1,4 +1,4 @@
-@playwright @ADO#trade_early_termination @ADO#trade_lifecycle @test
+@playwright @ADO#trade_early_termination @ADO#trade_lifecycle
 Feature: Trade Early Termination E2E
   As a Trader
   I want to view the correct trade status after an EarlyTermination event is processed
@@ -13,7 +13,8 @@ Feature: Trade Early Termination E2E
     And the trade is closed as Terminated
 
     Examples:
-      | product_type |
-      | FX_CO        |
-      | FX_TRF       |
-      | FX_FSB       |
+      | product_type    |
+      | FX_PSCRIPT      |
+      | FX_TRF          |
+      | FX_PSCRIPT_FSKO |
+      | FX_PSCRIPT_TRF  |

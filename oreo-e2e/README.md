@@ -38,9 +38,8 @@ src/main/java/com/example/module/oreo/
           CommonHelpers.java, LoginSteps.java, NewTradeSteps.java, ToastSteps.java,
           TradeDetailSteps.java, TradePortalSteps.java, TradeLifecycleEventSteps.java,
           TradeProvisioningSteps.java   transcribed from the E2E project
-  glue/api/RestServiceResolver.java, ApiRequestSteps.java, ApiResponseAssertionSteps.java   transcribed
-          from the E2E project (a few method bodies not photographed yet)
-  glue/api/TradeApiSteps.java     partly transcribed (only the photographed middle of the file)
+  glue/api/RestServiceResolver.java, ApiRequestSteps.java, ApiResponseAssertionSteps.java,
+          TradeApiSteps.java   transcribed from the E2E project (a few method bodies not photographed yet)
   glue/hooks/ScenarioLifecycleHooks.java, E2EScenarioHooks.java   transcribed from the E2E project
   glue/hooks/PlaywrightTraceHooks          placeholder
   glue/ui/LoginSteps.java                  "<role> is logged in to the trade portal" (authentication_login.snippet)
