@@ -4,7 +4,7 @@
 
 **Goal:** Replace the YAML test data of `oreo-e2e/` with layered JSON case data per channel, setup files, and recorded API responses compared strictly.
 
-**Architecture:** New classes in `com.example.module.oreo.testdata` (no Genie dependency) load `data/<channel>/common.json` + `data/<channel>/<event>.json` and merge layers per case ID; `data/setup/<name>.json` holds setup payloads; `ApiResponseAssertionSteps` records or compares `data/api/expected/<event>/<caseId>.json`. Callers switch from `TestDataLoader` to `TestData`; the YAML and the old loader are removed last, after an equivalence test proves the new data sends the same requests.
+**Architecture:** New classes in `com.example.module.oreo.testdata` (no Genie dependency) load `data/<channel>/common.json` + `data/<channel>/<event>.json` and merge layers per case ID; `data/setup/<name>.json` holds setup payloads; `ApiResponseAssertionSteps` records or compares `data/api/expected/<event>/<caseId>.json`. Callers switch from `TestDataLoader` to `TestData`; the YAML and the old loader are removed after an equivalence test proves the new data sends the same requests. Last, a variant's expected file may hold only a patch on a base case of the same product (§7.5, Task 8).
 
 **Tech Stack:** as in `oreo-e2e/pom.xml`: Java 21, JUnit 4.13.2, JsonUnit through `net.javacrumbs.jsonunit.JsonAssert` (already used), Jackson and Spring core at the genie BOM's versions (Jackson >= 2.15: the existing code uses `JsonNode.properties()`), jackson-dataformat-yaml (old loader only, until Task 7). No new dependency.
 
@@ -30,6 +30,8 @@
 3. A typo in the update switch (`OREO_EXPECTED=updat`, `true`): an error, not a silent comparison. Test: `ExpectedResponsesTest.rejectsUnknownMode` (Task 3).
 4. A forked JVM whose working directory is not the project: the expected directory is still found from the classpath. Test: `ProjectPathsTest.resolvesRootFromTestClassesLayout` (Task 3).
 5. An expected file checked out with CRLF on Windows still compares equal; written files use LF. Test: `ExpectedResponsesTest.readsCrlfFile` (Task 3).
+6. A compaction that meets an error halfway (one base missing) leaves every file as it was, so a review never sees half a compaction. Test: `ExpectedCompactionTest.errorWritesNothing` (Task 8).
+7. A second compaction right after the first changes nothing, so review diffs show only real changes. Test: `ExpectedCompactionTest.secondRunChangesNothing` (Task 8).
 
 ---
 
@@ -303,3 +305,103 @@ Assert JSON equality with `assertEquals(Json.parse(expected), Json.parse(actual)
 - [ ] **Step 4: Commit and push**: `git commit -m "Remove the YAML test data and the old loader"`; `git push origin feature/testdata-refactor`; sync back to the local folder.
 
 - [ ] **Step 5: Handover 2 (user, company machine)**: `mvn test -Dtest='com.example.module.oreo.testdata.*Test'` and `mvn compile` -> PASS. Then the first recording (spec §9 step 6).
+
+### Task 8: Base and patch expected files
+
+Added on 2026-10-16 with spec §7.5 (approved by the user). Runs after Task 7. It changes no expected file, so the recordings the user made on the company machine merge without conflict; the first compaction runs there (Step 12).
+
+**Files:**
+- Create: `oreo-e2e/src/main/java/com/example/module/oreo/testdata/JsonPatch.java`, `ExpectedCompaction.java`
+- Modify: `testdata/TestDataRepository.java` (key `expectedBase`), `testdata/CaseData.java`, `testdata/ExpectedResponses.java`, `glue/api/ApiResponseAssertionSteps.java` (`responseMatchesCurrentScenario`)
+- Modify data: `oreo-e2e/src/test/resources/data/api/trade_creation.json` (`defaults.expectedBase`); fixtures `testdata-fixtures/data/api/sample_event.json`; create fixtures `testdata-fixtures/data/api/bad_base.json`, `testdata-fixtures/data/ui/ui_base.json`
+- Test: create `JsonPatchTest.java`, `ExpectedCompactionTest.java`, `CompactExpectedFiles.java` (the tool); modify `TestDataRepositoryTest.java`, `ExpectedResponsesTest.java`, `TestDataValidationTest.java`, `CaseDataLookup.java` (all in `oreo-e2e/src/test/java/com/example/module/oreo/testdata/`)
+- Docs: `oreo-e2e/README.md` ("Test data" section of Task 7), `docs/handover-notes.md` (the `oreo-e2e/` paragraph), spec status line
+
+**Interfaces:**
+- Consumes: `Json`, `CaseId` (Task 1); `TestDataRepository`, `TestData`, `CaseData` (Task 2); `ExpectedResponses` (Task 3); the checks of Task 6.
+- Produces:
+  - `JsonPatch.diff(JsonNode base, JsonNode target) -> ArrayNode`: the ops of §7.5 step 3; order: the keys of `base` in its order (`remove`, or recurse), then the keys only `target` has, in its order (`add`). `JsonPatch.apply(JsonNode base, JsonNode ops, String label) -> JsonNode`: a new tree, `base` untouched; errors `IllegalStateException("[JsonPatch] " + label + ": op " + i + " (" + op + " " + path + ") ...")`.
+  - `CaseData.expectedBase() -> String`: the resolved base case ID; `null` when there is none (no value, `null`, `<...>` on a case without product, or the case itself).
+  - `ExpectedResponses`: `static boolean isPatch(JsonNode)` (an object whose keys are exactly `_base` and `_patch`); `record Resolved(String json, Path file, String base)` (`json` = `Json.pretty` of the full form; `base` null for a full file) with `String describe()` = `file.toString()`, or `file + " (patch on " + base + ")"`; `Optional<Resolved> resolve(CaseId id)` (empty only when the case's own file is absent); `List<String> events()` (folder names under the root, sorted; empty when the root does not exist); `List<CaseId> cases(String eventFile)` (the folder's `*.json` names without `.json`, sorted, through `CaseId.parse`).
+  - `ExpectedCompaction`: `record Entry(CaseId id, String before, String after, String note)` with `boolean changed()` (`!before.equals(after)`); `record Plan(String eventFile, List<Entry> entries, List<String> errors)`; `static Plan plan(ExpectedResponses files, String eventFile, Function<CaseId, String> declaredBase)`; `static void write(ExpectedResponses files, Plan plan)`: `IllegalStateException` listing every error when `errors` is not empty, nothing written; else writes the changed entries. `note` is exactly `"full (no base)"`, `"patch on <B>, <n> ops"` or `"full (patch not shorter)"`.
+  - `CompactExpectedFiles` (test class, the tool of §7.5): `mvn test -Dtest=CompactExpectedFiles -Doreo.compact=<event>|all`.
+
+- [ ] **Step 1: Write the tests**
+
+```java
+// JsonPatchTest
+@Test public void identicalTreesGiveNoOps()          // diff({"a":1,"u":[1]}, the same) == []
+@Test public void replacesAChangedLeaf()             // {"a":{"b":1}} -> {"a":{"b":2}} == [{"op":"replace","path":"/a/b","value":2}]
+@Test public void removesThenAddsKeys()              // {"a":1,"b":2} -> {"a":1,"c":3} == [{"op":"remove","path":"/b"},{"op":"add","path":"/c","value":3}]
+@Test public void sameLengthArraysByIndex()          // {"u":[{"k":"x","v":"1"},{"k":"y","v":"2"}]} -> second v "3" == [{"op":"replace","path":"/u/1/v","value":"3"}]
+@Test public void otherLengthArraysReplacedWhole()   // {"u":[1,2]} -> {"u":[1,2,3]} == [{"op":"replace","path":"/u","value":[1,2,3]}]
+@Test public void typeChangeIsAReplace()             // {"i":{"x":1}} -> {"i":"${json-unit.ignore}"} == [{"op":"replace","path":"/i","value":"${json-unit.ignore}"}]
+@Test public void escapesPointerTokens()             // a key "a/b~c" gives path "/a~1b~0c"; apply finds the key again
+@Test public void numbersCompareExactly()            // {"n":70000.0} -> {"n":70000.00}: one replace; Json.compact of the applied tree contains "70000.00"
+@Test public void applyGivesTheTargetBack()          // nested objects, arrays, null, decimals: assertEquals(target, JsonPatch.apply(base, JsonPatch.diff(base, target), "x"))
+@Test public void applyLeavesTheBaseUntouched()
+@Test public void addOnAnExistingKeyFails()          // IllegalStateException whose message contains "x: op 0 (add /a)"
+@Test public void replaceOnAMissingKeyFails()
+@Test public void removeOnAMissingKeyFails()
+@Test public void indexOutOfRangeFails()             // replace /u/5 on {"u":[1]}
+@Test public void unknownOpFails()                   // {"op":"move","path":"/a"}
+
+// ExpectedResponsesTest, added (TemporaryFolder root, folder trade_creation)
+@Test public void resolvesAFullFile()                // json() parses to the file's content; base() null; describe() == the file path
+@Test public void resolvesAPatchOnItsBase()          // base {"a":1,"b":2}; variant {"_base":"<base id>","_patch":[{"op":"replace","path":"/b","value":3}]} -> json() parses to {"a":1,"b":3}; describe() ends with "(patch on <base id>)"
+@Test public void patchOnAMissingBaseFails()         // IllegalStateException whose message contains the base's file path
+@Test public void patchOnAPatchFails()               // message contains "is itself a patch"
+@Test public void patchOnAnotherEventFails()         // _base "TC-OTHER-EVENT-FX_TRF-API-001"
+@Test public void malformedPatchFails()              // {"_base":1,"_patch":[]}
+@Test public void isPatchNeedsExactlyTheTwoKeys()    // {"_base":"x","_patch":[]} true; the same with a third key false; {"code":200} false
+@Test public void listsEventsAndCases()              // events() == ["trade_creation"]; cases("trade_creation") sorted by name
+
+// ExpectedCompactionTest (TemporaryFolder root, folder sample_event; declared bases from a Map: 002 and 003 -> 001)
+// files: 001 an object of about ten fields; 002 = 001 with one leaf changed; 003 a small object sharing nothing with 001; TC-SAMPLE-EVENT-API-004 {"code":400}
+@Test public void variantBecomesAPatch()             // after plan + write: 002 is {"_base":"TC-SAMPLE-EVENT-FX_TRF-API-001","_patch":[one replace]}, note "patch on TC-SAMPLE-EVENT-FX_TRF-API-001, 1 ops"; 001 and 004 not changed, note "full (no base)"
+@Test public void keepsFullWhenThePatchIsNotShorter() // 003 not changed, note "full (patch not shorter)"
+@Test public void caseWithoutBaseExpandsAPatch()     // 002 on disk as a patch, declared base null -> 002 written in its full form
+@Test public void patchFollowsANewBase()             // 002 on disk as a patch on 001, declared base 005 (below) -> 002's _base is 005, resolve(002).json() unchanged
+@Test public void secondRunChangesNothing()          // a plan right after write: no entry changed()
+@Test public void errorWritesNothing()               // 001's file deleted: errors name TC-SAMPLE-EVENT-FX_TRF-API-001; write throws IllegalStateException; 002 and 003 byte-identical to before
+@Test public void chainedBaseIsAnError()             // 001 declares base 004 while 002 builds on 001: an error naming TC-SAMPLE-EVENT-FX_TRF-API-001 "declares a base of its own"
+@Test public void dataErrorIsListed()                // declaredBase throws for 004: an error containing "TC-SAMPLE-EVENT-API-004" and the exception's message
+
+// TestDataRepositoryTest, added (fixture sample_event.json: defaults "expectedBase": "TC-SAMPLE-EVENT-<product_type>-API-001"; row API-002 byProduct FX_PSCRIPT_TRF "expectedBase": null)
+@Test public void expectedBaseFollowsTheProduct()    // forCase("TC-SAMPLE-EVENT-FX_TRF-API-002").expectedBase() == "TC-SAMPLE-EVENT-FX_TRF-API-001"
+@Test public void baseCaseHasNoBase()                // forCase("TC-SAMPLE-EVENT-FX_TRF-API-001").expectedBase() == null
+@Test public void caseWithoutProductHasNoBase()      // forCase("TC-SAMPLE-EVENT-API-004").expectedBase() == null
+@Test public void nullRemovesTheBase()               // forCase("TC-SAMPLE-EVENT-FX_PSCRIPT_TRF-API-002").expectedBase() == null
+@Test(expected = IllegalStateException.class) public void baseInAnotherEventIsAnError()  // api/bad_base.json: defaults "expectedBase": "TC-OTHER-EVENT-<product_type>-API-001"; forCase("TC-BAD-BASE-FX_TRF-API-002")
+@Test(expected = IllegalStateException.class) public void expectedBaseRejectedInUi()     // ui/ui_base.json: defaults "expectedBase": "TC-UI-BASE-<product_type>-UI-001"; forCase("TC-UI-BASE-FX_TRF-UI-002")
+```
+
+The existing assertions of `TestDataRepositoryTest` stay as they are: the two new fixture keys change no request, rule or layer label.
+
+For `patchFollowsANewBase` a fifth file `TC-SAMPLE-EVENT-FX_TRF-API-005`, a near copy of 002's full form, is added with no declared base.
+
+- [ ] **Step 2: `JsonPatch`** per §7.5 (the op rules and step 3). JSON Pointer per RFC 6901, escaping in both directions; array indexes only on arrays; equality by `JsonNode.equals` (so `70000.0` and `70000.00` differ).
+
+- [ ] **Step 3: `expectedBase`** in `TestDataRepository`: allowed keys of §5.2 (api only; under `ui/` a load error like `dynamicFields`), layered as a scalar (§5.4: a later layer replaces it, `null` removes it); resolution of §7.5: `<...>` replaced by the product, none on a case without product, none when equal to the case; `CaseId.parse` of the result must give the same `eventFile()` and channel `API`, else `IllegalStateException` naming the file and the layer. `CaseData` gets the resolved value through its package-private constructor.
+
+- [ ] **Step 4: `ExpectedResponses`**: `isPatch`, `resolve`, `events`, `cases`. Error texts: `"[ExpectedResponses] " + file + " builds on " + base + ", which has no file " + baseFile`; `"... builds on " + base + ", which is itself a patch: run CompactExpectedFiles"`; `"... builds on " + base + ", a case of another event"`; `"... is not a patch file: _base must be text and _patch an array"`. The `apply` label is the file name.
+
+- [ ] **Step 5: `ExpectedCompaction`** per §7.5 steps 1-5: resolve every file of the event before deciding anything; a base's full form comes from that step, never from a file written in the same run; an exception of `declaredBase` goes into `errors` with the case ID; the size rule compares `Json.pretty(patchFile).length()` with `Json.pretty(fullForm).length()` (patch written only when strictly shorter).
+
+- [ ] **Step 6: `ApiResponseAssertionSteps.responseMatchesCurrentScenario`**: in update mode the file is not read; otherwise `resolve(id)`; empty -> record as now; compare `JsonAssert.assertJsonEquals(resolved.json(), actual)`; on failure `e.getMessage() + "\nExpected file: " + resolved.describe() + "\nIf the change is intended, run again with OREO_EXPECTED=update, compact with mvn test -Dtest=CompactExpectedFiles -Doreo.compact=" + id.eventFile() + ", and review the diff."`
+
+- [ ] **Step 7: Checks and tools.** `TestDataValidationTest.rulesAgreeWithExpectedFiles` reads `resolve(id).json()`. New `@Test public void expectedFilesAreCompacted()` (§10.7): `ExpectedCompaction.plan` for every `events()` with `id -> TestData.forCase(id.raw()).expectedBase()`; errors -> fail, listing them; changed entries -> printed `"[warn] " + file + ": " + note + ": run CompactExpectedFiles"`. `CaseDataLookup` also prints `expectedBase` and the resolved expected (`describe()`, then `json()`; `not recorded` when absent). `CompactExpectedFiles.compact()`: `Assume` that `oreo.compact` is set; `all` -> every `events()`, else that event (not among `events()` -> `AssertionError` naming the known ones); plans every event first and writes only when no plan has errors (else one `AssertionError` with all of them); prints `<file name>: <note>`, with ` (unchanged)` for an entry that did not change.
+
+- [ ] **Step 8: Data.** `data/api/trade_creation.json`: `defaults.expectedBase` = `"TC-TRADE-CREATION-<product_type>-API-001"`, and its `_comment` says that variants are compared as patches on the product's API-001. The expected files are not touched (see the task's header).
+
+- [ ] **Step 9: Docs.** README "Test data": base and patch, the compaction command, its place in the daily use of §7.4; `docs/handover-notes.md`: one sentence; spec status line -> `implemented on feature/testdata-refactor; first compaction pending`.
+
+- [ ] **Step 10: Check by reading**: every test's expected value follows from §7.5 and the Interfaces above; only JDK / Jackson / JUnit 4 imports in `testdata/`; `grep -n "\.read(id)" oreo-e2e/src/main/java/com/example/module/oreo/glue/api/ApiResponseAssertionSteps.java` prints nothing.
+
+- [ ] **Step 11: Commit and push**: `git commit -m "Compare variant responses as patches on a base case of the same product"`; `git push origin feature/testdata-refactor`; sync back to the local folder.
+
+- [ ] **Step 12: Handover 3 (user, company machine)**, on the real recordings:
+  1. `mvn test -Dtest='com.example.module.oreo.testdata.*Test'` -> PASS; check 7 warns for the `-002` / `-003` files (not compacted yet).
+  2. `mvn test -Dtest=CompactExpectedFiles -Doreo.compact=trade_creation` -> one line per file: the `-001` files and `API-004..006` `full (no base)`; the `-002` / `-003` files `patch on ...-API-001, <n> ops`, or `full (patch not shorter)`.
+  3. Step 1 again -> no check 7 warning. Review `git diff` (the variant files become patches), scan it for what must not be public, commit.
+  4. The API creation cases against the real system -> PASS: a patch compares the same as the full file it replaced.

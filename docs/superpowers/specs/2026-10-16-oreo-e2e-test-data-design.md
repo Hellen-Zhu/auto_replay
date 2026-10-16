@@ -1,6 +1,6 @@
 # oreo-e2e test data: design
 
-Status: approved by the user on 2026-10-16. Branch: `feature/testdata-refactor`.
+Status: approved by the user on 2026-10-16; section 7.5 (base and patch) added and approved the same day. Branch: `feature/testdata-refactor`.
 Scope: the Java + Cucumber (Genie) project in `oreo-e2e/` only. The Playwright side is not touched.
 
 ## 1. Goals and constraints
@@ -44,7 +44,7 @@ src/test/resources/data/
     trade_creation.json                   one file per feature file name
     expected/
       trade_creation/
-        TC-TRADE-CREATION-FX_TRF-API-001.json     recorded response, one per case
+        TC-TRADE-CREATION-FX_TRF-API-001.json     recorded response, one per case: in full, or a patch on its base (7.5)
         ...
   ui/
     common.json                           shared blocks for UI event files
@@ -97,6 +97,7 @@ The case ID comes from the scenario name, as today (`TestDataLoader.tcKeyFromNam
   "_comment": "features/api/trading/trade_creation.feature",
   "defaults": {
     "use": ["trade-basic"],
+    "expectedBase": "TC-TRADE-CREATION-<product_type>-API-001",
     "dynamicFields": {
       "msg": "regex:Submitted for checker approval\\. TaskId: CHK-.*",
       "data.trade.id": "type",
@@ -152,11 +153,11 @@ The `dynamicFields` above are the initial rules. They cover only what changes fr
 | `common.json` | `_comment`, `shared` |
 | a shared block | `_comment`, `request`, `dynamicFields` |
 | event file | `_comment`, `defaults`, `byProduct`, `cases` |
-| `defaults`, a `byProduct` entry | `_comment`, `use`, `request`, `dynamicFields` |
-| a case row | `id`, `_comment`, `use`, `request`, `dynamicFields`, `byProduct` |
+| `defaults`, a `byProduct` entry | `_comment`, `use`, `request`, `dynamicFields`, `expectedBase` |
+| a case row | `id`, `_comment`, `use`, `request`, `dynamicFields`, `expectedBase`, `byProduct` |
 
 - `request` is a JSON object: the request body (API) or the form values (UI). The name stays `request` because it becomes `_tc.request`, as today.
-- `dynamicFields` exists in `data/api/` only (UI has no recorded responses).
+- `dynamicFields` and `expectedBase` (7.5) exist in `data/api/` only (UI has no recorded responses).
 - `byProduct` keys are `ProductDatFiles` constants.
 - Any other key is a load error (it catches `byproduct`, `requests` ...).
 - `_comment` is dropped at every depth before merging.
@@ -180,10 +181,11 @@ Layers, applied in this order, each optional:
 3. the case's row
 4. `byProduct[P]` of the row
 
-Applying a layer = apply each shared block of its `use` in order, then its own `request` and `dynamicFields`.
+Applying a layer = apply each shared block of its `use` in order, then its own `request`, `dynamicFields` and `expectedBase`.
 
 - Objects merge deeply; arrays and scalars replace; `null` deletes the key (`"premiumAmount": null`, `"dynamicFields": null`). The current YAML has no `null`, so this changes no migrated value.
 - `dynamicFields` is a flat map of path -> rule; the path is a key, not a nested object.
+- `expectedBase` is a scalar: a later layer replaces it, `null` removes it.
 - A case without a product (API-004) gets layers 1 and 3 only.
 - No event file for the case: the case has no data (empty request); that is valid for a feature that needs no data.
 
@@ -271,15 +273,15 @@ The setup trade body and the API case blocks (`trade-basic`, `stepin-*`) hold th
 actual = ctx.helper().response().extract().asString()        // genie-rest, as today
 file   = expected/<event>/<caseId>.json
 if update mode, or file missing:
-    write mask(actual, case.dynamicFields) to file
+    write mask(actual, case.dynamicFields) to file           // always in full (7.5)
     if file was missing and not update mode: fail "Expected response recorded to <file>: review it, commit it, run again"
     else: report "[expected:updated] <file>", pass
 else:
-    JsonAssert.assertJsonEquals(read(file), actual)          // strict, as today
-    on failure: JsonUnit's diff + the file path + "intended change? run with OREO_EXPECTED=update"
+    JsonAssert.assertJsonEquals(fullForm(file), actual)      // strict, as today; a patch is applied to its base first (7.5)
+    on failure: JsonUnit's diff + the file path (and its base) + "intended change? run with OREO_EXPECTED=update, compact, review"
 ```
 
-- Update mode: environment variable `OREO_EXPECTED=update` or system property `-Doreo.expected=update`. Both are read: a forked JVM always inherits the environment, a `-D` may not reach it.
+- Update mode: environment variable `OREO_EXPECTED=update` or system property `-Doreo.expected=update`. Both are read: a forked JVM always inherits the environment, a `-D` may not reach it. In update mode the file is not read, so a broken patch never blocks a new recording.
 - A recording happens only after the status code check passed, so a 500 is never recorded as a positive baseline.
 - Parallel runs are safe: a case writes only its own file.
 - The step `response matches expected from test data '<name>'` compares strictly with the `response` of setup file `<name>`; it never records.
@@ -305,10 +307,59 @@ A rule is the value of a `dynamicFields` entry; the key is a path: keys joined b
 | Situation | Run | Result |
 |---|---|---|
 | Regression | `mvn test` | strict comparison |
-| New product or case | `mvn test` | its files are recorded, those scenarios fail once; review the files against the requirement, commit, run again |
-| The API changed on purpose | `OREO_EXPECTED=update mvn test ...` | files rewritten; review `git diff`, commit |
+| New product or case | `mvn test`, then the compaction (7.5) | its files are recorded, those scenarios fail once; compact; review the files against the requirement, commit, run again |
+| The API changed on purpose | `OREO_EXPECTED=update mvn test ...`, then the compaction | files rewritten in full, compacted again; review `git diff` (a change every variant shares shows in the base files only), commit |
 
 The risk of recording: a system bug at the first recording becomes the baseline. That is why a first recording always fails and has to be reviewed.
+
+### 7.5 Base and patch
+
+The variants of a case return mostly the same response: in the first real recording `FX_TRF-API-001` to `003` differ in a few fields. A variant's expected file therefore holds only its differences from a base case of the same product. It is still one file per case: each case records only its own file (parallel runs stay safe), a failure names exactly one file, and two people recording different cases never edit the same file.
+
+**The base** is declared by `expectedBase` (5.2, 5.4), once in `defaults`:
+
+- `<product_type>` is replaced by the case's product, so every product has its own base: `FX_TRF-API-002` and `003` build on `FX_TRF-API-001`, `FX_PSCRIPT-API-002` on `FX_PSCRIPT-API-001`.
+- A case without a product (`API-004`) has no base when the value names `<product_type>`. A base equal to the case itself (`API-001`) means no base. A `byProduct` entry or a row may name another base, or `null`.
+- The value is written like a row ID (a `<...>` token only right before the channel) and names a case of the same event and channel; anything else is a load error.
+- A base has no base of its own (no chains).
+
+**Two forms of an expected file**, under the same name `<caseId>.json`:
+
+| Form | Content | The case is compared with |
+|---|---|---|
+| full | the masked response (7.3), as before | the file |
+| patch | `{"_base": "<base case ID>", "_patch": [<ops>]}` | the base's file with the ops applied |
+
+```json
+{
+  "_base": "TC-TRADE-CREATION-FX_TRF-API-001",
+  "_patch": [
+    { "op": "replace", "path": "/data/trade/basic/eventStatus", "value": "..." },
+    { "op": "add", "path": "/data/trade/basic/udf", "value": [ "..." ] }
+  ]
+}
+```
+
+- A file is a patch when it is an object whose keys are exactly `_base` and `_patch`; `_base` must then be text and `_patch` an array. Any other file is full.
+- Ops: `add` (a key the base does not have), `remove`, `replace`. `path` is a JSON Pointer (RFC 6901): `/` before each key, array indexes as numbers, `~1` for `/` and `~0` for `~` inside a key. An op that does not fit the base (`add` on a key that exists, `replace` or `remove` on one that does not, an index out of range, an unknown op) is an error naming the file and the op's index.
+- `_base` must name a full file in the same folder. The comparison follows `_base`, not the data: an expected file is understood without the data files.
+- The ops applied to the base give the full form, compared strictly as in 7.2. Added keys come last; JsonUnit ignores key order.
+
+**Recording does not change**: a first recording and update mode always write the full form. Patches are made afterwards by the compaction.
+
+**Compaction**: `mvn test -Dtest=CompactExpectedFiles -Doreo.compact=<event>` (or `all`), run after a recording, in one JVM, before the review:
+
+1. Every expected file of the event is resolved to its full form, in memory, from the files as they are.
+2. A case without a declared base gets the full form.
+3. A case with base `B` gets the patch from `B`'s full form to its own:
+   - objects key by key: `remove` for a key only the base has, `add` for a key only the case has, the same rules again for a key both have;
+   - arrays of the same length element by element, by index (`/data/trade/basic/udf/2/value`); arrays of different lengths are replaced whole;
+   - any other differing value is replaced.
+   The patch is written only when its text (pretty-printed as in 7.3) is shorter than the full form's; otherwise the file stays full (a negative case with a product, a variant that shares little with its base).
+4. Errors stop the compaction before any file is written, and all are listed: `B` has no file, `B` declares a base of its own, `B` is in another folder, a patch on disk does not apply, the data of a case does not load.
+5. A file whose text does not change is not rewritten, so a second run changes nothing. The summary gives one line per file: its form (`full (no base)`, `patch on <B>, <n> ops`, `full (patch not shorter)`) and whether it changed.
+
+Then review `git diff` and commit. Forgetting the compaction is harmless: a full file is compared as before, and check 7 (section 10) warns. A change every variant shares (a new response field) shows in the base files only; the patches stay the same. A variant whose response no longer matches base + patch fails like any case: record it again, compact again.
 
 ## 8. Code
 
@@ -319,17 +370,19 @@ All new classes are in `testdata/` and depend only on Jackson, Spring core (clas
 | `CaseId` | parses a case ID (section 4); knows the products from `ProductDatFiles` |
 | `JsonLayers` | deep merge with `null` delete; drops `_comment` |
 | `TestData` | facade: `forCase(String caseId) -> CaseData`, `setup(String name) -> SetupData`; loads and validates files lazily, once, thread-safe; errors name the file and key |
-| `CaseData` | `request()` (merged JSON), `hasRequest()`, `flattenRequest()`, `dynamicFields()`, `layers()` (applied layers, for the report and errors) |
+| `CaseData` | `request()` (merged JSON), `hasRequest()`, `flattenRequest()`, `dynamicFields()`, `expectedBase()` (7.5), `layers()` (applied layers, for the report and errors) |
 | `SetupData` | `request()`, `response()`, `hasRequest()`, `hasResponse()` |
-| `ExpectedResponses` | file location, update mode, read, write |
+| `ExpectedResponses` | file location, update mode, read, write; the full form of a patch file (7.5) |
 | `ResponseMasker` | applies the rules of 7.3 |
+| `JsonPatch` | the patch between two JSON trees and its application (7.5) |
+| `ExpectedCompaction` | plans and writes the compaction of 7.5; used by the tool `CompactExpectedFiles` and by check 7 |
 
 Changed callers (only the lines that look data up):
 
 | File | Change |
 |---|---|
 | `ScenarioLifecycleHooks` | `TestData.forCase(tcId)`; sets `_tc.key`, and when the merged request is not empty `_tc.request`, `_tc.request.<top field>` and the flattened leaves, as today; no `_tc.response`; writes the applied layers with the request; a broken data file fails the scenario instead of logging a warning |
-| `ApiResponseAssertionSteps` | `response matches current scenario` as in 7.2; `... from test data '<name>'` reads setup |
+| `ApiResponseAssertionSteps` | `response matches current scenario` as in 7.2 and 7.5; `... from test data '<name>'` reads setup |
 | `ApiRequestSteps`, `TradeApiSteps` | `from test data '<name>'` reads setup |
 | `common_trade_action.snippet` | argument `'API-SETUP-TRADE-CREATE'` -> `'trade-create'` (the step text does not change) |
 | `TradeProvisioningSteps` | setup names of section 6; **sets `basic.productId` from the product before submitting**. Today it sends the template's `FX_TRF` with every product's dat file; the API steps already set it. Behaviour change, to confirm on the real system |
@@ -349,7 +402,8 @@ Done in steps, each a commit on `feature/testdata-refactor`:
 3. **Switch the callers** of section 8.
 4. **Offline validation and lookup** (section 10).
 5. **Clean up**: remove the YAML, `TestDataLoader`, `TestDataRecord` and the equivalence test; update `oreo-e2e/README.md` and `docs/handover-notes.md`.
-6. **First recording on the real system** (user, company machine): `OREO_EXPECTED=update` on the API creation cases; review the diff. This replaces the converted files with real recordings. Fields that are placeholders in the old data without a rule (the warnings of check 5: `tradeType`, `currencyPair`, `rate`, `scbEntity`, `ci`, `cva`, `fva`, `vmc` ...) become exact values; for each, the review decides whether it is exact or dynamic (risk figures such as `cva` / `fva` may change from day to day: then a `type` rule and record again). The recording also answers two open points: whether the responses name the products `FX_CO` / `FX_FSB`, and the nine inferred lines of `FX_PSCRIPT_TRF-API-002/003`.
+6. **First recording on the real system** (user, company machine; first recordings made on 2026-10-16): `OREO_EXPECTED=update` on the API creation cases; review the diff. This replaces the converted files with real recordings. Fields that are placeholders in the old data without a rule (the warnings of check 5: `tradeType`, `currencyPair`, `rate`, `scbEntity`, `ci`, `cva`, `fva`, `vmc` ...) become exact values; for each, the review decides whether it is exact or dynamic (risk figures such as `cva` / `fva` may change from day to day: then a `type` rule and record again). The recording also answers two open points: whether the responses name the products `FX_CO` / `FX_FSB`, and the nine inferred lines of `FX_PSCRIPT_TRF-API-002/003`.
+7. **Base and patch** (7.5), after step 5: `expectedBase` in the event files, the compaction, check 7. The first compaction runs on the recordings of step 6.
 
 Verification here: Genie's artifacts are not reachable outside the company network, so only the `testdata/` package and its tests are built and run here (a scratch build with Jackson, Spring core, JsonUnit, JUnit). The changed glue classes are checked by reading; they compile on the company machine.
 
@@ -361,20 +415,21 @@ Verification here: Genie's artifacts are not reachable outside the company netwo
 2. Every case ID expanded from every feature file (scenario names, Examples column `product_type`) resolves without error, and no case matches two rows.
 3. Every row matches at least one case ID; every event file has a feature file of the same name in its channel.
 4. Every API case has an expected file; every expected file belongs to a case. (So a product just added to the Examples fails this check until its files are recorded and committed.)
-5. Rules and expected files agree (catches a rule changed without recording again). For every rule of a case, its path exists in the expected file and holds: a placeholder for `type`, `regex:`, `ignore`; a placeholder or a tree whose leaves are all placeholders for `type-tree`. A path whose ancestor is a placeholder (the converted old data ignored a whole `instrument`) passes with a warning. Placeholders where no rule exists are warnings too. Both come from the converted old data, are weaker than a recording, and are the checklist of migration step 6.
+5. Rules and expected files agree (catches a rule changed without recording again). For every rule of a case, its path exists in the expected file's full form (7.5) and holds: a placeholder for `type`, `regex:`, `ignore`; a placeholder or a tree whose leaves are all placeholders for `type-tree`. A path whose ancestor is a placeholder (the converted old data ignored a whole `instrument`) passes with a warning. Placeholders where no rule exists are warnings too. Both come from the converted old data, are weaker than a recording, and are the checklist of migration step 6.
 6. Every setup name used in `src/main/java` (`TestData.setup("...")`) and in snippets (`from test data '...'`) exists. `trade-cancellation` and `trade-amendment` are listed in the test as known missing until their bodies arrive.
+7. Expected files are consistent and compacted: the compaction of 7.5, planned on every event without writing, has no errors (an error fails the check) and would change no file (a change is a warning: "run CompactExpectedFiles").
 
-Lookup: `mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002` prints the applied layers, the final request, the `dynamicFields` and the expected file path.
+Lookup: `mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002` prints the applied layers, the final request, the `dynamicFields`, the `expectedBase`, the expected file path with its form (full, or patch on which base), and the full form of the expected response.
 
 ## 11. Maintenance
 
 | Task | What to change |
 |---|---|
-| New product | `ProductDatFiles` constant + `data/<P>.dat`; the product in each feature's Examples; `byProduct` entries only where its data or dynamic fields differ; run the API cases, review the recorded files, commit |
-| New positive case | nothing when it runs on the defaults; otherwise a row with the feature's ID |
+| New product | `ProductDatFiles` constant + `data/<P>.dat`; the product in each feature's Examples; `byProduct` entries only where its data or dynamic fields differ; run the API cases, compact, review the recorded files, commit. No base to declare: `defaults` covers every product |
+| New positive case | nothing when it runs on the defaults; otherwise a row with the feature's ID; after the recording, compact |
 | New negative case | a row with the `request` change and `"dynamicFields": null` |
 | New event | `data/<channel>/<event>.json` named after the feature file; shared blocks from `common.json` through `use` |
-| API response gains a field | `OREO_EXPECTED=update`, review the diff |
+| API response gains a field | `OREO_EXPECTED=update`, compact, review the diff (the base files change, the patches do not) |
 | A field turns out dynamic | its rule in the event file (`defaults` or `byProduct`), then record again |
 | Change the default counterparty | `api/common.json`, `ui/common.json`, `setup/trade-create*.json` (three places, decoupled on purpose); record API again |
 | New setup payload | `data/setup/<what-it-prepares>.json`, referenced by that name |
@@ -389,4 +444,4 @@ Lookup: `mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT
 
 1. Step 6 of the migration (first recording) needs the real system.
 
-Decided on 2026-10-16: the `basic.productId` fix in `TradeProvisioningSteps` is approved; cancellation and amendment are not covered for now, so `trade-cancellation` and `trade-amendment` stay without a file (listed as known missing by check 6).
+Decided on 2026-10-16: base and patch (7.5), with arrays of the same length compared by index and the full form kept when a patch is not shorter; one expected file per case stays. The `basic.productId` fix in `TradeProvisioningSteps` is approved; cancellation and amendment are not covered for now, so `trade-cancellation` and `trade-amendment` stay without a file (listed as known missing by check 6).
