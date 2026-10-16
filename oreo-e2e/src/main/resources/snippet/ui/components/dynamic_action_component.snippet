@@ -33,9 +33,6 @@
 @When "^component dynamic action types novation remaining target amount from stored variable '([^']*)'$"
     When type inner value '$1' from stored variable into 'dynamic_action.nr_new_target_amount_input'
 
-@When "^component dynamic action types novation remaining delts from stored variable '([^']*)'$"
-    When type inner value '$1' from stored variable into 'dynamic_action.delta_input'
-
 @When "^component dynamic action types new notional from stored variable '([^']*)'$"
     When type inner value '$1' from stored variable into 'dynamic_action.pt_new_notional_input'
 
