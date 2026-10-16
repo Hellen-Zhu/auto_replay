@@ -84,7 +84,8 @@ public class CommonE2EInteraction {
     public void typeInnerValueFromStoredVariable(String ctxKey, String elementKey) {
         String value = ctx.get(ctxKey);
         ctx.write("Typing inner value from stored variable request: " + value);
-        // [not in the photos: the rest of this method]
+        Locator innerInput = ctx.service().getLocator(elementKey).locator("input[part='input'], textarea[part='input']");
+        innerInput.fill(value);
     }
 
     @When("^type inner value '([^']*)' from stored variable into '([^']*)' with dynamic value from stored variable '([^']*)'$")
