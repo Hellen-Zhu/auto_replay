@@ -1,1 +1,24 @@
-# Placeholder: copy lifecycle_event.snippet from the E2E project.
+# ── FLOW: LIFECYCLE EVENT (COMMON) ──────────────────────────────────
+
+@When "^opens lifecycle action '(allocation|novation remaining|partial novation remaining|step out full|step out partial|early termination|partial termination|portfolio reassignment)' for current trade$"
+    When page trade portal searches and opens action menu for trade stored as 'createdTradeId'
+    And page trade portal $1 action button is visible
+    And page trade portal clicks $1 action for current trade
+    And component dynamic action dialog is visible
+
+@When "^submits lifecycle event and waits for page ready$"
+    When confirm dynamic action form using configured risk engine mode for trade stored as 'createdTradeId'
+    And component trade change confirmation dialog is visible
+    And confirm lifecycle event trade change and wait for page ready
+
+@Then "^the trade remains Live and is marked as Amended$"
+    Then the trade has status 'LIVE' and event status 'Amended' in the blotter
+
+@Then "^the original trade is closed as Novated$"
+    Then the trade has status 'DEAD' and event status 'Novated' in the blotter
+
+@Then "^the original trade is closed as Novated and new novated trade is live$"
+    Then the new trade has status 'LIVE' and event status 'Novated' and original trade has status 'DEAD' and event status 'Novated' in the blotter
+
+@Then "^the trade remains Live and is marked as Novated$"
+    Then the trade has status 'LIVE' and event status 'Novated' in the blotter

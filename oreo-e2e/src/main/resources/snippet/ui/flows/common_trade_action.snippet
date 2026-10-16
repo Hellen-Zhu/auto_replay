@@ -1,1 +1,44 @@
-# Placeholder: copy common_trade_action.snippet from the E2E project.
+@Given "^a Draft Pending Approval '([^']*)' trade exists in the blotter$"
+    Given a draft pending approval '$1' trade is provisioned via playwright api
+
+@Given "^a Draft Pending Approval '([^']*)' StepIn Full trade exists in the blotter$"
+    Given a draft pending approval '$1' stepin full trade is provisioned via playwright api
+
+@Given "^a Draft Pending Approval '([^']*)' StepIn Partial trade exists in the blotter$"
+    Given a draft pending approval '$1' stepin partial trade is provisioned via playwright api
+
+@Given "^a Live '([^']*)' trade exists in the blotter$"
+    Given a live '$1' trade is provisioned via playwright api
+
+@Given "^a Dead '([^']*)' trade exists in the blotter$"
+    Given a dead '$1' trade is provisioned via playwright api
+
+@Given "^a Draft '([^']*)' trade exists in the blotter$"
+    Given a draft '$1' trade is provisioned via playwright api
+
+@Then "^the trade has status '([^']*)' and event status '([^']*)' in the blotter$"
+    When page trade portal navigates to Trade Portal page
+    And page trade portal searches and views trade stored as 'createdTradeId'
+    And page trade portal blotter column 'status' is '$1'
+    And page trade portal blotter column 'eventStatus' is '$2'
+
+@Then "^the new trade has status '([^']*)' and event status '([^']*)' and original trade has status '([^']*)' and event status '([^']*)' in the blotter$"
+    When page trade portal navigates to Trade Portal page
+    And page trade portal searches and views trade stored as 'createdTradeId'
+    And page trade portal blotter column 'status' is '$1'
+    And page trade portal blotter column 'eventStatus' is '$2'
+    And page trade portal blotter row 2 column 'status' is '$3'
+    And page trade portal blotter row 2 column 'eventStatus' is '$4'
+
+@Then "^the trade is Live and marked as New$"
+    Then the trade has status 'LIVE' and event status 'New' in the blotter
+
+@Then "^trade status is updated to '([^']*)' and event status is updated to '([^']*)' in the trade portal page$"
+    When page trade detail navigates back to blotter view
+    Then the trade has status '$1' and event status '$2' in the blotter
+
+@Then "^the trade is rejected successfully$"
+    Then assert toast notification with type 'success' and title as 'Trade rejected successfully'
+
+@Then "^the trade is approved successfully$"
+    Then assert toast notification with type 'success' and title as 'Trade approved successfully'

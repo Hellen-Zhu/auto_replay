@@ -1,1 +1,25 @@
-# Placeholder: copy authentication_login.snippet from the E2E project.
+# ── FLOW: AUTHENTICATION ────────────────────────────────────────────
+
+@Given "^login in application with email '([^']*)' and password '([^']*)'$"
+    Given navigate to login page
+    And page login signs in with email '$1' and password '$2'
+
+@When "^maker is logged in to the trade portal$"
+    When login in application with email 'maker@example.com' and password '<password not committed>'
+
+@When "^checker is logged in to the trade portal$"
+    When login in application with email 'checker@example.com' and password '<password not committed>'
+
+@When "^admin is logged in to the trade portal$"
+    When login in application with email 'admin@example.com' and password '<password not committed>'
+
+@When "^user is logged in to the trade portal$"
+    When login in application with email 'user@example.com' and password '<password not committed>'
+
+@When "^user logs out and re-login$"
+    When page user preference opens settings panel
+    And page user preference clicks logout button
+    And user is logged in to the trade portal
+
+@Then "^has access to the trade portal$"
+    Then page trade portal is displayed

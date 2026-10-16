@@ -1,1 +1,12 @@
-# Placeholder: copy trade_early_termination.snippet from the E2E project.
+@When "^perform the Early Termination event on the '([^']*)' trade$"
+    When opens lifecycle action 'early termination' for current trade
+    And component dynamic action selects direction from stored variable 'earlyTermination.direction'
+    And component dynamic action types amount from stored variable 'earlyTermination.amount'
+    And component dynamic action types currency from stored variable 'earlyTermination.ccy'
+    And submits lifecycle event and waits for page ready
+
+@Then "^the early termination is completed successfully$"
+    Then assert toast notification with type 'success' and message 'EarlyTermination completed successfully'
+
+@Then "^the trade is closed as Terminated$"
+    Then the trade has status 'DEAD' and event status 'Terminated' in the blotter

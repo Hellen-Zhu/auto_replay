@@ -1,1 +1,58 @@
-# Placeholder: copy trade_creation.snippet from the E2E project.
+# ── FLOW: TRADE CREATION ────────────────────────────────────────────
+
+@When "^creates a new '([^']*)' trade$"
+    When page trade portal clicks new trade button
+    And page new trade container is visible
+    And page new trade selects basic mandatory info
+    And upload '$1' dat file
+    And page new trade book and captures trade id as 'createdTradeId'
+    And page trade detail header card contains from stored variable 'createdTradeId'
+
+@When "^creates a new '([^']*)' StepIn partial trade$"
+    When page trade portal clicks new trade button
+    And upload '$1' dat file
+    And page new trade selects basic mandatory info
+    And page new trade enables stepin toggle
+    And page new trade selects stepin partial radio
+    And page new trade selects old counterparty from stored variable 'stepIn.oldCounterpartyName'
+    And page new trade book and captures trade id as 'createdTradeId'
+
+@When "^creates a new '([^']*)' StepIn full trade$"
+    When page trade portal clicks new trade button
+    And upload '$1' dat file
+    And page new trade selects basic mandatory info
+    And page new trade enables stepin toggle
+    And page new trade selects stepin full radio
+    And page new trade selects old counterparty from stored variable 'stepIn.oldCounterpartyName'
+    And page new trade book and captures trade id as 'createdTradeId'
+
+@Then "^trade is created with pending approval status and info$"
+    Then page trade detail header card contains from stored variable 'createdTradeId'
+    And page trade detail status badge shows 'PARV'
+    And the trade show correct info in trade details
+
+@Then "^trade is created with live status and info$"
+    Then page trade detail header card contains from stored variable 'createdTradeId'
+    And page trade detail status badge shows 'LIVE'
+    And the trade show correct info in trade details
+
+@Then "^the StepIn Full trade is Live in trade details$"
+    Then the trade remains Live in trade details
+
+@Then "^the newly created trade is pending checker approval$"
+    Then the trade has status 'PARV' and event status 'New' in the blotter
+
+@Then "^the StepIn Full trade is pending checker approval$"
+    Then the trade has status 'PARV' and event status 'StepInFull' in the blotter
+
+@Then "^the StepIn Partial trade is pending checker approval$"
+    Then the trade has status 'PARV' and event status 'StepInPartial' in the blotter
+
+@Then "^the StepIn Partial trade is reverted to Draft$"
+    Then the trade has status 'DRFT' and event status 'StepInPartial' in the blotter
+
+@Then "^the rejected trade submission is reverted to Draft$"
+    Then trade status is updated to 'DRFT' and event status is updated to 'New' in the trade portal page
+
+@Then "^the StepIn Full trade is Live after checker approval$"
+    Then trade status is updated to 'LIVE' and event status is updated to 'StepInFull' in the trade portal page

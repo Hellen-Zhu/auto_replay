@@ -1,1 +1,31 @@
-# Placeholder: copy trade_detail.snippet from the E2E project.
+@When "^opens trade detail for current trade from trade portal$"
+    When page trade portal searches and views trade stored as 'createdTradeId'
+    And double click to navigate to trade detail and wait for page ready for stored variable 'createdTradeId'
+    And page trade detail container is visible
+
+@When "^approves the trade from the trade detail page$"
+    When opens trade detail for current trade from trade portal
+    And page trade detail clicks approve button
+    And page trade detail confirms checker action and waits for page ready
+
+@When "^rejects the trade from the trade detail page$"
+    When opens trade detail for current trade from trade portal
+    And page trade detail clicks reject button
+    And page trade detail confirms checker action and waits for page ready
+
+@Then "^the trade show correct info in trade details$"
+    Then page trade detail basic info card is visible
+    And page trade detail risk metrics section is visible
+    And page trade detail instrument section is visible
+    And page trade detail schedule section is visible
+    And page trade detail history events card is visible
+    And page trade detail audit trail card is visible
+
+@Then "^the trade is pending checker approval in trade details$"
+    Then page trade detail status badge shows 'PARV'
+
+@Then "^the trade remains Live in trade details$"
+    Then page trade detail status badge shows 'LIVE'
+
+@Then "^the trade is reverted to Draft in trade details$"
+    Then page trade detail status badge shows 'DRFT'
