@@ -1,0 +1,1 @@
+{ "_comment": "Fixture: dynamicFields are API only", "defaults": { "dynamicFields": { "x": "type" } } }

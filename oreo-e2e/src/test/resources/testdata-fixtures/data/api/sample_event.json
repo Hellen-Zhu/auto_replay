@@ -1,0 +1,13 @@
+{
+  "_comment": "Fixture for TestDataRepositoryTest: every layer",
+  "defaults": { "use": ["base"], "dynamicFields": { "data.id": "type" } },
+  "byProduct": {
+    "FX_PSCRIPT_TRF": { "request": { "basic": { "premium": null } } }
+  },
+  "cases": [
+    { "id": "TC-SAMPLE-EVENT-<product_type>-API-002", "use": ["extra"],
+      "byProduct": { "FX_PSCRIPT_TRF": { "request": { "basic": { "ccy": "" } } } } },
+    { "id": "TC-SAMPLE-EVENT-API-004", "_comment": "a negative case drops the rules",
+      "request": { "basic": { "a": "2" } }, "dynamicFields": null }
+  ]
+}

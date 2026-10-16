@@ -1,0 +1,7 @@
+{
+  "_comment": "Fixture for TestDataRepositoryTest: shared blocks",
+  "shared": {
+    "base": { "request": { "basic": { "a": "1", "premium": 10 } } },
+    "extra": { "request": { "basic": { "udf": ["x"] } }, "dynamicFields": { "msg": "type" } }
+  }
+}

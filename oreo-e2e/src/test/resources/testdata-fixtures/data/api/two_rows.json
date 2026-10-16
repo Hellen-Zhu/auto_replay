@@ -1,0 +1,7 @@
+{
+  "_comment": "Fixture: one case matched by two rows",
+  "cases": [
+    { "id": "TC-TWO-ROWS-<product_type>-API-001" },
+    { "id": "TC-TWO-ROWS-FX_TRF-API-001" }
+  ]
+}

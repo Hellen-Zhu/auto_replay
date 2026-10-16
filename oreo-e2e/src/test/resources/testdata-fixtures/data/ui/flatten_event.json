@@ -1,0 +1,1 @@
+{ "_comment": "Fixture: flattening into ctx keys", "defaults": { "request": { "basic": { "a": "1" }, "udf": [ { "k": "v" } ] } } }
