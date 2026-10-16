@@ -1,1 +1,55 @@
-# Placeholder: copy dynamic_action_component.snippet from the E2E project.
+# ── DYNAMIC ACTION COMPONENT ────────────────────────────────────────
+
+@And "^component dynamic action dialog is visible$"
+    And assert that inner '[slot="header"]' property of 'dynamic_action.dialog' is eventually visible
+
+@And "^component dynamic action dialog is hidden$"
+    And assert that inner '[slot="header"]' property of 'dynamic_action.dialog' is eventually hidden
+
+@When "^component dynamic action selects portfolio from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.portfolio_select'
+    And click option from stored variable '$1'
+
+@When "^component dynamic action selects direction from stored variable '([^']*)'$"
+    When click 'dynamic_action.et_direction_select'
+    And click option from stored variable '$1'
+
+@When "^component dynamic action selects counterparty from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.counterparty_select'
+    And click option from stored variable '$1'
+
+@When "^component dynamic action types amount from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.amount_input'
+
+@When "^component dynamic action types currency from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.et_ccy_input'
+
+@When "^component dynamic action types settle date from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.et_settle_date_input'
+
+@When "^component dynamic action types effective date from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.effective_date_input'
+
+@When "^component dynamic action types novation remaining target amount from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.nr_new_target_amount_input'
+
+@When "^component dynamic action types novation remaining delts from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.delta_input'
+
+@When "^component dynamic action types new notional from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.pt_new_notional_input'
+
+@When "^component dynamic action types Unwind Fee Amount from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.amount_input'
+
+@When "^component dynamic action types remaining notional from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.remaining_notional_input'
+
+@When "^component dynamic action types novation date from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'dynamic_action.novation_date_input'
+
+@When "^component dynamic action clicks confirm button$"
+    When click 'dynamic_action.confirm_btn'
+
+@Then "^component dynamic action equation line contains stored variable '([^']*)'$"
+    Then assert that 'dynamic_action.equation_line' eventually contains from stored variable '$1'

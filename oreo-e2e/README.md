@@ -52,6 +52,7 @@ src/main/java/com/example/module/oreo/
 src/main/resources/
   META-INF/services/com.example.genie.module.GenieModule   placeholder (named after the GenieModule interface there)
   snippet/api/, snippet/ui/components|flows|pages/*.snippet placeholders
+  snippet/ui/components/*.snippet   transcribed from the E2E project
   cucumber.xml                    transcribed from the E2E project
 src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/; glue and report set here)

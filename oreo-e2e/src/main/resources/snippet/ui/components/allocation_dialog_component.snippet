@@ -1,1 +1,23 @@
-# Placeholder: copy allocation_dialog_component.snippet from the E2E project.
+# ── COMPONENT: ALLOCATION DIALOG ────────────────────────────────────
+@When "^component allocation dialog enters split number '([^']*)'$"
+    When type value '$1' into 'allocation_dialog.number_split_input'
+
+
+@When "^component allocation dialog enters percentage '([^']*)' and clicks allocate$"
+    When type value '$1' into 'allocation_dialog.percentage_input'
+    And click 'allocation_dialog.allocate_btn'
+
+@When "^component allocation dialog clicks add subtrade button$"
+    When click 'allocation_dialog.add_subtrade_btn'
+
+@Then "^component allocation dialog remaining value is '([^']*)'$"
+    Then assert that 'allocation_dialog.allocation_remaining_value' is '$1'
+
+@Then "^component allocation dialog total pct value is '([^']*)'$"
+    Then assert that 'allocation_dialog.allocation_total_pct_value' is '$1'
+
+@Then "^component allocation dialog add subtrade button is enabled$"
+    Then assert that inner 'button' property of 'allocation_dialog.add_subtrade_btn' is eventually enabled
+
+@Then "^component allocation dialog add subtrade button is disabled$"
+    Then assert that inner 'button' property of 'allocation_dialog.add_subtrade_btn' is eventually disabled

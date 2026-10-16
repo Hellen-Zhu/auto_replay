@@ -1,1 +1,17 @@
-# Placeholder: copy trade_change_confirmation_component.snippet from the E2E project.
+# ── TRADE CHANGE CONFIRMATION COMPONENT ─────────────────────────────
+
+@And "^component trade change confirmation dialog is visible$"
+    And assert that inner '[slot="header"]' property of 'trade_change_confirmation.dialog' is eventually visible
+
+@And "^component trade change confirmation dialog is hidden$"
+    And assert that inner '[slot="header"]' property of 'trade_change_confirmation.dialog' is eventually hidden
+
+@When "^component trade change confirmation selects reason option '([^']*)'$"
+    When click 'trade_change_confirmation.reason_select'
+    And click option '$1'
+
+@When "^component trade change confirmation types comments as '([^']*)'$"
+    When type value '$1' into 'trade_change_confirmation.comments_textarea'
+
+@When "^component trade change confirmation types comments from stored variable '([^']*)'$"
+    When type inner value '$1' from stored variable into 'trade_change_confirmation.comments_textarea'
