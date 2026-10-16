@@ -1,77 +1,100 @@
 package com.example.module.oreo.testdata;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Iterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * The resolved test data of one case: the request body and the expected response as JSON text, the same shape the
- * hook stores in the scenario context today ({@code _tc.request}, {@code _tc.response}).
- */
 public final class TestDataRecord {
 
-    private final String tcKey;
-    private final JsonNode request;
-    private final JsonNode response;
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
-    TestDataRecord(String tcKey, JsonNode request, JsonNode response) {
-        this.tcKey = tcKey;
-        this.request = request;
+    private final String request;
+    private final String response;
+
+    private TestDataRecord(String request, String response) {
+        this.request  = request;
         this.response = response;
     }
 
-    public String tcKey() {
-        return tcKey;
+    /**
+     * Creates a new {@code TestDataRecord}.
+     *
+     * @param request  raw JSON string from the {@code request:} node, or {@code null}
+     * @param response raw JSON string from the {@code response:} node, or {@code null}
+     */
+    public static TestDataRecord of(String request, String response) {
+        return new TestDataRecord(request, response);
     }
 
-    /** Request body as pretty-printed JSON, or null when the case has none. */
-    public String request() {
-        return toText(request);
-    }
+    // ── Accessors ────────────────────────────────────────────────────────────
 
-    /** Expected response as pretty-printed JSON, or null when the case has none. */
-    public String response() {
-        return toText(response);
-    }
+    /** Raw JSON string of the request body, or {@code null} if not configured. */
+    public String request()  { return request;  }
 
-    public JsonNode requestNode() {
-        return request;
-    }
+    /** Raw JSON string of the expected response snapshot, or {@code null} if not configured. */
+    public String response() { return response; }
 
-    public JsonNode responseNode() {
-        return response;
-    }
+    // ── Convenience guards ───────────────────────────────────────────────────
+
+    /** {@code true} if a {@code request:} node was present in YAML. */
+    public boolean hasRequest()  { return request  != null && !request.isBlank();  }
+
+    /** {@code true} if a {@code response:} node was present in YAML. */
+    public boolean hasResponse() { return response != null && !response.isBlank(); }
 
     /**
-     * Leaf values of the request by their dotted path ({@code basic.counterpartyName}); array items as
-     * {@code subTrades[0].notional}. Keep the existing flattenRequest() of the E2E project if its paths differ.
+     * Flattens the {@code request:} JSON into a map of dot-path keys to string leaf values.
+     * Array elements use bracket notation: {@code "subTrades[0].portfolioId"}.
+     *
+     * <p>Called by {@code ScenarioLifecycleHooks} at scenario start to bulk-inject
+     * all test data fields into the scenario context. An empty object {@code {}} or
+     * a missing {@code request:} node returns an empty map — nothing is stored.
+     *
+     * @return immutable map of dot-path → string value; empty if request is absent or {@code {}}
      */
     public Map<String, String> flattenRequest() {
-        Map<String, String> out = new LinkedHashMap<>();
-        if (request != null) {
-            flatten("", request, out);
+        if (!hasRequest()) {
+            return Collections.emptyMap();
         }
-        return out;
+        try {
+            JsonNode root = JSON_MAPPER.readTree(request);
+            if (root == null || root.isMissingNode() || root.isNull()) {
+                return Collections.emptyMap();
+            }
+            Map<String, String> result = new LinkedHashMap<>();
+            flattenNode(root, "", result);
+            return Collections.unmodifiableMap(result);
+        } catch (Exception e) {
+            throw new AssertionError(
+                    "[TestDataRecord] Failed to parse request JSON: " + e.getMessage());
+        }
     }
 
-    private static void flatten(String prefix, JsonNode node, Map<String, String> out) {
+    @Override
+    public String toString() {
+        return "TestDataRecord{"
+                + "hasRequest=" + hasRequest()
+                + ", hasResponse=" + hasResponse()
+                + '}';
+    }
+
+    // ── Private ──────────────────────────────────────────────────────────────
+
+    private static void flattenNode(JsonNode node, String prefix, Map<String, String> result) {
         if (node.isObject()) {
-            Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
-            while (fields.hasNext()) {
-                Map.Entry<String, JsonNode> e = fields.next();
-                flatten(prefix.isEmpty() ? e.getKey() : prefix + "." + e.getKey(), e.getValue(), out);
+            for (Map.Entry<String, JsonNode> field : node.properties()) {
+                String childKey = prefix.isEmpty() ? field.getKey() : prefix + "." + field.getKey();
+                flattenNode(field.getValue(), childKey, result);
             }
         } else if (node.isArray()) {
             for (int i = 0; i < node.size(); i++) {
-                flatten(prefix + "[" + i + "]", node.get(i), out);
+                flattenNode(node.get(i), prefix + "[" + i + "]", result);
             }
-        } else if (!node.isNull()) {
-            out.put(prefix, node.asText());
+        } else if (!node.isNull() && !node.isMissingNode()) {
+            result.put(prefix, node.asText());
         }
-    }
-
-    private static String toText(JsonNode node) {
-        return node == null ? null : node.toPrettyString();
     }
 }

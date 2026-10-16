@@ -43,10 +43,7 @@ src/main/java/com/example/module/oreo/
   glue/ui/TradeLifecycleEventSteps.java    lifecycle_event / common_trade_action / trade_early_termination snippets
   glue/ui/BlotterSteps, CommonE2EAssertion, CommonE2EInteraction, CommonHelpers, PlaywrightServiceResolver,
           ToastSteps, TradeDetailSteps, TradePortalSteps            placeholders
-  testdata/TestDataLoader.java    case data (getByTcId) and setup data (forKey); new files, old YAML as fallback;
-                                  deep merge (objects key by key, arrays replaced)
-  testdata/TestDataRecord.java    request / response JSON + flattenRequest()
-  testdata/ProductDatFiles.java   enum of the dat files; forProduct(name) -> data/<PRODUCT ID>.dat
+  testdata/TestDataLoader.java, TestDataRecord.java, ProductDatFiles.java   transcribed from the E2E project (YAML loader)
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
   utils/CleanupTestDataUtil, DatabaseSqlUtil, DateUtil, RestApiUtil  placeholders
   utils/ui/OreoUi.java, RecordingOreoUi.java     browser actions by element key (Genie built-ins, ctx.click...)

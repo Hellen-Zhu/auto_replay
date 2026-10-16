@@ -1,25 +1,34 @@
 package com.example.module.oreo.testdata;
 
-/**
- * The dat file a product's trade is created from, as ProductDatFiles in the E2E project: {@code <PRODUCT ID>.dat} in
- * {@code oreo.datDir} (default {@code src/test/resources/data}). A product name is turned into its product ID by
- * {@link Products} first (FX_FSB -> FX_PSCRIPT_FSKO).
- */
+
 public enum ProductDatFiles {
-    FX_PSCRIPT,
-    FX_PSCRIPT_FSKO,
-    FX_PSCRIPT_TRF,
-    FX_TRF;
 
-    public String fileName() {
-        return name() + ".dat";
+    /** FX Total Return Forward — uses the standard TRF .dat template. */
+    FX_TRF("data/FX_TRF.dat"),
+
+    /** CorrOption (FX Correlation Option). */
+    FX_CO("data/FX_CO.dat"),
+
+    /** FX Floating Strike Barrier. */
+    FX_FSB("data/FX_FSB.dat"),
+
+    /** TRF Generic product — uses dedicated FX_PSCRIPT_TRF template. */
+    FX_PSCRIPT_TRF("data/FX_PSCRIPT_TRF.dat"),
+
+    /** Placeholder for FX Option — replace path when .dat template is available. */
+    FX_OPT("data/fx-opt.dat");
+
+    private final String classpathPath;
+
+    ProductDatFiles(String classpathPath) {
+        this.classpathPath = classpathPath;
     }
 
+    /**
+     * Classpath-relative path to the {@code .dat} file for this product type,
+     * suitable for {@code getClassLoader().getResource(path)}.
+     */
     public String path() {
-        return System.getProperty("oreo.datDir", "src/test/resources/data") + "/" + fileName();
-    }
-
-    public static String forProduct(String product) {
-        return valueOf(Products.productId(product)).path();
+        return classpathPath;
     }
 }
