@@ -373,7 +373,12 @@ public class TestDataValidationTest {
         for (Path dir : List.of(project.resolve("src/main/resources/snippet"),
                 project.resolve("src/test/resources/features"))) {
             for (Path file : files(dir, dir.endsWith("snippet") ? ".snippet" : ".feature")) {
-                collect(STEP_TEXT, Files.readString(file, StandardCharsets.UTF_8), used);
+                for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+                    // A snippet's '@Given "^... from test data '([^']*)'$"' line defines the step (its regex is
+                    // no name); a feature's '@' line holds tags. Only the other lines use a setup name.
+                    if (line.trim().startsWith("@")) continue;
+                    collect(STEP_TEXT, line, used);
+                }
             }
         }
         used.removeIf(name -> name.startsWith("$"));
