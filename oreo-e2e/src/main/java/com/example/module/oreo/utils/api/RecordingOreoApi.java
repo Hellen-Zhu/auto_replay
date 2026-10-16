@@ -36,6 +36,12 @@ public class RecordingOreoApi implements OreoApi {
         return parse("{\"code\":200,\"status\":\"SUCCESS\"}");
     }
 
+    @Override
+    public JsonNode putJson(String path, String userId, String body) {
+        log.add("PUT " + path + " as " + userId + " " + compact(body));
+        return parse("{\"code\":200,\"status\":\"SUCCESS\"}");
+    }
+
     private static String compact(String json) {
         return parse(json).toString();
     }

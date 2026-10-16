@@ -53,7 +53,7 @@ public class NewTradeSteps {
     @Then("trade is created with pending approval status and info")
     public void tradeIsPendingApproval() {
         // "and info": which details the snippet checks besides the status was not seen
-        new TradeDetailPage(session.ui()).expectTrade(ctx.text("createdTradeId"), TradeDetailPage.PENDING_APPROVAL);
+        new TradeDetailPage(session.ui()).expectTrade(ctx.get("createdTradeId"), TradeDetailPage.PENDING_APPROVAL);
     }
 
     private void createStepIn(String product, boolean full) {
@@ -61,7 +61,7 @@ public class NewTradeSteps {
         newTrade.uploadDat(ProductDatFiles.forProduct(product));
         selectBasicInfo();
         newTrade.enableStepIn(full);
-        newTrade.selectStepInOldCounterparty(ctx.text("stepIn.oldCounterpartyName"));
+        newTrade.selectStepInOldCounterparty(ctx.get("stepIn.oldCounterpartyName"));
         bookAndConfirm();
     }
 
@@ -71,10 +71,10 @@ public class NewTradeSteps {
     }
 
     private void selectBasicInfo() {
-        newTrade.selectCounterparty(ctx.text("basic.counterpartyName"));
-        newTrade.selectPortfolio(ctx.text("basic.portfolioId"));
-        newTrade.selectProductId(ctx.text("basic.productId"));
-        newTrade.selectDirection(ctx.text("basic.direction"));
+        newTrade.selectCounterparty(ctx.get("basic.counterpartyName"));
+        newTrade.selectPortfolio(ctx.get("basic.portfolioId"));
+        newTrade.selectProductId(ctx.get("basic.productId"));
+        newTrade.selectDirection(ctx.get("basic.direction"));
     }
 
     /** Book, then confirm and store the new trade's ID as {@code createdTradeId} */
@@ -82,7 +82,7 @@ public class NewTradeSteps {
         newTrade.book(session.config().riskEngineMode());
         String response = newTrade.confirmAndCaptureCreation();
         try {
-            ctx.setAttribute("createdTradeId", JSON.readTree(response).at("/data/trade/id").asText());
+            ctx.set("createdTradeId", JSON.readTree(response).at("/data/trade/id").asText());
         } catch (IOException e) {
             throw new UncheckedIOException("The trade creation answer is not JSON: " + response, e);
         }

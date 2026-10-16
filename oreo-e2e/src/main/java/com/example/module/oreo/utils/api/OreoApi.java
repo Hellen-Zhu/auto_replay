@@ -11,4 +11,6 @@ public interface OreoApi {
     JsonNode postMultipart(String path, String userId, String jsonPart, String json, String filePart, String file);
 
     JsonNode postJson(String path, String userId, String body);
+
+    JsonNode putJson(String path, String userId, String body);
 }
