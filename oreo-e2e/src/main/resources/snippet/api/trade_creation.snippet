@@ -1,0 +1,57 @@
+# ── Build request ───────────────────────────────────────────────────
+
+# Product param must match a ProductDatFiles enum name: FX_TRF | FX_PSCRIPT that match a .dat test data file name
+@Given "^maker has valid data for '([^']*)' (?:New|StepIn Partial|StepIn Full) trade submission$"
+    Given build multipart request with parameter 'trade' from current scenario for product '$1' as user 'maker@example.com'
+
+@Given "^checker has valid data for '([^']*)' (?:New|StepIn Partial|StepIn Full) trade submission$"
+    Given build multipart request with parameter 'trade' from current scenario for product '$1' as user 'checker@example.com'
+
+@Given "^maker has invalid '([^']*)' data for '([^']*)' (?:New|StepIn Partial|StepIn Full) trade submission$"
+    Given build multipart request with parameter 'trade' from current scenario for product '$2' as user 'maker@example.com'
+
+
+# ── Make api call ───────────────────────────────────────────────────
+
+@When "performs the Trade Creation action via api$"
+    When post to path '/trades/create?tradeAction=SUBMIT'
+    And attach the response body to the report
+
+
+# ── Assertions ──────────────────────────────────────────────────────
+
+@Then "^new trade is persisted in database successfully$"
+    When store response field 'data.trade.id' as 'createdTradeId'
+    And execute sql query:
+      | SELECT id AS active FROM trades WHERE id = '\${createdTradeId}' |
+    Then assert query result is not empty
+
+# Asserts 200 + full schema match, then stores tradeId for the DB assertion that follows.
+@Then "^the trade is created and persisted successfully$"
+    Then the 'trade' should be 'created' successfully
+    And new trade is persisted in database successfully
+
+@Then "^the trade is created with status as '([^']*)' and persisted successfully$"
+    Then the 'trade' should be 'created' successfully
+    And new trade is persisted in database successfully
+    And the trade basic status is 'Pending Approval Draft'
+
+@Then "^the trade is updated with status as '([^']*)' and persisted successfully$"
+    Then the 'trade' should be 'updated' successfully
+    And new trade is persisted in database successfully
+
+@Then "^the trade details are returned with the expected instrument structure$"
+    Then the 'trade details' should be 'retrieved' successfully
+
+@Then "^the trade submission response status is '([^']*)'$"
+    Then response body contains a key 'status' with value '$1'
+
+@Then "^the trade creation request is rejected with a validation error$"
+    Then failed to 'create' 'trade'
+
+@Then "^the trade creation request is rejected with permission denied$"
+    Then failed to 'create' 'trade' with status '403'
+
+@Then "^the trade creation response includes the maker's user identity as the trader$"
+    Then response matches current scenario
+

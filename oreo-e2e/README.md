@@ -38,6 +38,9 @@ src/main/java/com/example/module/oreo/
           CommonHelpers.java, LoginSteps.java, NewTradeSteps.java, ToastSteps.java,
           TradeDetailSteps.java, TradePortalSteps.java, TradeLifecycleEventSteps.java,
           TradeProvisioningSteps.java   transcribed from the E2E project
+  glue/api/RestServiceResolver.java, ApiRequestSteps.java, ApiResponseAssertionSteps.java   transcribed
+          from the E2E project (a few method bodies not photographed yet)
+  glue/api/TradeApiSteps.java     partly transcribed (only the photographed middle of the file)
   glue/hooks/ScenarioLifecycleHooks.java, E2EScenarioHooks.java   transcribed from the E2E project
   glue/hooks/PlaywrightTraceHooks          placeholder
   glue/ui/LoginSteps.java                  "<role> is logged in to the trade portal" (authentication_login.snippet)
@@ -51,8 +54,8 @@ src/main/java/com/example/module/oreo/
   utils/DateUtil.java, RestApiUtil.java   transcribed from the E2E project
 src/main/resources/
   META-INF/services/com.example.genie.module.GenieModule   placeholder (named after the GenieModule interface there)
-  snippet/api/, snippet/ui/components|flows|pages/*.snippet placeholders
-  snippet/ui/components/*.snippet, snippet/ui/flows/*.snippet,
+  snippet/api/common_api.snippet, common_trade_action.snippet, trade_creation.snippet,
+          snippet/ui/components/*.snippet, snippet/ui/flows/*.snippet,
           snippet/ui/pages/*.snippet, elements/**/*.json,
           pom.xml, genie.properties, log4j2.xml   transcribed from the E2E project
   cucumber.xml                    transcribed from the E2E project

@@ -1,0 +1,45 @@
+# ── Provisioning ────────────────────────────────────────────────────
+
+@Given "^a '([^']*)' trade is submitted to pending approval and trade stored as '([^']*)'$"
+    Given build multipart request with parameter 'trade' from test data 'API-SETUP-TRADE-CREATE' for product '$1' as user 'maker@example.com'
+    When post to path '/trades/create?tradeAction=SUBMIT'
+    Then response status code is '200'
+    And store response field 'data.trade.id' as '$2'
+
+@Given "^a live '([^']*)' trade is created via api with trade stored as '([^']*)' and task stored as '([^']*)'$"
+    Given a '$1' trade is submitted to pending approval and trade stored as '$2'
+    And store response field 'data.checkerContext.taskId' as '$3'
+    And checker approve a trade by stored taskId '$3'
+
+@Given "^a live '([^']*)' trade is created via api$"
+    Given a live '$1' trade is created via api with trade stored as 'createdTradeId' and task stored as 'createdTaskId'
+
+@Given "^a '([^']*)' trade pending checker approval is created with trade stored as '([^']*)' and task stored as '([^']*)'$"
+    Given a '$1' trade is submitted to pending approval and trade stored as '$2'
+    And store response field 'data.checkerContext.taskId' as '$3'
+
+@Given "^a '([^']*)' trade is submitted to pending approval via api$"
+    Given a '$1' trade pending checker approval is created with trade stored as 'createdTradeId' and task stored as 'createdTaskId'
+
+@Given "^a dead '([^']*)' trade is created via api$"
+    Given a '$1' trade with pending cancellation is created and task stored as 'createdTaskId'
+    And checker approve a trade by stored taskId 'createdTaskId'
+
+@Given "^a draft '([^']*)' trade is created via api$"
+    Given a '$1' trade with pending cancellation is created and task stored as 'createdTaskId'
+    And checker reject a trade by stored taskId 'createdTaskId'
+
+# ── Assertions ──────────────────────────────────────────────────────
+
+@Then "^the trade basic status is '([^']*)'$"
+    Then response status code is '200'
+    And response body contains a key 'data.trade.basic.status' with value '$1'
+
+@Then "^the trade basic event status is '([^']*)'$"
+    Then response status code is '200'
+    And response body contains a key 'data.trade.basic.eventStatus' with value '$1'
+
+@Then "^the trade basic status is '([^']*)' and event status is '([^']*)'$"
+    Then the trade basic status is '$1'
+    And the trade basic event status is '$2'
+

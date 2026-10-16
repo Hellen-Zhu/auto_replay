@@ -1,0 +1,87 @@
+# ── Build request ───────────────────────────────────────────────────
+@Given "^build json request with body from test data '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to 'maker@example.com'
+    And set the payload content type to 'application/json'
+    And set request body from test data '$1'
+
+@Given "^build json request with body from test data '([^']*)' as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$2'
+    And set the payload content type to 'application/json'
+    And set request body from test data '$1'
+
+@Given "^build json request with body from current scenario$"
+    Given start building a new request
+    And set header 'X-User-Id' to 'maker@example.com'
+    And set the payload content type to 'application/json'
+    And set request body from current scenario
+
+@Given "^build json request with body from current scenario as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$1'
+    And set the payload content type to 'application/json'
+    And set request body from current scenario
+
+@Given "^build request as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$1'
+
+@Given "^build json request with path parameter '([^']*)' from stored variable '([^']*)' as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$3'
+    And set header 'Content-Type' to 'application/json'
+    And set path parameter '$1' from stored variable '$2'
+
+@Given "^build json request from test data '([^']*)' with trade id from stored variable '([^']*)' as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$3'
+    And set header 'Content-Type' to 'application/json'
+    And set json request body from test data '$1' with trade id from stored variable '$2'
+
+@Given "^build json request from current scenario with trade id from stored variable '([^']*)' as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$2'
+    And set header 'Content-Type' to 'application/json'
+    And set json request body from current scenario with trade id from stored variable '$1'
+
+@Given "^build multipart request with parameter '([^']*)' from test data '([^']*)' for product '([^']*)' as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$4'
+    And set multi-part form parameter '$1' for product '$3' from test data '$2'
+    And set multi-part dat file for product '$3'
+
+@Given "^build multipart request with parameter '([^']*)' from current scenario for product '([^']*)' as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$3'
+    And set multi-part form parameter '$1' for product '$2' from current scenario
+    And set multi-part dat file for product '$2'
+
+@Given "^build json request from current scenario with task ids from stored variables '([^']*)' and '([^']*)' as user '([^']*)'$"
+    Given start building a new request
+    And set header 'X-User-Id' to '$3'
+    And set header 'Content-Type' to 'application/json'
+    And set json request body from current scenario with task ids from stored variables '$1' and '$2'
+
+@When "^get '([^']*)' with path parameter '([^']*)' from stored variable '([^']*)' as user '([^']*)'$"
+    Given build json request with path parameter '$2' from stored variable '$3' as user '$4'
+    When get from path '$1'
+
+# ── Common Assertions ───────────────────────────────────────────────
+
+# Happy path: HTTP 200 + full schema match against current scenario's YAML response: node.
+# Use this as the standard success assertion in every positive scenario.
+# Example: successfully retrieved trade, successfully created reason, successfully approved trade etc.
+@Then "^the '([^']*)' should be '([^']*)' successfully$"
+    Then response status code is '200'
+    And response matches current scenario
+
+# Failed path: HTTP 400 + full schema match against current scenario's YAML response: node.
+# Example: failed to retrieve trade, failed to create reason, failed to approve trade etc.
+@Then "^failed to '([^']*)' '([^']*)'$"
+    Then response status code is '400'
+    And response matches current scenario
+
+@Then "^failed to '([^']*)' '([^']*)' with status '([^']*)'$"
+    Then response status code is '$3'
+    And response matches current scenario
