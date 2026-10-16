@@ -40,7 +40,7 @@ src/main/java/com/example/module/oreo/
   glue/ui/NewTradeSteps.java               trade_creation.snippet
   glue/ui/TradeProvisioningSteps.java      "a Live '<P>' trade exists in the blotter" (API, forKey API-SETUP-TRADE-CREATE)
   glue/ui/TradeLifecycleEventSteps.java    lifecycle_event / common_trade_action / trade_early_termination snippets
-  glue/ui/BlotterSteps, CommonE2EAssertion, CommonE2EInteraction, CommonHelpers, PlaywrightServiceResolver,
+  glue/ui/CommonE2EAssertion, CommonE2EInteraction, CommonHelpers, PlaywrightServiceResolver,
           ToastSteps, TradeDetailSteps, TradePortalSteps            placeholders
   testdata/TestDataLoader.java, TestDataRecord.java, ProductDatFiles.java   transcribed from the E2E project (YAML loader)
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
@@ -53,15 +53,12 @@ src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/; glue and report set here)
 src/test/resources/
   data/common.json                shared blocks; setup data API-SETUP-TRADE-CREATE, UI-SETUP-RISK-CALC-NEW-SUCCESS
-  data/ui/trade_creation.json     replaces 93 lines of YAML
-  data/ui/trade_early_termination.json   replaces the template and its 3 entries
+  data/ui/trade_creation.yml, trade_early_termination.yml, data/api/trade_creation.yml   the E2E project's YAML test data
   data/<PRODUCT ID>.dat           placeholders: FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF, FX_TRF
   elements/components|pages/*.json       the files the replay project has (../elements/) copied; the others []
   features/ui/trading/            trade_creation.feature, trade_early_termination.feature, as in the E2E project
-  features/ui/<area>/             placeholders (empty folders or a comment-only feature)
   genie.properties, uat.properties       settings without accounts or addresses
   enrich, pt, sit .properties, log4j2.xml   placeholders
-  legacy-data/                    the old YAML files (examples of the YAML fallback)
 ```
 
 ## How a step maps to the E2E project
