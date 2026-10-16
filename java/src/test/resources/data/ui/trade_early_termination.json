@@ -1,0 +1,11 @@
+{
+  "defaults": {
+    "request": {
+      "earlyTermination": {
+        "direction": "Pay",
+        "amount": "100",
+        "ccy": "USD"
+      }
+    }
+  }
+}

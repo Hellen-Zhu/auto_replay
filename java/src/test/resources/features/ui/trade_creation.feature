@@ -1,6 +1,7 @@
-Feature: Trade creation
-  As a maker
-  I want to create and submit FX trades in the portal
+@playwright @ADO#trade_creation @ADO#trade_lifecycle @test
+Feature: Trade Creation E2E
+  As a Trader
+  I want to create and submit FX TRF trades in the portal
   So that trades progress through the correct trade states and are visible in the blotter
 
   @ADO#positive @ADO#smoke

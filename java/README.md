@@ -1,9 +1,10 @@
 # Layered test data for the Java E2E project
 
 Reference implementation of this project's test data mechanism (`testdata/*.json`: shared blocks, feature
-defaults, case rows, `byProduct`) for the Java + Cucumber (Genie) E2E project, with trade creation migrated as the
-first feature. Self-contained Maven module: no Genie, no browser. The step classes here only check the data the real
-snippets would read.
+defaults, case rows, `byProduct`) for the Java + Cucumber (Genie) E2E project, with two features written end to end
+on it: trade creation and trade early termination (feature, steps, page objects, data). Self-contained Maven module:
+no Genie, no browser. The browser and the API are two interfaces (`OreoUi`, `OreoApi`); here they are recording
+stand-ins that log each action, in the E2E project they are backed by Genie.
 
 ## Problem it solves
 
@@ -15,21 +16,51 @@ entry only logs a warning.
 
 ```
 src/main/java/com/oreo/uat/testdata/
-  TestDataLoader.java     resolves a case ID to its record (new files, old YAML as fallback)
+  TestDataLoader.java     case data (getByTcId) and setup data (forKey); new files, old YAML as fallback
   TestDataRecord.java     request / response JSON + flattenRequest()
   JsonMerge.java          deep merge (objects key by key, arrays replaced)
   Products.java           product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
 src/test/java/com/oreo/uat/
   hooks/ScenarioLifecycleHooks.java   same ctx keys as today (_tc.key, _tc.request, _tc.request.<field>, basic.xxx)
-  steps/TradeCreationSteps.java       data-only stand-ins for the trade creation snippets
-  testdata/TestDataLoaderTest.java    the 9 trade creation cases and API-SETUP-TRADE-CREATE resolve to exactly the old YAML's data
+  hooks/ActionLogHook.java            writes the recorded actions into the scenario report
+  support/OreoUi.java, OreoApi.java   browser and API actions by element key / path (Genie built-ins, RestApiUtil)
+  support/OreoConfig.java             accounts and riskEngine from -Doreo.<key> (genie.properties there)
+  support/OreoSession.java            per scenario: ctx, ui, api, config (PicoContainer)
+  support/DatFiles.java               dat/<PRODUCT ID>/<PRODUCT ID>.dat (ProductDatFiles there)
+  fake/RecordingOreoUi.java, RecordingOreoApi.java   the stand-ins: log instead of acting
+  pages/                              LoginPage, TradePortalPage, NewTradePage, TradeDetailPage,
+                                      DynamicActionComponent, TradeChangeConfirmation, Toast, RiskCalculation
+  steps/AuthenticationSteps.java      "<role> is logged in to the trade portal"
+  steps/TradeProvisioningSteps.java   "a Live '<P>' trade exists in the blotter" (API, forKey API-SETUP-TRADE-CREATE)
+  steps/TradeCreationSteps.java       trade_creation.snippet
+  steps/TradeLifecycleEventSteps.java lifecycle_event / common_trade_action snippets: open action, submit, blotter status
+  steps/TradeEarlyTerminationSteps.java  trade_early_termination.snippet
+  steps/ScenarioActionsTest.java      the exact actions of an early termination and a StepIn creation, in order
+  testdata/TestDataLoaderTest.java    the 12 cases and API-SETUP-TRADE-CREATE resolve to exactly the old YAML's data
 src/test/resources/
-  data/common.json                    shared blocks and setup data (forKey)
-  data/ui/trade_creation.json         the feature's data (replaces 93 lines of YAML)
-  features/ui/trade_creation.feature  unchanged feature
-  legacy-data/{ui,api}/trade_creation.yml   the old files, only for the equivalence tests
+  data/common.json                    shared blocks; setup data API-SETUP-TRADE-CREATE, UI-SETUP-RISK-CALC-NEW-SUCCESS
+  data/ui/trade_creation.json         replaces 93 lines of YAML
+  data/ui/trade_early_termination.json   replaces the template and its 3 entries
+  features/ui/*.feature               the two features as in the E2E project
+  legacy-data/                        the old files, only for the equivalence tests
   fixture-data/                       unit test fixture for setup changes of a feature and a case
 ```
+
+## How a step maps to the E2E project
+
+| E2E project | Here |
+|---|---|
+| feature line -> FLOW snippet | a Cucumber step method (`steps/`) doing the snippet's lines in order |
+| PAGE / COMPONENT snippet, built-in step on `'<element key>'` | a page object method calling `OreoUi` with the same element key |
+| `ctx.clickAndWaitForResponse`, `clickWithMockedResponse`, `clickAndCaptureResponse` | the `OreoUi` methods of the same names |
+| `RestApiUtil.postMultipart(...)` | `OreoApi.postMultipart(...)` |
+| `ctx.riskEngineMode()` | `OreoConfig.riskEngineMode()`; `RiskCalculation.clickUsingMode` = the switch of TradeLifecycleEventSteps |
+| `from stored variable 'earlyTermination.amount'` | `ctx.text("earlyTermination.amount")`, injected by the hook |
+
+Taken from the replay project, not seen in the Java code: the login testids, `/checker/tasks/<taskId>/approve`
+with `{}`, `/trades/calculate-risk-for-new` for Book (mocked like the trade's calculation), the trade detail check of
+"trade is created with pending approval status and info" (trade ID and `PARV` on the header card), and the blotter
+check by row and column.
 
 ## Data files
 
@@ -139,4 +170,5 @@ Assumed, to confirm against the E2E project's loader (its source was not availab
 merge is a deep merge (the per-product overrides only set `basic.productId`, so a shallow merge would lose the rest of
 `basic`), and `response` is not taken from the template.
 
-To check: `mvn test` (the equivalence test plus the feature run through Cucumber with the data-only steps).
+To check: `mvn test` (the equivalence tests, the action sequences, and both features run through Cucumber against the
+recording stand-ins; the actions of each scenario are in `target/cucumber-report.html`).

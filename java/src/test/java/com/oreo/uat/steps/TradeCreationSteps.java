@@ -1,57 +1,90 @@
 package com.oreo.uat.steps;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oreo.uat.hooks.ScenarioContext;
-import com.oreo.uat.testdata.Products;
+import com.oreo.uat.pages.NewTradePage;
+import com.oreo.uat.pages.TradeDetailPage;
+import com.oreo.uat.pages.TradePortalPage;
+import com.oreo.uat.support.DatFiles;
+import com.oreo.uat.support.OreoSession;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 
 /**
- * Data-only stand-ins for the trade creation snippets: no browser. Each step checks that the values the real snippet
- * types ("from stored variable 'basic.counterpartyName'") are in the ctx with the expected product. In the E2E
- * project the real snippets run instead and these steps do not exist.
+ * trade_creation.snippet. Every value comes from the case data the hook put into the ctx ({@code basic.*},
+ * {@code stepIn.*}, from data/ui/trade_creation.json); the product ID is the registry's.
  */
 public class TradeCreationSteps {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private final OreoSession session;
     private final ScenarioContext ctx;
+    private final TradePortalPage portal;
+    private final NewTradePage newTrade;
 
-    public TradeCreationSteps(ScenarioContext ctx) {
-        this.ctx = ctx;
-    }
-
-    @When("maker is logged in to the trade portal")
-    public void makerIsLoggedIn() {
-        // Login is the snippet's job; nothing to check in the data
+    public TradeCreationSteps(OreoSession session) {
+        this.session = session;
+        this.ctx = session.ctx();
+        this.portal = new TradePortalPage(session.ui());
+        this.newTrade = new NewTradePage(session.ui());
     }
 
     @When("creates a new {string} trade")
-    public void createsANewTrade(String productType) {
-        checkBasic(productType);
+    public void createsANewTrade(String product) {
+        openNewTradeForm();
+        selectBasicInfo();
+        newTrade.uploadDat(DatFiles.forProduct(product));
+        bookAndConfirm();
     }
 
     @When("creates a new {string} StepIn full trade")
-    public void createsAStepInFullTrade(String productType) {
-        checkBasic(productType);
-        assertFalse(ctx.text("stepIn.oldCounterpartyName").isBlank());
+    public void createsAStepInFullTrade(String product) {
+        createStepIn(product, true);
     }
 
     @When("creates a new {string} StepIn partial trade")
-    public void createsAStepInPartialTrade(String productType) {
-        checkBasic(productType);
-        assertFalse(ctx.text("stepIn.oldCounterpartyName").isBlank());
+    public void createsAStepInPartialTrade(String product) {
+        createStepIn(product, false);
     }
 
     @Then("trade is created with pending approval status and info")
     public void tradeIsPendingApproval() {
-        // Checked on the page by the real snippet
+        // "and info": which details the snippet checks besides the status was not seen
+        new TradeDetailPage(session.ui()).expectTrade(ctx.text("createdTradeId"), TradeDetailPage.PENDING_APPROVAL);
     }
 
-    private void checkBasic(String productType) {
-        assertEquals(Products.productId(productType), ctx.text("basic.productId"));
-        for (String field : new String[] {"portfolioId", "counterpartyFmId", "counterpartyName", "direction"}) {
-            assertFalse(ctx.text("basic." + field).isBlank(), "basic." + field);
+    private void createStepIn(String product, boolean full) {
+        openNewTradeForm();
+        newTrade.uploadDat(DatFiles.forProduct(product));
+        selectBasicInfo();
+        newTrade.enableStepIn(full);
+        newTrade.selectStepInOldCounterparty(ctx.text("stepIn.oldCounterpartyName"));
+        bookAndConfirm();
+    }
+
+    private void openNewTradeForm() {
+        portal.clickNewTrade();
+        newTrade.expectOpen();
+    }
+
+    private void selectBasicInfo() {
+        newTrade.selectCounterparty(ctx.text("basic.counterpartyName"));
+        newTrade.selectPortfolio(ctx.text("basic.portfolioId"));
+        newTrade.selectProductId(ctx.text("basic.productId"));
+        newTrade.selectDirection(ctx.text("basic.direction"));
+    }
+
+    /** Book, then confirm and store the new trade's ID as {@code createdTradeId} */
+    private void bookAndConfirm() {
+        newTrade.book(session.config().riskEngineMode());
+        String response = newTrade.confirmAndCaptureCreation();
+        try {
+            ctx.setAttribute("createdTradeId", JSON.readTree(response).at("/data/trade/id").asText());
+        } catch (IOException e) {
+            throw new UncheckedIOException("The trade creation answer is not JSON: " + response, e);
         }
     }
 }

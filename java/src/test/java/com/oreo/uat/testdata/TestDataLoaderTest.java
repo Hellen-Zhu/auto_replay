@@ -19,12 +19,14 @@ class TestDataLoaderTest {
         return Paths.get(TestDataLoaderTest.class.getClassLoader().getResource(name).toURI());
     }
 
-    /** The new files give every trade creation case exactly the data the old YAML gave it. */
+    /** The new files give every trade creation and early termination case exactly the data the old YAML gave it. */
     @ParameterizedTest
     @ValueSource(strings = {
         "TC-TRADE-CREATION-FX_CO-UI-001", "TC-TRADE-CREATION-FX_TRF-UI-001", "TC-TRADE-CREATION-FX_FSB-UI-001",
         "TC-TRADE-CREATION-FX_CO-UI-002", "TC-TRADE-CREATION-FX_TRF-UI-002", "TC-TRADE-CREATION-FX_FSB-UI-002",
-        "TC-TRADE-CREATION-FX_CO-UI-003", "TC-TRADE-CREATION-FX_TRF-UI-003", "TC-TRADE-CREATION-FX_FSB-UI-003"})
+        "TC-TRADE-CREATION-FX_CO-UI-003", "TC-TRADE-CREATION-FX_TRF-UI-003", "TC-TRADE-CREATION-FX_FSB-UI-003",
+        "TC-TRADE-EARLY-TERMINATION-FX_CO-UI-001", "TC-TRADE-EARLY-TERMINATION-FX_TRF-UI-001",
+        "TC-TRADE-EARLY-TERMINATION-FX_FSB-UI-001"})
     void newFilesMatchTheOldYaml(String tcId) throws Exception {
         TestDataRecord layered = new TestDataLoader(resource("data")).resolve(tcId);
         TestDataRecord legacy = new TestDataLoader(resource("legacy-data")).resolve(tcId);

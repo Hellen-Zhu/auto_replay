@@ -34,6 +34,19 @@
           "premiumCurrency": "USD"
         }
       }
+    },
+    "UI-SETUP-RISK-CALC-NEW-SUCCESS": {
+      "_comment": "Answer of a mocked risk calculation (riskEngine=mock): RESP-TPL-MOCK-DATA-UI-001 with this entry's data",
+      "response": {
+        "code": 200,
+        "status": "SUCCESS",
+        "msg": "",
+        "data": {
+          "calculationTimestamp": "2026-08-21T08:35:21.383923927Z",
+          "pnl": -18726.25346898106,
+          "riskEngine": "Cortex-QR"
+        }
+      }
     }
   }
 }
