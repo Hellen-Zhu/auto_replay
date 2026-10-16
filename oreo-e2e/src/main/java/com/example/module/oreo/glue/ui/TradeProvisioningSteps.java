@@ -1,51 +1,203 @@
 package com.example.module.oreo.glue.ui;
 
-import com.example.module.oreo.OreoModule;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.example.genie.module.rest.service.RequestResponseHelper;
 import com.example.module.oreo.testdata.ProductDatFiles;
 import com.example.module.oreo.testdata.TestDataLoader;
-import com.fasterxml.jackson.databind.JsonNode;
-import io.cucumber.java.en.Given;
+import com.example.module.oreo.utils.RestApiUtil;
+import cucumber.api.java.Before;
+import cucumber.api.java.en.Given;
+import cucumber.api.Scenario;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * Trades a case needs before it starts, created through the API (TradeProvisioningSteps of the E2E project):
- * common_trade_action.snippet maps "a Live '$1' trade exists in the blotter" to "a live '$1' trade is provisioned
- * via playwright api". The body is the setup data {@code API-SETUP-TRADE-CREATE} with the product's ID.
- */
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+
 public class TradeProvisioningSteps {
 
-    static final String SETUP_KEY = "API-SETUP-TRADE-CREATE";
-    static final String SUBMIT_PATH = "/trades/create?tradeAction=SUBMIT";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(TradeProvisioningSteps.class);
+    private RequestResponseHelper helper;
+    private PlaywrightServiceResolver.Context ctx;
 
-    private final OreoModule session;
-
-    public TradeProvisioningSteps(OreoModule session) {
-        this.session = session;
+    @Before({"@playwright"})
+    public void beforeScenario(Scenario scenario) {
+        this.ctx = PlaywrightServiceResolver.from(scenario);
+        this.helper = RestApiUtil.helperFromScenario(scenario);
     }
 
-    @Given("a Live {string} trade exists in the blotter")
-    public void aLiveTradeExists(String product) {
-        provisionLiveTrade(product);
+    @Given("^a draft pending approval '([^']*)' trade is provisioned via playwright api$")
+    public void provisionPendingTrade(String product) throws Exception {
+        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE",
+                ProductDatFiles.valueOf(product));
     }
 
-    /** The maker submits the trade, the checker approves its task: the trade is LIVE. */
-    public void provisionLiveTrade(String product) {
-        submitTradeAsPendingApproval(product);
-        approveTask(session.ctx().text("createdTaskId"), "checker");
+    @Given("^a draft pending approval '([^']*)' stepin full trade is provisioned via playwright api$")
+    public void provisionPendingStepInFullTrade(String product) throws Exception {
+        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "API-SETUP-STEPIN-FULL-TRADE-CREATE", ProductDatFiles.valueOf(product));
     }
 
-    public void submitTradeAsPendingApproval(String product) {
-        String tradeJson = TestDataLoader.forKey(SETUP_KEY, product).request();
-        JsonNode body = session.api().postMultipart(SUBMIT_PATH, session.config().email("maker"),
-            "trade", tradeJson, "datFile", ProductDatFiles.forProduct(product));
-        session.ctx().setAttribute("createdTradeId", body.at("/data/trade/id").asText());
-        session.ctx().setAttribute("createdTaskId", body.at("/data/checkerContext/taskId").asText());
+    @Given("^a draft pending approval '([^']*)' stepin partial trade is provisioned via playwright api$")
+    public void provisionPendingStepInPartialTrade(String product) throws Exception {
+        submitTradeAsPendingApproval("createdTradeId", "createdTaskId", "API-SETUP-STEPIN-PARTIAL-TRADE-CREATE", ProductDatFiles.valueOf(product));
     }
 
-    /**
-     * Not seen in the E2E project (the body of approveTask): taken from the browser's Network tab, POST with the body
-     * {} (confirmed on the real system by the replay project).
-     */
-    public void approveTask(String taskId, String role) {
-        session.api().postJson("/checker/tasks/" + taskId + "/approve", session.config().email(role), "{}");
+    @Given("^a live '([^']*)' trade is provisioned via playwright api$")
+    public void provisionLiveTradeByProduct(String product) throws Exception {
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
+    }
+
+    @Given("^a '([^']*)' trade with pending cancellation is provisioned via playwright api$")
+    public void provisionPendingCancellation(String product) throws Exception {
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CANCELLATION");
+    }
+
+    @Given("^multiple '([^']*)' trades with pending cancellation are provisioned via playwright api$")
+    public void provisionMultiplePendingCancellation(String product) throws Exception {
+        provisionLiveTradeAs("createdTradeId1", "createdTaskId1", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId1", "createdTaskId1", "API-SETUP-TRADE-CANCELLATION");
+        provisionLiveTradeAs("createdTradeId2", "createdTaskId2", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId2", "createdTaskId2", "API-SETUP-TRADE-CANCELLATION");
+    }
+
+    @Given("^a dead '([^']*)' trade is provisioned via playwright api$")
+    public void provisionDeadTrade(String product) throws Exception {
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CANCELLATION");
+        approveTask(ctx.get("createdTaskId"), "checker@example.com");
+    }
+
+    @Given("^a draft '([^']*)' trade is provisioned via playwright api$")
+    public void provisionDraftTrade(String product) throws Exception {
+        provisionLiveTradeAs("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CREATE", ProductDatFiles.valueOf(product));
+        provisionLifecycleEvent("createdTradeId", "createdTaskId", "API-SETUP-TRADE-CANCELLATION");
+        rejectTask(ctx.get("createdTaskId"), "checker@example.com");
+    }
+
+    @Given("^amendment for stored trade is submitted as maker via playwright api$")
+    public void submitAmendmentForStoredTrade() {
+        submitAmendment("createdTradeId", "UI-SETUP-AMENDMENT", "maker@example.com");
+    }
+
+    private void provisionLiveTradeAs(String tradeIdVar, String taskIdVar, String testDataKey, ProductDatFiles datFile) throws Exception {
+        log.info("[TradeProvisioningSteps] Provisioning live trade: tradeIdVar='{}', taskIdVar='{}', testDataKey='{}', datFile='{}'",
+                tradeIdVar, taskIdVar, testDataKey, datFile);
+        submitTradeAsPendingApproval(tradeIdVar, taskIdVar, testDataKey, datFile);
+        String taskId = ctx.get(taskIdVar);
+        log.info("[TradeProvisioningSteps] Approving checker task for live trade: taskIdVar='{}', taskId='{}'", taskIdVar, taskId);
+        approveTask(taskId, "checker@example.com");
+        log.info("[TradeProvisioningSteps] Live trade provisioned successfully: tradeId='{}', taskId='{}'",
+                ctx.get(tradeIdVar), ctx.get(taskIdVar));
+    }
+
+    private void submitTradeAsPendingApproval(String tradeIdVar, String taskIdVar, String testDataKey, ProductDatFiles datFile) throws Exception {
+        log.info("[TradeProvisioningSteps] Submitting trade as pending approval: tradeIdVar='{}', taskIdVar='{}', testDataKey='{}', datFile='{}'",
+                tradeIdVar, taskIdVar, testDataKey, datFile);
+
+        JsonNode body = submitTrade("maker@example.com", testDataKey, datFile);
+        String tradeId = body.at("/data/trade/id").asText();
+        String taskId = body.at("/data/checkerContext/taskId").asText();
+
+        log.info("[TradeProvisioningSteps] Trade submitted: extracted tradeId='{}', taskId='{}'", tradeId, taskId);
+
+        ctx.set(tradeIdVar, tradeId);
+        ctx.write("Trade created with id: " + tradeId);
+        ctx.set(taskIdVar, taskId);
+    }
+
+    private void provisionLifecycleEvent(String tradeIdVar, String taskIdVar, String testDataKey) throws Exception {
+        String tradeId = ctx.get(tradeIdVar);
+        log.info("[TradeProvisioningSteps] Provisioning lifecycle event: tradeIdVar='{}', tradeId='{}', taskIdVar='{}', testDataKey='{}'",
+                tradeIdVar, tradeId, taskIdVar, testDataKey);
+
+        JsonNode body = triggerEvent(List.of(tradeId), "maker@example.com", testDataKey);
+        String taskId = body.at("/data/results/0/checkerTaskId").asText();
+
+        log.info("[TradeProvisioningSteps] Lifecycle event submitted: extracted checkerTaskId='{}'", taskId);
+
+        ctx.set(taskIdVar, taskId);
+    }
+
+    private JsonNode submitTrade(String userId, String testDataKey, ProductDatFiles datFile) throws Exception {
+        String tradeJson = TestDataLoader.forKey(testDataKey).request();
+        URL resource = getClass().getClassLoader().getResource(datFile.path());
+
+        log.info("[TradeProvisioningSteps] submitTrade: userId='{}', testDataKey='{}', datFile='{}', endpoint='{}'",
+                userId, testDataKey, datFile, "/trades/create?tradeAction=SUBMIT");
+
+        Path datFilePath = Paths.get(resource.toURI());
+
+        JsonNode response = RestApiUtil.postMultipart(
+                helper,
+                "/trades/create?tradeAction=SUBMIT",
+                userId,
+                "trade",
+                tradeJson,
+                "datFile",
+                datFilePath
+        );
+
+        log.info("[TradeProvisioningSteps] submitTrade completed successfully for testDataKey='{}'", testDataKey);
+        return response;
+    }
+
+    private void submitAmendment(String tradeIdVar, String testDataKey, String userId) {
+        String tradeId = ctx.get(tradeIdVar);
+        String payload = TestDataLoader.forKey(testDataKey).request();
+
+        log.info("[TradeProvisioningSteps] submitAmendment: tradeIdVar='{}', tradeId='{}', testDataKey='{}', userId='{}', endpoint='{}'",
+                tradeIdVar, tradeId, testDataKey, userId, "/trades/" + tradeId + "/update");
+
+        RestApiUtil.post(helper, "/trades/" + tradeId + "/update", userId, payload);
+
+        log.info("[TradeProvisioningSteps] submitAmendment completed for tradeId='{}'", tradeId);
+    }
+
+    private JsonNode triggerEvent(List<String> tradeIds, String userId, String testDataKey) throws Exception {
+        String raw = TestDataLoader.forKey(testDataKey).request();
+        ObjectNode body = (ObjectNode) OBJECT_MAPPER.readTree(raw);
+        ArrayNode arr = OBJECT_MAPPER.createArrayNode();
+        tradeIds.forEach(arr::add);
+        body.set("tradeIds", arr);
+
+        log.info("[TradeProvisioningSteps] triggerEvent: tradeIds='{}', userId='{}', testDataKey='{}', endpoint='{}'",
+                tradeIds, userId, testDataKey, "/trades/trigger-event");
+
+        JsonNode response = RestApiUtil.post(
+                helper,
+                "/trades/trigger-event",
+                userId,
+                OBJECT_MAPPER.writeValueAsString(body)
+        );
+
+        log.info("[TradeProvisioningSteps] triggerEvent completed for tradeIds='{}'", tradeIds);
+        return response;
+    }
+
+    private JsonNode approveTask(String taskId, String userId) {
+        log.info("[TradeProvisioningSteps] approveTask: taskId='{}', userId='{}', endpoint='{}'",
+                taskId, userId, "/checker/tasks/" + taskId + "/approve");
+
+        JsonNode response = RestApiUtil.post(helper, "/checker/tasks/" + taskId + "/approve", userId);
+
+        log.info("[TradeProvisioningSteps] approveTask completed: taskId='{}'", taskId);
+        return response;
+    }
+
+    private JsonNode rejectTask(String taskId, String userId) {
+        log.info("[TradeProvisioningSteps] rejectTask: taskId='{}', userId='{}', endpoint='{}'",
+                taskId, userId, "/checker/tasks/" + taskId + "/reject");
+
+        JsonNode response = RestApiUtil.post(helper, "/checker/tasks/" + taskId + "/reject", userId);
+
+        log.info("[TradeProvisioningSteps] rejectTask completed: taskId='{}'", taskId);
+        return response;
     }
 }

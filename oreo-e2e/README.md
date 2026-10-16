@@ -36,7 +36,8 @@ src/main/java/com/example/module/oreo/
   glue/ScenarioContext.java       transcribed from the E2E project
   glue/ui/PlaywrightServiceResolver.java, CommonE2EInteraction.java, CommonE2EAssertion.java,
           CommonHelpers.java, LoginSteps.java, NewTradeSteps.java, ToastSteps.java,
-          TradeDetailSteps.java, TradePortalSteps.java, TradeLifecycleEventSteps.java   transcribed from the E2E project
+          TradeDetailSteps.java, TradePortalSteps.java, TradeLifecycleEventSteps.java,
+          TradeProvisioningSteps.java   transcribed from the E2E project
   glue/hooks/ScenarioLifecycleHooks.java, E2EScenarioHooks.java   transcribed from the E2E project
   glue/hooks/PlaywrightTraceHooks          placeholder
   glue/ui/LoginSteps.java                  "<role> is logged in to the trade portal" (authentication_login.snippet)

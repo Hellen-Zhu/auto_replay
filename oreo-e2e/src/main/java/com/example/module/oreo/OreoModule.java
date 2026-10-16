@@ -1,6 +1,6 @@
 package com.example.module.oreo;
 
-// [not in the photos: line 3, presumably the import of GenieRuntime]
+// [not in the photos: the package of GenieRuntime] import ....GenieRuntime;
 import com.example.genie.module.BaseGenieGlueModule;
 import com.example.genie.module.database.DatabaseModule;
 import com.example.genie.module.jdbc.JdbcModule;
