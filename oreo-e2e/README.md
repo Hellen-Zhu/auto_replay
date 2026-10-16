@@ -53,7 +53,8 @@ src/main/resources/
   META-INF/services/com.example.genie.module.GenieModule   placeholder (named after the GenieModule interface there)
   snippet/api/, snippet/ui/components|flows|pages/*.snippet placeholders
   snippet/ui/components/*.snippet, snippet/ui/flows/*.snippet,
-          snippet/ui/pages/*.snippet, elements/**/*.json   transcribed from the E2E project
+          snippet/ui/pages/*.snippet, elements/**/*.json,
+          pom.xml, genie.properties, log4j2.xml   transcribed from the E2E project
   cucumber.xml                    transcribed from the E2E project
 src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/; glue and report set here)

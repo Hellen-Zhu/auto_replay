@@ -4,61 +4,145 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Same layout as the Java + Cucumber (Genie) E2E project: glue, testdata and utils in src/main, features and
-         data in src/test/resources. Self-contained: no Genie, no browser. See README.md. -->
-    <groupId>com.example.module</groupId>
+    <groupId>com.example.oreo</groupId>
     <artifactId>oreo-e2e</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
 
     <properties>
-        <maven.compiler.release>11</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jackson.version>2.16.1</jackson.version>
-        <cucumber.version>7.15.0</cucumber.version>
-        <junit.version>5.10.2</junit.version>
-        <junit-platform.version>1.10.2</junit-platform.version>
+        <java.version>21</java.version>
+        <genie.version>5.0.0-RC7-SNAPSHOT</genie.version>
+        <genie.playwright.version>1.0.0-SNAPSHOT</genie.playwright.version>
+        <genie.report.ado.version>5.0.0-RC7-SNAPSHOT</genie.report.ado.version>
+        <!-- ── Third-party dependency versions ── -->
+        <log4j.version>2.25.1</log4j.version>
+        <hamcrest.version>3.0</hamcrest.version>
+        <junit.version>4.13.2</junit.version>
+        <postgresql.version>42.7.3</postgresql.version>
+
+        <!-- ── Plugin versions ── -->
+        <surefire.plugin.version>3.2.5</surefire.plugin.version>
+        <compiler.plugin.version>3.13.0</compiler.plugin.version>
+        <enforcer.plugin.version>3.3.0</enforcer.plugin.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.example.genie</groupId>
+                <artifactId>genie</artifactId>
+                <version>${genie.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Pin hamcrest-core to 3.0 to resolve convergence conflict between
+                 junit:4.13.2 (pulls 1.3) and json-unit-core:4.1.1 (pulls 3.0) -->
+            <dependency>
+                <groupId>org.hamcrest</groupId>
+                <artifactId>hamcrest-core</artifactId>
+                <version>${hamcrest.version}</version>
+            </dependency>
+            <!-- Pin genie-java to RC7 to resolve convergence conflict:
+                 genie-playwright:1.0.0-SNAPSHOT pulls 4.11.1 while all other
+                 genie modules require 5.0.0-RC7-SNAPSHOT. -->
+            <dependency>
+                <groupId>com.example.genie</groupId>
+                <artifactId>genie-java</artifactId>
+                <version>${genie.version}</version>
+            </dependency>
+            <!-- Pin assertj to prevent convergence conflict if pulled transitively -->
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>3.25.3</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <!-- ── Logging ── -->
         <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <version>${log4j.version}</version>
         </dependency>
-        <!-- Only for reading the old YAML files during the migration -->
         <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>${jackson.version}</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
         </dependency>
 
+        <!-- ── Spring (only the modules we directly import) ── -->
         <dependency>
-            <groupId>io.cucumber</groupId>
-            <artifactId>cucumber-java</artifactId>
-            <version>${cucumber.version}</version>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+        </dependency>
+
+        <!-- ── Genie framework ── -->
+        <dependency>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-core</artifactId>
+            <version>${genie.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.cucumber</groupId>
-            <artifactId>cucumber-picocontainer</artifactId>
-            <version>${cucumber.version}</version>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-snippet</artifactId>
+            <version>${genie.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.cucumber</groupId>
-            <artifactId>cucumber-junit-platform-engine</artifactId>
-            <version>${cucumber.version}</version>
-            <scope>test</scope>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-rest</artifactId>
+            <version>${genie.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.junit.platform</groupId>
-            <artifactId>junit-platform-suite</artifactId>
-            <version>${junit-platform.version}</version>
-            <scope>test</scope>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-report</artifactId>
+            <version>${genie.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-spring</artifactId>
+            <version>${genie.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-enrich-sql</artifactId>
+            <version>${genie.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-database</artifactId>
+            <version>${genie.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-jdbc</artifactId>
+            <version>${genie.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-report-ado</artifactId>
+            <version>${genie.report.ado.version}</version>
+        </dependency>
+        <!-- genie-playwright:1.0.0-SNAPSHOT pulls genie-java:4.11.1; version is
+             managed in dependencyManagement above — no direct dependency needed. -->
+        <dependency>
+            <groupId>com.example.genie</groupId>
+            <artifactId>genie-playwright</artifactId>
+            <version>${genie.playwright.version}</version>
+        </dependency>
+
+        <!-- ── Database ── -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+        </dependency>
+
+        <!-- ── Test runner ── -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
             <version>${junit.version}</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -66,9 +150,88 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${compiler.plugin.version}</version>
+                <configuration>
+                    <release>${java.version}</release>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>${surefire.plugin.version}</version>
+                <configuration>
+                    <argLine>
+                        -Xmx2048m
+                        --add-opens java.base/jdk.internal.loader=ALL-UNNAMED
+                    </argLine>
+                    <environmentVariables>
+                        <PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD>1</PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${enforcer.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-dependency-convergence</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <dependencyConvergence/>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
+    <repositories>
+        <repository>
+            <id>artifactory</id>
+            <url>https://artifactory.example.com/artifactory/maven-release</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>artifactory-snapshots</id>
+            <url>https://artifactory.example.com/artifactory/maven-snapshot</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>artifactory</id>
+            <url>https://artifactory.example.com/artifactory/maven-release</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+        <pluginRepository>
+            <id>artifactory-snapshot</id>
+            <url>https://artifactory.example.com/artifactory/maven-snapshot</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
 </project>
