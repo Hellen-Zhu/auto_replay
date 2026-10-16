@@ -60,9 +60,9 @@ public class TradeLifecycleEventSteps {
     public void performEarlyTermination(String product) {
         ScenarioContext ctx = session.ctx();
         opensLifecycleAction("early termination");
-        dynamicAction.selectDirection(ctx.get("earlyTermination.direction"));
-        dynamicAction.typeAmount(ctx.get("earlyTermination.amount"));
-        dynamicAction.typeCurrency(ctx.get("earlyTermination.ccy"));
+        dynamicAction.selectDirection(ctx.text("earlyTermination.direction"));
+        dynamicAction.typeAmount(ctx.text("earlyTermination.amount"));
+        dynamicAction.typeCurrency(ctx.text("earlyTermination.ccy"));
         submitsLifecycleEvent();
     }
 
@@ -77,6 +77,6 @@ public class TradeLifecycleEventSteps {
     }
 
     private String tradeId() {
-        return session.ctx().get("createdTradeId");
+        return session.ctx().text("createdTradeId");
     }
 }

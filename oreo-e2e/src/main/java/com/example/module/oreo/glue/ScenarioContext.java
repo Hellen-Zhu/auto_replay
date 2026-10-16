@@ -2,7 +2,7 @@ package com.example.module.oreo.glue;
 
 import com.example.genie.model.GenieScenario;
 
-/** The scenario's attributes (GenieScenario) as the steps use them. */
+
 public abstract class ScenarioContext {
 
     private final GenieScenario genieScenario;
@@ -10,6 +10,7 @@ public abstract class ScenarioContext {
     protected ScenarioContext(GenieScenario genieScenario) {
         this.genieScenario = genieScenario;
     }
+
 
     public void write(String message) {
         genieScenario.write(message);
@@ -35,8 +36,9 @@ public abstract class ScenarioContext {
     public <T> T get(String key) {
         T value = genieScenario.getAttribute(key);
         if (value == null) {
-            throw new AssertionError("ctx key '" + key + "' is not set - ensure it is set before this step.");
+            throw new AssertionError("ctx key '" + key + "' is not set — ensure it is set before this step.");
         }
         return value;
     }
+
 }

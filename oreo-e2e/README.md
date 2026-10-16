@@ -20,24 +20,22 @@ entry only logs a warning.
 
 ## Layout
 
+**Current stage: transcription.** The E2E project's files are typed in from the user's photos as they are, without
+guessing missing code and without making the project compile; only the company package prefix is written `com.example`
+and the accounts' e-mail domain `example.com`, since this repository is public. Lines the photos do not show are
+marked `[not in the photos]`. Until all files are in, `mvn test` is not expected to pass.
+
 The folders follow the E2E project. Files marked *placeholder* hold only a comment (Java: an empty class) and are
 there so the tree matches; copy the real file over them from the E2E project.
 
 ```
 pom.xml, .gitignore
 .gitattributes, .mcp.json, azure-pipelines-maven.yml, .claude/, docs/   placeholders
-src/main/java/com/example/genie/model/
-  GenieScenario.java, GenieScenarioBinder.java   stand-in for Genie's GenieScenario (attributes, write, getError);
-                                  do not copy: Genie has the real one
 src/main/java/com/example/module/oreo/
   OreoModule.java                 per scenario: ctx, ui, api, config (PicoContainer)
   OreoModuleConfiguration.java    genie.properties + <env>.properties + -Doreo.<key>; Mode REAL / MOCK
-  glue/ScenarioContext.java       as in the E2E project: write / set / find / get over GenieScenario
-  glue/hooks/ScenarioLifecycleHooks.java   as in the E2E project: begin / end log, case data into the ctx (_tc.key,
-                                           _tc.request, basic.xxx), target/results/failed-scenarios-<time>.log;
-                                           plus the current case for forKey
-  glue/hooks/E2EScenarioHooks.java         as in the E2E project: @playwright scenarios reset maker's and checker's
-                                           user preferences (forKey SETUP-USER-PREFERENCE-CONFIG-DEFAULTS)
+  glue/ScenarioContext.java       transcribed from the E2E project
+  glue/hooks/ScenarioLifecycleHooks.java, E2EScenarioHooks.java   transcribed from the E2E project
   glue/hooks/PlaywrightTraceHooks          placeholder
   glue/ui/LoginSteps.java                  "<role> is logged in to the trade portal" (authentication_login.snippet)
   glue/ui/NewTradeSteps.java               trade_creation.snippet
@@ -50,8 +48,7 @@ src/main/java/com/example/module/oreo/
   testdata/TestDataRecord.java    request / response JSON + flattenRequest()
   testdata/ProductDatFiles.java   enum of the dat files; forProduct(name) -> data/<PRODUCT ID>.dat
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
-  utils/DateUtil.java             now / format / elapsedMs / formatDuration (names from the hooks, formats assumed)
-  utils/CleanupTestDataUtil, DatabaseSqlUtil, RestApiUtil  placeholders
+  utils/CleanupTestDataUtil, DatabaseSqlUtil, DateUtil, RestApiUtil  placeholders
   utils/ui/OreoUi.java, RecordingOreoUi.java     browser actions by element key (Genie built-ins, ctx.click...)
   utils/api/OreoApi.java, RecordingOreoApi.java  requests (RestApiUtil there)
   utils/pages/                    LoginPage, TradePortalPage, NewTradePage, TradeDetailPage,
@@ -186,10 +183,9 @@ Not known from the E2E project: how its step puts the product into `productId` t
 1. Copy the `testdata` package into the E2E project's `testdata` package (rename the package). Keep the static API the hook and the steps call: `tcKeyFromName(name)`, `getByTcId(tcId)` throwing
    `AssertionError`, `forKey(key)` (plus the new `forKey(key, product)`).
    If the existing `TestDataRecord.flattenRequest()` builds array paths another way, keep that one.
-2. `ScenarioLifecycleHooks`: add `TestDataLoader.setCurrentCase(tcId)` before the lookup and
-   `TestDataLoader.clearCurrentCase()` in `afterScenario` (both in the version here); nothing else changes. The
-   version here differs only where Genie is missing: the GenieScenario is injected instead of cast from the
-   Scenario, and `extractError` keeps frames of `com.example`.
+2. `ScenarioLifecycleHooks`: add `TestDataLoader.setCurrentCase(tcId)` before the lookup and an `@After` that calls
+   `clearCurrentCase()` (both in the version here); nothing else changes. Its `GenieScenario.setAttribute` calls stay; the
+   version here writes to `ScenarioContext` only because Genie is not available.
 3. The data root is `data/` on the classpath (or `-Doreo.testdata.dir=...`). Old YAML files under it keep working:
    a case whose feature has no `.json` file is looked up there (`requestRef` template deep-merged with the entry's
    `request`). So features migrate one at a time.

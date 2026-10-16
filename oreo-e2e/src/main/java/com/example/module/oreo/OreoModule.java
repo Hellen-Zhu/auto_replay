@@ -1,6 +1,5 @@
 package com.example.module.oreo;
 
-import com.example.genie.model.GenieScenario;
 import com.example.module.oreo.glue.ScenarioContext;
 import com.example.module.oreo.utils.api.OreoApi;
 import com.example.module.oreo.utils.api.RecordingOreoApi;
@@ -22,9 +21,8 @@ public class OreoModule {
     private final OreoApi api;
     private final OreoModuleConfiguration config;
 
-    public OreoModule(GenieScenario genieScenario) {
-        this.ctx = new ScenarioContext(genieScenario) {
-        };
+    public OreoModule(ScenarioContext ctx) {
+        this.ctx = ctx;
         this.ui = new RecordingOreoUi(log);
         this.api = new RecordingOreoApi(log);
         this.config = OreoModuleConfiguration.withPlaceholders();

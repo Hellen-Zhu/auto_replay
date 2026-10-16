@@ -1,14 +1,14 @@
 package com.example.module.oreo.glue.hooks;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.genie.model.GenieScenario;
 import com.example.module.oreo.testdata.TestDataLoader;
 import com.example.module.oreo.testdata.TestDataRecord;
 import com.example.module.oreo.utils.DateUtil;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.cucumber.java.After;
-import io.cucumber.java.Before;
-import io.cucumber.java.Scenario;
+import cucumber.api.Scenario;
+import cucumber.api.java.After;
+import cucumber.api.java.Before;
 import org.apache.logging.log4j.ThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,17 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * As in the E2E project, with these differences:
- * <ul>
- *   <li>the GenieScenario is injected (the {@link GenieScenario} stand-in) instead of cast from the Scenario, so
- *       {@code asGenieScenario} and {@code extractError} are instance methods;</li>
- *   <li>the test data comes from TestDataLoader's layered JSON files; the hook also tells it the running case
- *       ({@code setCurrentCase}), so {@code forKey} in an API setup step applies the case's product and setup
- *       changes, and clears it after the scenario;</li>
- *   <li>{@code extractError} keeps the first frame of this project's code ({@code com.example}).</li>
- * </ul>
- */
 public class ScenarioLifecycleHooks {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioLifecycleHooks.class);
@@ -63,17 +52,11 @@ public class ScenarioLifecycleHooks {
         }
     }
 
-    private final GenieScenario genieScenario;
-
     /** Per-thread start time; safe because Genie runs one scenario per thread per fork. */
     private Instant scenarioStartTime;
 
-    public ScenarioLifecycleHooks(GenieScenario genieScenario) {
-        this.genieScenario = genieScenario;
-    }
-
     // -------------------------------------------------------------------------
-    // Before - order 0: logging
+    // Before — order 0: logging
     // -------------------------------------------------------------------------
 
     @Before(order = 0)
@@ -86,13 +69,12 @@ public class ScenarioLifecycleHooks {
     }
 
     // -------------------------------------------------------------------------
-    // Before - order 1: auto-inject test data into scenario ctx
+    // Before — order 1: auto-inject YAML test data into scenario ctx
     // -------------------------------------------------------------------------
 
     /**
-     * Puts the test data of the current scenario's TC-ID into the ctx: {@code _tc.key}, {@code _tc.request},
-     * {@code _tc.response} (raw JSON), {@code _tc.request.<field>} (JsonNode) and the flattened leaves
-     * ({@code basic.counterpartyName}).
+     * Flattens the YAML {@code request:} JSON for the current scenario's TC-ID and
+     * [not in the photos: the rest of this Javadoc]
      */
     @Before(order = 1)
     public void injectTestDataIntoContext(Scenario scenario) {
@@ -101,27 +83,25 @@ public class ScenarioLifecycleHooks {
 
         String tcId = TestDataLoader.tcKeyFromName(scenario.getName());
         if (tcId == null) {
-            log.debug("[ScenarioLifecycleHooks] No [TC-...] token found in scenario name for '{}' - skipping data injection",
+            log.debug("[ScenarioLifecycleHooks] No [TC-...] token found in scenario name for '{}' — skipping data injection",
                     scenario.getName());
             return;
         }
-        // TestDataLoader.forKey(...) in an API setup step then applies this case's setup changes and product
-        TestDataLoader.setCurrentCase(tcId);
 
         TestDataRecord record;
         try {
             record = TestDataLoader.getByTcId(tcId);
         } catch (AssertionError e) {
-            // Scenario name contains a TC-ID but its feature has no data file.
-            log.warn("[ScenarioLifecycleHooks] TC-ID '{}' from scenario name has no test data - ctx injection skipped for '{}'. "
-                            + "If this scenario reads from ctx, check data/**/*.json for its feature: {}",
-                    tcId, scenario.getName(), e.getMessage());
+            // Scenario name contains a TC-ID but no matching YAML entry was found.
+            log.warn("[ScenarioLifecycleHooks] TC-ID '{}' from scenario name has no YAML entry — ctx injection skipped for '{}'. "
+                            + "If this scenario reads from ctx, check data/**/*.yml for a matching key.",
+                    tcId, scenario.getName());
             return;
         }
 
         // Always store framework keys for step-class access
-        genieScenario.setAttribute("_tc.key", tcId);
-        genieScenario.setAttribute("_tc.request", record.request());
+        genieScenario.setAttribute("_tc.key",      tcId);
+        genieScenario.setAttribute("_tc.request",  record.request());
         genieScenario.setAttribute("_tc.response", record.response());
 
         if (record.request() != null && !record.request().isBlank()) {
@@ -172,7 +152,7 @@ public class ScenarioLifecycleHooks {
         long durationMs = DateUtil.elapsedMs(scenarioStartTime, end);
         boolean failed = scenario.isFailed();
         log.info("========================================");
-        log.info("[SCENARIO END]   {} - {}", scenario.getName(), failed ? "FAILED" : "PASSED");
+        log.info("[SCENARIO END]   {} — {}", scenario.getName(), failed ? "FAILED" : "PASSED");
         log.info("  Start   : {}", DateUtil.format(scenarioStartTime));
         log.info("  End     : {}", DateUtil.format(end));
         log.info("  Duration: {}", DateUtil.formatDuration(durationMs));
@@ -194,7 +174,6 @@ public class ScenarioLifecycleHooks {
                 log.warn("[ScenarioLifecycleHooks] Could not write failure log to {}: {}", FAILED_LOG_PATH, e.getMessage());
             }
         }
-        TestDataLoader.clearCurrentCase();
         ThreadContext.clearAll();
     }
 
@@ -203,13 +182,13 @@ public class ScenarioLifecycleHooks {
     // -------------------------------------------------------------------------
 
     /**
-     * The scenario's error with up to two causes, each with the first stack frame of this project's code,
+     * [not in the photos: the start of this Javadoc]
      * not just Genie's CucumberException wrapper.
      * GenieScenario inherits getError() from cucumber.runtime.ScenarioImpl.
      */
-    private String extractError(Scenario scenario) {
+    private static String extractError(Scenario scenario) {
         try {
-            Throwable error = asGenieScenario(scenario).getError();
+            Throwable error = ((GenieScenario) scenario).getError();
             if (error == null) return "(no error details)";
 
             StringBuilder sb = new StringBuilder();
@@ -219,7 +198,7 @@ public class ScenarioLifecycleHooks {
                 if (depth > 0) sb.append("\n    caused by: ");
                 sb.append(current.getClass().getSimpleName()).append(": ").append(current.getMessage());
                 for (StackTraceElement frame : current.getStackTrace()) {
-                    if (frame.getClassName().contains("com.example")) {
+                    if (frame.getClassName().contains("example")) {
                         sb.append("\n      at ").append(frame);
                         break;
                     }
@@ -233,14 +212,14 @@ public class ScenarioLifecycleHooks {
         }
     }
 
-    private GenieScenario asGenieScenario(Scenario scenario) {
-        return genieScenario;
+    private static GenieScenario asGenieScenario(Scenario scenario) {
+        return (GenieScenario) scenario;
     }
 
     /**
      * Dumps ctx attributes into two groups:
      * - runtime variables: keys set by step classes during execution (no _tc. prefix)
-     * - test data: injected test data fields (_tc.* prefix, excluding raw JSON _tc.request/_tc.response)
+     * - test data: injected YAML fields (_tc.* prefix, excluding raw JSON _tc.request/_tc.response)
      */
     private static String dumpCtx(GenieScenario gs) {
         try {

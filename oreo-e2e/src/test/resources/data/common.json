@@ -47,17 +47,6 @@
           "riskEngine": "Cortex-QR"
         }
       }
-    },
-    "SETUP-USER-PREFERENCE-CONFIG-DEFAULTS": {
-      "_comment": "Body of PUT /uc/api/user-preferences, sent for maker and checker before every @playwright scenario (E2EScenarioHooks); the values of the replay project (framework/api/user-preferences.api.ts)",
-      "request": {
-        "theme": "light",
-        "numberFormat": "en-US",
-        "dateFormat": "MM/DD/YYYY",
-        "activeBlotters": [
-          "BLT-DEFAULT-NEW-TODAY"
-        ]
-      }
     }
   }
 }

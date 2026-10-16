@@ -30,15 +30,15 @@ public class TradeProvisioningSteps {
     /** The maker submits the trade, the checker approves its task: the trade is LIVE. */
     public void provisionLiveTrade(String product) {
         submitTradeAsPendingApproval(product);
-        approveTask(session.ctx().get("createdTaskId"), "checker");
+        approveTask(session.ctx().text("createdTaskId"), "checker");
     }
 
     public void submitTradeAsPendingApproval(String product) {
         String tradeJson = TestDataLoader.forKey(SETUP_KEY, product).request();
         JsonNode body = session.api().postMultipart(SUBMIT_PATH, session.config().email("maker"),
             "trade", tradeJson, "datFile", ProductDatFiles.forProduct(product));
-        session.ctx().set("createdTradeId", body.at("/data/trade/id").asText());
-        session.ctx().set("createdTaskId", body.at("/data/checkerContext/taskId").asText());
+        session.ctx().setAttribute("createdTradeId", body.at("/data/trade/id").asText());
+        session.ctx().setAttribute("createdTaskId", body.at("/data/checkerContext/taskId").asText());
     }
 
     /**

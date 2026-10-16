@@ -11,7 +11,7 @@ import org.junit.platform.suite.api.Suite;
 @Suite
 @IncludeEngines("cucumber")
 @SelectClasspathResource("features")
-@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.example.module.oreo.glue, com.example.genie.model")
+@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.example.module.oreo.glue")
 @ConfigurationParameter(key = PLUGIN_PROPERTY_NAME, value = "pretty, html:target/cucumber-report.html")
 public class OreoTest {
 }
