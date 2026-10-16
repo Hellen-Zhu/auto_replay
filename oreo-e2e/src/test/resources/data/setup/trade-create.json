@@ -1,0 +1,13 @@
+{
+  "_comment": "Trade submitted before a case: common_trade_action.snippet (API), TradeProvisioningSteps (UI). The step sets basic.productId.",
+  "request": {
+    "basic": {
+      "counterpartyFmId": "300036958",
+      "counterpartyName": "10 AM NY",
+      "portfolioId": "ABS_EQF",
+      "direction": "Buy",
+      "premiumAmount": 10000,
+      "premiumCurrency": "USD"
+    }
+  }
+}

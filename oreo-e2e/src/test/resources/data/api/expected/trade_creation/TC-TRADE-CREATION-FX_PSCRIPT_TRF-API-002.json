@@ -1,0 +1,54 @@
+{
+  "code": 200,
+  "status": "PENDING APPROVAL",
+  "msg": "${json-unit.any-string}",
+  "data": {
+    "trade": {
+      "id": "${json-unit.any-string}",
+      "basic": {
+        "dealDate": "${json-unit.any-string}",
+        "valueDate": "${json-unit.any-string}",
+        "tradeType": "FX_PSCRIPT_TRF",
+        "productId": "FX_PSCRIPT_TRF",
+        "currencyPair": "${json-unit.any-string}",
+        "notionalAmount": "${json-unit.any-number}",
+        "notionalCurrency": "CNH",
+        "rate": "${json-unit.any-number}",
+        "counterpartyName": "10 AM NY",
+        "counterpartyFmId": "300036958",
+        "portfolioId": "ABS_EQF",
+        "status": "Pending Approval Draft",
+        "eventStatus": "${json-unit.any-string}",
+        "trader": "system",
+        "scbEntity": "LONDON",
+        "source": "OREO",
+        "ci": 0,
+        "hardMargin": 0,
+        "cva": 0,
+        "fva": 0,
+        "marketers": [
+          {
+            "marketerId": "system",
+            "revenueShare": 100.0,
+            "marketerType": "COVERAGE"
+          }
+        ],
+        "structuringInvolved": false,
+        "vmc": 0,
+        "premiumAmount": "${json-unit.any-number}",
+        "premiumCurrency": "USD",
+        "premiumDate": "${json-unit.any-string}",
+        "version": "${json-unit.any-number}",
+        "direction": "Sell",
+        "udf": "${json-unit.ignore}"
+      },
+      "instrument": "${json-unit.ignore}",
+      "trace": "${json-unit.ignore}"
+    },
+    "checkerContext": {
+      "taskId": "${json-unit.any-string}",
+      "submittedBy": "maker@example.com",
+      "eventType": "SUBMIT"
+    }
+  }
+}

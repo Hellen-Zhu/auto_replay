@@ -1,0 +1,9 @@
+{
+  "_comment": "User preferences reset before every UI scenario (E2EScenarioHooks)",
+  "request": {
+    "theme": "light",
+    "numberFormat": "en-US",
+    "dateFormat": "MM/DD/YYYY",
+    "activeBlotters": ["BLT-DEFAULT-NEW-TODAY"]
+  }
+}

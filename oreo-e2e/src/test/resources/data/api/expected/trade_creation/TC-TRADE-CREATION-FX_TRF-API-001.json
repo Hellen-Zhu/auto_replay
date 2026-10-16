@@ -1,0 +1,119 @@
+{
+  "code": 200,
+  "status": "PENDING APPROVAL",
+  "msg": "${json-unit.regex}Submitted for checker approval. TaskId: CHK-.*",
+  "data": {
+    "trade": {
+      "id": "${json-unit.any-string}",
+      "basic": {
+        "dealDate": "${json-unit.any-string}",
+        "valueDate": "${json-unit.any-string}",
+        "tradeType": "FX_TRF",
+        "productId": "FX_TRF",
+        "currencyPair": "${json-unit.any-string}",
+        "notionalAmount": 70000.0,
+        "notionalCurrency": "${json-unit.any-string}",
+        "rate": "${json-unit.any-number}",
+        "counterpartyName": "10 AM NY",
+        "counterpartyFmId": "300036958",
+        "portfolioId": "ABS_EQF",
+        "status": "Pending Approval Draft",
+        "eventStatus": "New",
+        "trader": "system",
+        "scbEntity": "${json-unit.any-string}",
+        "source": "OREO",
+        "ci": "${json-unit.any-number}",
+        "hardMargin": "${json-unit.any-number}",
+        "cva": "${json-unit.any-number}",
+        "fva": "${json-unit.any-number}",
+        "marketers": "${json-unit.ignore}",
+        "structuringInvolved": false,
+        "vmc": "${json-unit.any-number}",
+        "premiumAmount": "${json-unit.any-number}",
+        "premiumCurrency": "${json-unit.any-string}",
+        "premiumDate": "${json-unit.any-string}",
+        "version": "${json-unit.any-number}",
+        "direction": "Buy"
+      },
+      "instrument": {
+        "version": "${json-unit.any-string}",
+        "tradeType": "Cortex.Finance.Tradeable.TRF",
+        "TRF": {
+          "underlyings": {
+            "ASSET": {
+              "Index": {
+                "assetClass": "FX",
+                "indexName": "USDJPY",
+                "fixingQualifier": "[BFIX]-1500-JP TYO"
+              }
+            }
+          },
+          "schedule": "${json-unit.ignore}",
+          "notionals": [
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0,
+            70000.0
+          ],
+          "targetCGain": {
+            "TD_BigFigure": {
+              "td_ty": "Full",
+              "td_bf": 500,
+              "td_firstPeriod": 0
+            }
+          },
+          "payoffDict": "${json-unit.ignore}",
+          "payoffs": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1"
+          ],
+          "delivery": {
+            "DD_Physical": {
+              "dd_roundings": "${json-unit.ignore}"
+            }
+          }
+        }
+      },
+      "trace": []
+    },
+    "checkerContext": {
+      "taskId": "${json-unit.any-string}",
+      "submittedBy": "maker@example.com",
+      "eventType": "SUBMIT"
+    }
+  }
+}

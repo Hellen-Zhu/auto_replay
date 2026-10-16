@@ -1,0 +1,5 @@
+{
+  "code": 400,
+  "status": "ERROR",
+  "msg": "Failed to create trade: Failed to populate trade from .dat file: Counterparty name is required"
+}

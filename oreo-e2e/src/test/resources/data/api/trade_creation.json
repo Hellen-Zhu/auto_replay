@@ -1,0 +1,84 @@
+{
+  "_comment": "features/api/trading/trade_creation.feature. Layers: defaults, byProduct, the case's row, the row's byProduct. API-001 has no row: it runs on the defaults.",
+  "defaults": {
+    "use": ["trade-basic"],
+    "dynamicFields": {
+      "msg": "regex:Submitted for checker approval\\. TaskId: CHK-.*",
+      "data.trade.id": "type",
+      "data.trade.basic.dealDate": "type",
+      "data.trade.basic.valueDate": "type",
+      "data.trade.basic.premiumDate": "type",
+      "data.checkerContext.taskId": "type"
+    }
+  },
+  "byProduct": {
+    "FX_TRF": {
+      "dynamicFields": {
+        "data.trade.instrument.version": "type",
+        "data.trade.instrument.TRF.schedule": "type-tree",
+        "data.trade.instrument.TRF.payoffDict": "type-tree",
+        "data.trade.instrument.TRF.delivery.DD_Physical.dd_roundings": "type-tree"
+      }
+    },
+    "FX_PSCRIPT": {
+      "dynamicFields": {
+        "data.trade.instrument.PayoffScript.trdData.DataRec.fixingSched.FS_SchedParams.fs_anchorDate": "type",
+        "data.trade.instrument.PayoffScript.trdData.DataRec.fixingSched.FS_SchedParams.fs_end.SE_ByEndDate.se_endDate": "type"
+      }
+    },
+    "FX_PSCRIPT_FSKO": {
+      "dynamicFields": {
+        "data.trade.basic.notionalAmount": "type",
+        "data.trade.instrument.version": "type",
+        "data.trade.instrument.PayoffScript": "type-tree"
+      }
+    },
+    "FX_PSCRIPT_TRF": {
+      "_comment": "Sold, without premium",
+      "request": {
+        "basic": { "direction": "Sell", "premiumAmount": null, "premiumCurrency": null }
+      },
+      "dynamicFields": {
+        "data.trade.instrument": "type-tree",
+        "data.trade.trace": "type-tree"
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "TC-TRADE-CREATION-<product_type>-API-002",
+      "_comment": "StepIn Partial",
+      "use": ["stepin-partial"],
+      "byProduct": {
+        "FX_PSCRIPT_TRF": { "request": { "basic": { "notionalCurrency": "" } } }
+      }
+    },
+    {
+      "id": "TC-TRADE-CREATION-<product_type>-API-003",
+      "_comment": "StepIn Full",
+      "use": ["stepin-full"],
+      "byProduct": {
+        "FX_PSCRIPT_TRF": { "request": { "basic": { "direction": "Buy", "notionalCurrency": "CNH" } } }
+      }
+    },
+    {
+      "id": "TC-TRADE-CREATION-API-004",
+      "_comment": "Counterparty name absent: 400",
+      "use": ["stepin-partial"],
+      "request": { "basic": { "counterpartyFmId": "300036957", "counterpartyName": "" } },
+      "dynamicFields": null
+    },
+    {
+      "id": "TC-TRADE-CREATION-API-005",
+      "_comment": "Portfolio absent: 400",
+      "use": ["stepin-full"],
+      "request": { "basic": { "portfolioId": "" } },
+      "dynamicFields": null
+    },
+    {
+      "id": "TC-TRADE-CREATION-API-006",
+      "_comment": "A user without the Maker role submits: 403",
+      "dynamicFields": null
+    }
+  ]
+}

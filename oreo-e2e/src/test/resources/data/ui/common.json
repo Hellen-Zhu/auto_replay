@@ -1,0 +1,22 @@
+{
+  "_comment": "Shared blocks for data/ui/ event files. Nothing here applies unless a file or row names the block in \"use\".",
+  "shared": {
+    "trade-basic": {
+      "_comment": "New Trade form values; the flow takes the product from the case",
+      "request": {
+        "basic": {
+          "counterpartyFmId": "300036958",
+          "counterpartyName": "10 AM NY",
+          "portfolioId": "ABS_EQF",
+          "direction": "Buy"
+        }
+      }
+    },
+    "stepin": {
+      "_comment": "StepIn section of the New Trade form",
+      "request": {
+        "stepIn": { "oldCounterpartyName": "10 AM JAK" }
+      }
+    }
+  }
+}

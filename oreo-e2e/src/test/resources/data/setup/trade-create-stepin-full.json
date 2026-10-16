@@ -1,0 +1,14 @@
+{
+  "_comment": "StepIn Full trade submitted before a case (TradeProvisioningSteps): trade-create with the StepIn udf entries",
+  "extends": "trade-create",
+  "request": {
+    "basic": {
+      "udf": [
+        { "key": "stepInType", "value": "StepInFull", "type": "Text" },
+        { "key": "oldCptyName", "value": "10 AM JAK", "type": "Text" },
+        { "key": "oldCptyFmId", "value": "300036957", "type": "Text" },
+        { "key": "novationDate", "value": "2026-06-10", "type": "Date" }
+      ]
+    }
+  }
+}

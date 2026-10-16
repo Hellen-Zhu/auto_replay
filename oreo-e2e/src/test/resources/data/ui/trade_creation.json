@@ -1,0 +1,10 @@
+{
+  "_comment": "features/ui/trading/trade_creation.feature. UI-001 has no row: it runs on the defaults.",
+  "defaults": {
+    "use": ["trade-basic"]
+  },
+  "cases": [
+    { "id": "TC-TRADE-CREATION-<product_type>-UI-002", "_comment": "StepIn Full", "use": ["stepin"] },
+    { "id": "TC-TRADE-CREATION-<product_type>-UI-003", "_comment": "StepIn Partial", "use": ["stepin"] }
+  ]
+}

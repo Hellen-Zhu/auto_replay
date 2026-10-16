@@ -1,0 +1,8 @@
+{
+  "_comment": "features/ui/trading/trade_early_termination.feature",
+  "defaults": {
+    "request": {
+      "earlyTermination": { "direction": "Pay", "amount": "100", "ccy": "USD" }
+    }
+  }
+}

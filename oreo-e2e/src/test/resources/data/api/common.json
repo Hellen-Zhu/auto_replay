@@ -1,0 +1,44 @@
+{
+  "_comment": "Shared blocks for data/api/ event files. Nothing here applies unless a file or row names the block in \"use\".",
+  "shared": {
+    "trade-basic": {
+      "_comment": "Trade body of POST /trades/create (part 'trade'); the step sets basic.productId from the product",
+      "request": {
+        "basic": {
+          "counterpartyFmId": "300036958",
+          "counterpartyName": "10 AM NY",
+          "portfolioId": "ABS_EQF",
+          "direction": "Buy",
+          "premiumAmount": 10000,
+          "premiumCurrency": "USD"
+        }
+      }
+    },
+    "stepin-partial": {
+      "_comment": "StepIn Partial: the old counterparty and the novation date as udf entries",
+      "request": {
+        "basic": {
+          "udf": [
+            { "key": "stepInType", "value": "StepInPartial", "type": "Text" },
+            { "key": "oldCptyName", "value": "10 AM JAK", "type": "Text" },
+            { "key": "oldCptyFmId", "value": "300036957", "type": "Text" },
+            { "key": "novationDate", "value": "2026-06-10", "type": "Date" }
+          ]
+        }
+      }
+    },
+    "stepin-full": {
+      "_comment": "StepIn Full: the old counterparty and the novation date as udf entries",
+      "request": {
+        "basic": {
+          "udf": [
+            { "key": "stepInType", "value": "StepInFull", "type": "Text" },
+            { "key": "oldCptyName", "value": "10 AM JAK", "type": "Text" },
+            { "key": "oldCptyFmId", "value": "300036957", "type": "Text" },
+            { "key": "novationDate", "value": "2026-06-10", "type": "Date" }
+          ]
+        }
+      }
+    }
+  }
+}
