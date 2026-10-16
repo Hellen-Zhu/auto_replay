@@ -185,9 +185,15 @@ public class TestDataValidationTest {
         for (FeatureCase c : featureCases) {
             if (!c.channelDir().equals("api")) continue;
             CaseId id = CaseId.parse(c.caseId());
-            String text = expected.read(id).orElse(null);
-            if (text == null) continue; // reported by everyApiCaseHasItsExpectedFile
-            JsonNode file = Json.parse(text);
+            JsonNode file;
+            try {
+                ExpectedResponses.Resolved resolved = expected.resolve(id).orElse(null);
+                if (resolved == null) continue; // reported by everyApiCaseHasItsExpectedFile
+                file = Json.parse(resolved.json());
+            } catch (IllegalStateException e) {
+                errors.add(c.caseId() + ": " + e.getMessage());
+                continue;
+            }
             Map<String, String> rules = TestData.forCase(c.caseId()).dynamicFields();
             List<List<Object>> ruleSteps = new ArrayList<>();
             for (Map.Entry<String, String> rule : rules.entrySet()) {
@@ -215,6 +221,32 @@ public class TestDataValidationTest {
             System.out.println("[TestDataValidation] " + warnings.size() + " warning(s): placeholders from the"
                     + " converted old data, weaker than a recording (checklist of migration step 6):");
             warnings.forEach(w -> System.out.println("  " + w));
+        }
+        failOn(errors);
+    }
+
+    // ── 10.7 ─────────────────────────────────────────────────────────────────
+
+    @Test
+    public void expectedFilesAreCompacted() {
+        ExpectedResponses expected = ExpectedResponses.standard();
+        List<String> errors = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        for (String event : expected.events()) {
+            ExpectedCompaction.Plan plan = ExpectedCompaction.plan(expected, event,
+                    id -> TestData.forCase(id.raw()).expectedBase());
+            errors.addAll(plan.errors());
+            for (ExpectedCompaction.Entry entry : plan.entries()) {
+                if (entry.changed()) {
+                    warnings.add(project.relativize(expected.fileFor(entry.id())) + ": " + entry.note()
+                            + ": run CompactExpectedFiles");
+                }
+            }
+        }
+        if (!warnings.isEmpty()) {
+            System.out.println("[TestDataValidation] " + warnings.size() + " expected file(s) not compacted"
+                    + " (mvn test -Dtest=CompactExpectedFiles -Doreo.compact=all):");
+            warnings.forEach(w -> System.out.println("  [warn] " + w));
         }
         failOn(errors);
     }

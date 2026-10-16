@@ -94,7 +94,7 @@ check by row and column.
 src/test/resources/data/
   api/common.json, ui/common.json       shared blocks; they apply only where a file names them in "use"
   api/<event>.json, ui/<event>.json     one per feature file name: defaults, byProduct, case rows
-  api/expected/<event>/<caseId>.json    recorded API responses, one per case
+  api/expected/<event>/<caseId>.json    recorded API responses, one per case: in full, or a patch on a base case
   setup/<name>.json                     payloads that prepare a case (trade-create, risk-calc-success-mock ...)
   <PRODUCT>.dat                         the products' dat files
 ```
@@ -145,8 +145,8 @@ status code check) compares the response strictly with `data/api/expected/<event
 | Situation | Run | Result |
 |---|---|---|
 | Regression | `mvn test` | strict comparison |
-| New product or case | `mvn test` | its file is recorded and the scenario fails once: review the file against the requirement, commit, run again |
-| The API changed on purpose | `OREO_EXPECTED=update mvn test ...` (or `-Doreo.expected=update`) | the files are rewritten: review `git diff`, commit |
+| New product or case | `mvn test`, then the compaction | its file is recorded and the scenario fails once: compact, review the file against the requirement, commit, run again |
+| The API changed on purpose | `OREO_EXPECTED=update mvn test ...` (or `-Doreo.expected=update`), then the compaction | the files are rewritten in full and compacted again: review `git diff`, commit |
 
 The values that change from run to run are masked by the case's `dynamicFields` (path -> rule) when the file is
 recorded:
@@ -161,6 +161,41 @@ recorded:
 A path is keys joined by `.`, `[n]` for one array element, `[*]` for all. A rule whose path is not in the response
 fails the recording. Never edit an expected file by hand: change the rule and record again.
 
+### Base and patch
+
+The variants of a case return mostly the same response, so a variant's file holds only its differences from a
+base case of the same product. The event file declares the base once:
+
+```jsonc
+"defaults": { "expectedBase": "TC-TRADE-CREATION-<product_type>-API-001", ... }
+```
+
+`<product_type>` becomes the case's product, so `FX_TRF-API-002` builds on `FX_TRF-API-001`. A case without a
+product, and the base case itself, have no base; a `byProduct` entry or a row may name another base, or `null`.
+A base has no base of its own.
+
+```json
+{
+  "_base": "TC-TRADE-CREATION-FX_TRF-API-001",
+  "_patch": [
+    { "op": "replace", "path": "/data/trade/basic/eventStatus", "value": "..." },
+    { "op": "add", "path": "/data/trade/basic/udf", "value": [ "..." ] }
+  ]
+}
+```
+
+The case is compared strictly with the base's file plus the ops. Recording always writes the full response; the
+compaction then turns the variants into patches:
+
+```bash
+mvn test -Dtest=CompactExpectedFiles -Doreo.compact=trade_creation
+```
+
+(`all` for every event.) Objects are compared key by key, arrays of the same length element by element, other arrays
+are replaced whole; a patch that is not shorter than the full response is not written. Any problem (a base without a
+file, a patch that does not apply) stops it before a file is written, and a second run changes nothing. Then review
+`git diff` and commit. A change every variant shares (a new response field) shows in the base files only.
+
 ### Commands
 
 ```bash
@@ -169,13 +204,15 @@ mvn test -Dtest='com.example.module.oreo.testdata.*Test'
 
 The unit tests and the offline checks of `TestDataValidationTest` (no environment needed): every data file loads,
 every case of every feature resolves, every row and event file has its feature, every API case has its expected file
-and every expected file its case, the rules agree with the expected files, every setup name used exists.
+and every expected file its case, the rules agree with the expected files, every setup name used exists, the expected
+files resolve and are compacted (a file the compaction would still change is a warning).
 
 ```bash
 mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002
 ```
 
-Prints the merged data of one case: the applied layers, the request, the `dynamicFields` and the expected file.
+Prints the merged data of one case: the applied layers, the request, the `dynamicFields`, the `expectedBase`, the
+expected file (full, or patch on which base) and the expected response in full.
 
 The offline tests are JUnit 4. Should `mvn test -Dtest=TestDataValidationTest` report no tests (a JUnit Platform
 without the vintage engine), add `org.junit.vintage:junit-vintage-engine` in test scope.
@@ -184,8 +221,8 @@ without the vintage engine), add `org.junit.vintage:junit-vintage-engine` in tes
 
 | Task | What to change |
 |---|---|
-| New product | `ProductDatFiles` constant and `data/<P>.dat`; the product in each feature's Examples; `byProduct` only where its data or dynamic fields differ; run the API cases, review the recorded files, commit |
-| New positive case | nothing when it runs on the defaults; otherwise a row with the feature's ID |
+| New product | `ProductDatFiles` constant and `data/<P>.dat`; the product in each feature's Examples; `byProduct` only where its data or dynamic fields differ; run the API cases, compact, review the recorded files, commit (no base to declare: `defaults` covers every product) |
+| New positive case | nothing when it runs on the defaults; otherwise a row with the feature's ID; after the recording, compact |
 | New negative case | a row with the `request` change and `"dynamicFields": null` |
 | New event | `data/<channel>/<event>.json`, named after the feature file; shared blocks through `use` |
 | A field turns out dynamic | its rule in the event file (`defaults` or `byProduct`), then record again |

@@ -1,0 +1,1 @@
+{ "_comment": "Fixture: a base must be a case of the same event", "defaults": { "expectedBase": "TC-OTHER-EVENT-<product_type>-API-001" } }

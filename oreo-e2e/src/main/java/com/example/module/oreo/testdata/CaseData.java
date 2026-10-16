@@ -14,12 +14,15 @@ public final class CaseData {
     private final CaseId id;
     private final ObjectNode request;
     private final Map<String, String> dynamicFields;
+    private final String expectedBase;
     private final List<String> layers;
 
-    CaseData(CaseId id, ObjectNode request, Map<String, String> dynamicFields, List<String> layers) {
+    CaseData(CaseId id, ObjectNode request, Map<String, String> dynamicFields, String expectedBase,
+             List<String> layers) {
         this.id = id;
         this.request = request.deepCopy();
         this.dynamicFields = Collections.unmodifiableMap(new LinkedHashMap<>(dynamicFields));
+        this.expectedBase = expectedBase;
         this.layers = List.copyOf(layers);
     }
 
@@ -33,6 +36,12 @@ public final class CaseData {
 
     /** Path -> rule ({@code type}, {@code type-tree}, {@code regex:...}, {@code ignore}), API cases only. */
     public Map<String, String> dynamicFields() { return dynamicFields; }
+
+    /**
+     * The case whose expected file this case's file is a patch on ({@code <product_type>} already replaced);
+     * {@code null} when it has none (API cases only).
+     */
+    public String expectedBase() { return expectedBase; }
 
     /** The layers applied, in order, e.g. {@code trade_creation.json defaults (use trade-basic)}. */
     public List<String> layers() { return layers; }

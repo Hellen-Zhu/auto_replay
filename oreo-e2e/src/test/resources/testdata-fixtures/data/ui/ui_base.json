@@ -1,0 +1,1 @@
+{ "_comment": "Fixture: expectedBase is API only", "defaults": { "expectedBase": "TC-UI-BASE-<product_type>-UI-001" } }

@@ -7,6 +7,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -77,6 +78,36 @@ public class TestDataRepositoryTest {
     @Test(expected = IllegalStateException.class)
     public void dynamicFieldsRejectedInUi() {
         repo.forCase("TC-UI-EVENT-FX_TRF-UI-001");
+    }
+
+    @Test
+    public void expectedBaseFollowsTheProduct() {
+        assertEquals("TC-SAMPLE-EVENT-FX_TRF-API-001", repo.forCase("TC-SAMPLE-EVENT-FX_TRF-API-002").expectedBase());
+    }
+
+    @Test
+    public void baseCaseHasNoBase() {
+        assertNull(repo.forCase("TC-SAMPLE-EVENT-FX_TRF-API-001").expectedBase());
+    }
+
+    @Test
+    public void caseWithoutProductHasNoBase() {
+        assertNull(repo.forCase("TC-SAMPLE-EVENT-API-004").expectedBase());
+    }
+
+    @Test
+    public void nullRemovesTheBase() {
+        assertNull(repo.forCase("TC-SAMPLE-EVENT-FX_PSCRIPT_TRF-API-002").expectedBase());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void baseInAnotherEventIsAnError() {
+        repo.forCase("TC-BAD-BASE-FX_TRF-API-002");
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void expectedBaseRejectedInUi() {
+        repo.forCase("TC-UI-BASE-FX_TRF-UI-002");
     }
 
     @Test

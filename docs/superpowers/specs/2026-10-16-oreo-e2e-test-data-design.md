@@ -1,6 +1,6 @@
 # oreo-e2e test data: design
 
-Status: approved by the user on 2026-10-16; section 7.5 (base and patch) added and approved the same day. Implemented on `feature/testdata-refactor` except section 7.5 (plan Task 8). The first recordings were made on the company machine and stay there; the branch keeps the expected files converted from the YAML.
+Status: approved by the user on 2026-10-16; section 7.5 (base and patch) added and approved the same day. Implemented on `feature/testdata-refactor`; first compaction pending. The first recordings were made on the company machine and stay there; the branch keeps the expected files converted from the YAML.
 Scope: the Java + Cucumber (Genie) project in `oreo-e2e/` only. The Playwright side is not touched.
 
 ## 1. Goals and constraints

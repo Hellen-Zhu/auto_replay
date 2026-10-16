@@ -1,7 +1,8 @@
 {
-  "_comment": "features/api/trading/trade_creation.feature. Layers: defaults, byProduct, the case's row, the row's byProduct. API-001 has no row: it runs on the defaults.",
+  "_comment": "features/api/trading/trade_creation.feature. Layers: defaults, byProduct, the case's row, the row's byProduct. API-001 has no row: it runs on the defaults. A variant's expected file may be a patch on the API-001 of its product (expectedBase; made by CompactExpectedFiles); cases without a product have no base.",
   "defaults": {
     "use": ["trade-basic"],
+    "expectedBase": "TC-TRADE-CREATION-<product_type>-API-001",
     "dynamicFields": {
       "msg": "regex:Submitted for checker approval\\. TaskId: CHK-.*",
       "data.trade.id": "type",

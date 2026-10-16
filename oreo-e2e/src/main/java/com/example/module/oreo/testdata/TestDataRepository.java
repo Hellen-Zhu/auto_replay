@@ -31,8 +31,9 @@ public final class TestDataRepository {
     private static final Set<String> COMMON_KEYS = Set.of("shared");
     private static final Set<String> BLOCK_KEYS = Set.of("request", "dynamicFields");
     private static final Set<String> EVENT_KEYS = Set.of("defaults", "byProduct", "cases");
-    private static final Set<String> LAYER_KEYS = Set.of("use", "request", "dynamicFields");
-    private static final Set<String> ROW_KEYS = Set.of("id", "use", "request", "dynamicFields", "byProduct");
+    private static final Set<String> LAYER_KEYS = Set.of("use", "request", "dynamicFields", "expectedBase");
+    private static final Set<String> ROW_KEYS = Set.of("id", "use", "request", "dynamicFields", "expectedBase",
+            "byProduct");
     private static final Set<String> SETUP_KEYS = Set.of("extends", "request", "response");
     private static final Pattern SETUP_NAME = Pattern.compile("[a-z0-9][a-z0-9-]*");
 
@@ -108,7 +109,10 @@ public final class TestDataRepository {
         return found;
     }
 
-    /** Applies one layer: its {@code use} blocks in order, then its own {@code request} and {@code dynamicFields}. */
+    /**
+     * Applies one layer: its {@code use} blocks in order, then its own {@code request}, {@code dynamicFields} and
+     * {@code expectedBase}.
+     */
     private static void apply(Merged merged, ObjectNode layer, String label, Map<String, JsonNode> shared,
                               String path) {
         if (layer == null) return;
@@ -126,13 +130,18 @@ public final class TestDataRepository {
         merged.layers.add(uses.isEmpty() ? label : label + " (use " + String.join(", ", uses) + ")");
     }
 
-    /** The request and dynamic fields merged so far. */
+    /** The request, dynamic fields and expected base merged so far. */
     private static final class Merged {
         ObjectNode request = Json.MAPPER.createObjectNode();
         final Map<String, String> dynamicFields = new LinkedHashMap<>();
+        String expectedBase;
         final List<String> layers = new ArrayList<>();
 
         void add(JsonNode part) {
+            JsonNode base = part.get("expectedBase");
+            if (base != null) {
+                expectedBase = base.isNull() ? null : base.asText();
+            }
             JsonNode req = part.get("request");
             if (req != null) {
                 request = JsonLayers.merge(request, (ObjectNode) req);
@@ -153,7 +162,21 @@ public final class TestDataRepository {
         }
 
         CaseData toCaseData(CaseId id) {
-            return new CaseData(id, request, dynamicFields, layers);
+            return new CaseData(id, request, dynamicFields, resolveBase(id), layers);
+        }
+
+        /**
+         * The base case ID: {@code <...>} replaced by the case's product; none on a case without a product when
+         * the value names one, and none when it is the case itself.
+         */
+        private String resolveBase(CaseId id) {
+            if (expectedBase == null) return null;
+            String resolved = expectedBase;
+            if (resolved.contains("<")) {
+                if (id.product() == null) return null;
+                resolved = resolved.replaceAll("<[^>]+>", id.product());
+            }
+            return resolved.equals(id.raw()) ? null : resolved;
         }
     }
 
@@ -191,9 +214,9 @@ public final class TestDataRepository {
         checkKeys(event, EVENT_KEYS, path, "");
         JsonNode defaults = event.get("defaults");
         if (defaults != null) {
-            checkLayer(defaults, LAYER_KEYS, path, "defaults", shared, channelDir);
+            checkLayer(defaults, LAYER_KEYS, path, "defaults", shared, id);
         }
-        checkByProduct(event.get("byProduct"), path, "byProduct", shared, channelDir);
+        checkByProduct(event.get("byProduct"), path, "byProduct", shared, id);
         JsonNode rows = event.get("cases");
         if (rows == null) return;
         if (!rows.isArray()) {
@@ -208,31 +231,31 @@ public final class TestDataRepository {
                 throw error(path, where + ".id", "every row needs an id (the case ID as written in the feature)");
             }
             where = "row " + rowId.asText();
-            checkRowId(rowId.asText(), id, path, where);
+            checkCaseIdPattern(rowId.asText(), id, path, where, "a row");
             if (!seen.add(rowId.asText())) {
                 throw error(path, where, "the row ID appears twice");
             }
-            checkLayer(row, ROW_KEYS, path, where, shared, channelDir);
-            checkByProduct(row.get("byProduct"), path, where + " byProduct", shared, channelDir);
+            checkLayer(row, ROW_KEYS, path, where, shared, id);
+            checkByProduct(row.get("byProduct"), path, where + " byProduct", shared, id);
         }
     }
 
-    private static void checkRowId(String rowId, CaseId id, String path, String where) {
+    /** A row ID or an {@code expectedBase}: written like a row ID, a case of this file's event and channel. */
+    private static void checkCaseIdPattern(String value, CaseId id, String path, String where, String what) {
         CaseId example;
         try {
-            CaseId.checkRowId(rowId);
-            example = CaseId.parse(rowId.replaceAll("<[^>]+>", ProductDatFiles.values()[0].name()));
+            CaseId.checkRowId(value);
+            example = CaseId.parse(value.replaceAll("<[^>]+>", ProductDatFiles.values()[0].name()));
         } catch (IllegalArgumentException e) {
             throw error(path, where, e.getMessage());
         }
         if (!example.event().equals(id.event()) || !example.channel().equals(id.channel())) {
-            throw error(path, where, "a row of " + id.eventFile() + ".json must be a TC-" + id.event() + "-..."
+            throw error(path, where, what + " of " + id.eventFile() + ".json must be a TC-" + id.event() + "-..."
                     + id.channel() + "-NNN case");
         }
     }
 
-    private void checkByProduct(JsonNode byProduct, String path, String where, Set<String> shared,
-                                String channelDir) {
+    private void checkByProduct(JsonNode byProduct, String path, String where, Set<String> shared, CaseId id) {
         if (byProduct == null) return;
         requireObject(byProduct, path, where);
         Set<String> products = new LinkedHashSet<>();
@@ -241,12 +264,13 @@ public final class TestDataRepository {
             if (!products.contains(entry.getKey())) {
                 throw error(path, where + "." + entry.getKey(), "not a product of ProductDatFiles " + products);
             }
-            checkLayer(entry.getValue(), LAYER_KEYS, path, where + "." + entry.getKey(), shared, channelDir);
+            checkLayer(entry.getValue(), LAYER_KEYS, path, where + "." + entry.getKey(), shared, id);
         }
     }
 
     private void checkLayer(JsonNode layer, Set<String> allowed, String path, String where, Set<String> shared,
-                            String channelDir) {
+                            CaseId id) {
+        String channelDir = id.channelDir();
         requireObject(layer, path, where);
         checkKeys((ObjectNode) layer, allowed, path, where);
         JsonNode use = layer.get("use");
@@ -263,6 +287,20 @@ public final class TestDataRepository {
         }
         checkRequest(layer, path, where);
         checkDynamicFields(layer, path, where, channelDir);
+        checkExpectedBase(layer, path, where, id);
+    }
+
+    private static void checkExpectedBase(JsonNode layer, String path, String where, CaseId id) {
+        JsonNode base = layer.get("expectedBase");
+        if (base == null) return;
+        if (!id.channelDir().equals("api")) {
+            throw error(path, where + ".expectedBase", "expectedBase exists in data/api/ only (UI has no recorded responses)");
+        }
+        if (base.isNull()) return;
+        if (!base.isTextual()) {
+            throw error(path, where + ".expectedBase", "must be a case ID (with <product_type> for the case's product) or null");
+        }
+        checkCaseIdPattern(base.asText(), id, path, where + ".expectedBase", "expectedBase");
     }
 
     private static void checkRequest(JsonNode part, String path, String where) {

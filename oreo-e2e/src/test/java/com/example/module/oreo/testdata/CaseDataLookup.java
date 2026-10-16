@@ -3,9 +3,8 @@ package com.example.module.oreo.testdata;
 import org.junit.Assume;
 import org.junit.Test;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Prints the data of one case without running it:
@@ -36,10 +35,17 @@ public class CaseDataLookup {
             for (Map.Entry<String, String> rule : data.dynamicFields().entrySet()) {
                 out.append("  ").append(rule.getKey()).append(" = ").append(rule.getValue()).append('\n');
             }
-            Path file = ExpectedResponses.standard().fileFor(id);
-            out.append("Expected file: ").append(file)
-                    .append(Files.isRegularFile(file) ? " (exists)" : " (missing: recorded at the first run)")
+            out.append("expectedBase: ").append(data.expectedBase() == null ? "(none)" : data.expectedBase())
                     .append('\n');
+            ExpectedResponses expected = ExpectedResponses.standard();
+            Optional<ExpectedResponses.Resolved> resolved = expected.resolve(id);
+            if (resolved.isEmpty()) {
+                out.append("Expected file: ").append(expected.fileFor(id))
+                        .append(" (not recorded: recorded at the first run)\n");
+            } else {
+                out.append("Expected file: ").append(resolved.get().describe()).append('\n');
+                out.append("Expected response (full form):\n").append(resolved.get().json());
+            }
         }
         System.out.println(out);
     }

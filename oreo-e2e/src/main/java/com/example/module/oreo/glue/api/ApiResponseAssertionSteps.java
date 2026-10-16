@@ -83,10 +83,11 @@ public class ApiResponseAssertionSteps {
     }
 
     /**
-     * Strict comparison with the recorded response of the case, {@code data/api/expected/<event>/<caseId>.json}.
-     * A missing file is recorded (the actual response with the case's {@code dynamicFields} masked) and the
-     * scenario fails once, so the recording is reviewed; with {@code OREO_EXPECTED=update} (or
-     * {@code -Doreo.expected=update}) the file is rewritten and the step passes.
+     * Strict comparison with the recorded response of the case, {@code data/api/expected/<event>/<caseId>.json}
+     * (a patch file is applied to its base first). A missing file is recorded (the actual response with the case's
+     * {@code dynamicFields} masked, in full) and the scenario fails once, so the recording is reviewed; with
+     * {@code OREO_EXPECTED=update} (or {@code -Doreo.expected=update}) the file is rewritten without being read and
+     * the step passes.
      */
     @Then("^response matches current scenario$")
     public void responseMatchesCurrentScenario() {
@@ -98,8 +99,8 @@ public class ApiResponseAssertionSteps {
         ExpectedResponses expectedResponses = ExpectedResponses.standard();
         Path file = expectedResponses.fileFor(id);
         String actual = ctx.helper().response().extract().asString();
-        Optional<String> recorded = expectedResponses.read(id);
         boolean update = ExpectedResponses.updateMode();
+        Optional<ExpectedResponses.Resolved> recorded = update ? Optional.empty() : expectedResponses.resolve(id);
 
         if (update || recorded.isEmpty()) {
             String masked = ResponseMasker.mask(actual, TestData.forCase(tcKey).dynamicFields(), tcKey);
@@ -114,12 +115,15 @@ public class ApiResponseAssertionSteps {
             return;
         }
 
-        log.info("[ApiResponseAssertionSteps] comparing the response of {} with {}", tcKey, file);
+        ExpectedResponses.Resolved expected = recorded.get();
+        log.info("[ApiResponseAssertionSteps] comparing the response of {} with {}", tcKey, expected.describe());
         try {
-            JsonAssert.assertJsonEquals(recorded.get(), actual);
+            JsonAssert.assertJsonEquals(expected.json(), actual);
         } catch (AssertionError e) {
-            throw new AssertionError(e.getMessage() + "\nExpected file: " + file
-                    + "\nIf the change is intended, run again with OREO_EXPECTED=update and review the diff.", e);
+            throw new AssertionError(e.getMessage() + "\nExpected file: " + expected.describe()
+                    + "\nIf the change is intended, run again with OREO_EXPECTED=update, compact with"
+                    + " mvn test -Dtest=CompactExpectedFiles -Doreo.compact=" + id.eventFile()
+                    + ", and review the diff.", e);
         }
     }
 
