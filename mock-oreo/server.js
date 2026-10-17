@@ -37,12 +37,25 @@
 //   that a case whose comments did not reach the control fails;
 // - PUT /api/v1/uc/api/user-preferences (path under /api/v1, method, X-User-Id header, the JSON body with
 //   "activeBlotters" and the answer { code, status: 'SUCCESS', data } are real; that the preferences change nothing
-//   on the pages is this mock's own).
+//   on the pages is this mock's own);
+// - POST /api/v1/blotter/trades: path and method are real (the Java E2E steps wait for its response after the login,
+//   the booking and a refresh); the Trades page loads its rows with it; its body and answer are this mock's own;
+// - for the Java API cases (oreo-e2e): a create request through the API is answered with the response that case
+//   recorded (oreo-e2e/src/test/resources/data/api/expected/trade_creation/, read at start, patch files applied;
+//   the case from the product and the udf entry stepInType), its placeholders filled in and this trade's IDs and
+//   submitter set. So are the negative answers: a checker gets 403 "Access denied", a request without counterparty
+//   name or portfolio 400 with the recorded text. A product without a recording gets this mock's own answer. The
+//   accounts maker@example.com / checker@example.com are those of the Java cases. Their SQL check (the trade
+//   persisted in the database) cannot pass against this mock.
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const PORT = Number(process.env.PORT || 4173);
 const PREFERENCES = {};
-const USERS = { 'maker@test.com': { pwd: 'maker1', name: 'maker' }, 'checker@test.com': { pwd: 'checker1', name: 'checker' } };
+const USERS = { 'maker@test.com': { pwd: 'maker1', name: 'maker' }, 'checker@test.com': { pwd: 'checker1', name: 'checker' },
+  // the accounts of the Java E2E cases (oreo-e2e)
+  'maker@example.com': { pwd: 'maker1', name: 'maker' }, 'checker@example.com': { pwd: 'checker1', name: 'checker' } };
 
 const components = `
 <script>
@@ -249,7 +262,7 @@ function render() {
     tbody.appendChild(tr);
   }
 }
-async function load() { trades = (await (await api('/api/trades')).json()).data.trades; render(); }
+async function load() { trades = (await (await api('/api/v1/blotter/trades', { method: 'POST', body: '{}' })).json()).data.trades; render(); }
 setTimeout(load, 300); // simulate async loading of the blotter
 search.addEventListener('input', render);
 document.addEventListener('mousedown', (e) => { if (!menu.contains(e.target)) menu.hidden = true; });
@@ -386,6 +399,71 @@ setTimeout(async () => {
 }, 300);
 </script></main></body></html>`;
 
+// The create responses recorded by the Java API cases (oreo-e2e, data/api/expected/trade_creation/<caseId>.json): a
+// create request through the API is answered with the recording of the case it stands for, its placeholders filled in,
+// so that those cases pass against this mock. Read once at start. A decimal number keeps its ".0": the cases compare
+// 70000.0 and 70000 as different values.
+const RECORDED_DIR = path.join(__dirname, '..', 'oreo-e2e', 'src', 'test', 'resources', 'data', 'api', 'expected', 'trade_creation');
+const FLOAT_MARK = '@@float@@';
+const parseKeepingFloats = (text) => JSON.parse(text.replace(/"(?:[^"\\]|\\.)*"|(-?\d+\.\d+(?:[eE][+-]?\d+)?)/g,
+  (m, number) => (number ? JSON.stringify(FLOAT_MARK + number) : m)));
+const stringifyKeepingFloats = (value) => JSON.stringify(value).replace(new RegExp('"' + FLOAT_MARK + '([^"]+)"', 'g'), '$1');
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const RECORDED = {};
+try {
+  for (const f of fs.readdirSync(RECORDED_DIR)) {
+    if (f.endsWith('.json')) RECORDED[f.slice(0, -'.json'.length)] = parseKeepingFloats(fs.readFileSync(path.join(RECORDED_DIR, f), 'utf8'));
+  }
+} catch { /* no oreo-e2e folder next to this one: every create gets this mock's own answer */ }
+
+// A recording in full: a patch file { _base, _patch } is applied to its base as the Java side does (add on an object
+// key, remove, replace; "" is the whole document)
+function recorded(caseId) {
+  const file = RECORDED[caseId];
+  if (!file || !file._patch) return file && clone(file);
+  let doc = recorded(file._base);
+  if (!doc) return undefined;
+  for (const op of file._patch) {
+    if (op.path === '') { doc = clone(op.value); continue; }
+    const tokens = op.path.split('/').slice(1).map((t) => t.replace(/~1/g, '/').replace(/~0/g, '~'));
+    const last = tokens.pop();
+    const parent = tokens.reduce((node, t) => node[t], doc);
+    if (op.op === 'remove') { if (Array.isArray(parent)) parent.splice(Number(last), 1); else delete parent[last]; }
+    else parent[last] = clone(op.value);
+  }
+  return doc;
+}
+
+// The placeholders of a recording filled in: any-string -> text (today for a ...Date key), any-number -> 0,
+// ignore -> null, regex -> its text without a final ".*"
+const TODAY = () => new Date().toISOString().slice(0, 10);
+function fill(node, key) {
+  if (Array.isArray(node)) return node.map((v) => fill(v));
+  if (node && typeof node === 'object') return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, fill(v, k)]));
+  if (node === '${json-unit.any-string}') return /Date$/.test(key || '') ? TODAY() : 'mock';
+  if (node === '${json-unit.any-number}') return 0;
+  if (node === '${json-unit.ignore}') return null;
+  if (typeof node === 'string' && node.startsWith('${json-unit.regex}')) return node.slice('${json-unit.regex}'.length).replace(/\.\*$/, '');
+  return node;
+}
+
+// The answer to a create request through the API: the recording of its case (the product; StepIn Partial / Full from
+// the udf entry stepInType, else the plain creation) with this trade's IDs and its submitter. The trade's values stay
+// the recording's, not the request's: the real system takes some of them from the dat file (a Buy StepIn Partial
+// FX_PSCRIPT is answered Sell) and answers the product with its old name (FX_CO, FX_FSB). Undefined when nothing is
+// recorded for the product
+function recordedAnswer(basic, id, taskId, caller) {
+  const stepInType = ((Array.isArray(basic.udf) ? basic.udf : []).find((u) => u && u.key === 'stepInType') || {}).value;
+  const n = stepInType === 'StepInPartial' ? '002' : stepInType === 'StepInFull' ? '003' : '001';
+  const body = recorded(`TC-TRADE-CREATION-${basic.productId}-API-${n}`) || recorded(`TC-TRADE-CREATION-${basic.productId}-API-001`);
+  if (!body || !body.data || !body.data.trade) return undefined;
+  const answer = fill(body);
+  answer.msg = 'Submitted for checker approval. TaskId: ' + taskId;
+  answer.data.trade.id = id;
+  if (answer.data.checkerContext) Object.assign(answer.data.checkerContext, { taskId, submittedBy: caller });
+  return answer;
+}
+
 const TRADES = {}; // trades booked in this mock session, kept in memory only
 const TASKS = {}; // approval tasks that are still open: task ID -> { tradeId, submittedBy, kind: 'create' | 'cancel' }
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
@@ -423,15 +501,21 @@ http.createServer((req, res) => {
 
   if (req.method === 'POST' && req.url === '/api/v1/trades/create?tradeAction=SUBMIT') {
     return readBody((body) => {
+      // The texts of the recorded negative responses (oreo-e2e TC-TRADE-CREATION-API-004, -005, -006)
+      const error = (code, msg) => json(res, code, { code, status: 'ERROR', msg });
+      if (USERS[caller].name === 'checker') return error(403, 'Access denied');
       const field = (name) => (body.match(new RegExp('name="' + name + '"[^\\r\\n]*\\r\\n(?:[^\\r\\n]+\\r\\n)*\\r\\n([\\s\\S]*?)\\r\\n--')) || [])[1];
       let t = JSON.parse(field('trade') || '{}');
+      let apiBasic = null; // the basic part of a request through the API
       if (t.basic) {
         // The real request (what a case sends through the API): { basic: {...} } plus the file part "datFile"
         const b = t.basic;
         if (!field('datFile')) return json(res, 400, { message: 'Invalid dat file: empty or null bytes' });
-        if (typeof b.premiumAmount !== 'number') return json(res, 400, { message: 'premiumAmount must be a number' });
+        if (!b.counterpartyName) return error(400, 'Failed to create trade: Failed to populate trade from .dat file: Counterparty name is required');
+        if (!b.portfolioId) return error(400, 'Failed to create trade: Failed to populate trade from .dat file: Portfolio ID is required');
         t = { counterparty: b.counterpartyName, portfolio: b.portfolioId, productId: b.productId, direction: b.direction,
           fileName: (body.match(/name="datFile"; filename="([^"]*)"/) || [])[1], stepIn: null, oldCounterparty: '' };
+        apiBasic = b;
       } else if (!field('file')) {
         // The simplified request of this mock's own New Trade page
         return json(res, 400, { message: 'The trade data file is missing or empty' });
@@ -444,9 +528,17 @@ http.createServer((req, res) => {
       const id = 'TRD-' + stamp, taskId = 'CHK-' + stamp;
       TRADES[id] = { ...t, id, status: 'PARV', eventStatus: 'New', taskId };
       TASKS[taskId] = { tradeId: id, submittedBy: caller, kind: 'create' };
+      const answer = apiBasic && recordedAnswer(apiBasic, id, taskId, caller);
+      if (answer) { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(stringifyKeepingFloats(answer)); }
       json(res, 200, { code: 200, status: 'PENDING APPROVAL', msg: 'Submitted for checker approval. TaskId: ' + taskId,
         data: { checkerContext: { taskId, submittedBy: caller }, trade: TRADES[id] } });
     });
+  }
+  // The blotter: the Trades page loads it after the login and on every reload (the E2E steps wait for this response
+  // after the login, the booking and a refresh). Path and method are the real ones; the body and the answer are this
+  // mock's own
+  if (req.method === 'POST' && req.url === '/api/v1/blotter/trades') {
+    return readBody(() => json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: { trades: Object.values(TRADES).reverse() } }));
   }
   // The risk calculation before a new trade is booked or an event is triggered: slow, and not always available
   if (req.method === 'POST' && /^\/api\/v1\/trades\/(calculate-risk-for-new|[^/]+\/calculate-risk)$/.test(req.url)) {
@@ -486,7 +578,6 @@ http.createServer((req, res) => {
   }
   // Nothing else is served under the API prefix: without this an unknown API path would be answered with a page
   if (req.url.startsWith('/api/v1/')) return json(res, 404, { message: 'Not found' });
-  if (req.method === 'GET' && req.url === '/api/trades') return json(res, 200, { data: { trades: Object.values(TRADES).reverse() } });
   if (req.method === 'GET' && req.url.startsWith('/api/trades/')) {
     const t = TRADES[req.url.split('/').pop()];
     return t ? json(res, 200, { data: { trade: t } }) : json(res, 404, { message: 'Trade not found' });
