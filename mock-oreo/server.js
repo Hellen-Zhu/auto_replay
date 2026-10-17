@@ -4,7 +4,8 @@
 // Start: npm run mock  ->  http://localhost:4173
 //
 // What is real and what is only this mock's guess:
-// - real testids: login-*, layout-*, create-trade-*, trade-file-upload, trade-detail-*, trade-change-confirmation-dialog,
+// - real testids: login-*, layout-*, create-trade-*, trade-file-upload (on the file input itself: the Java step sets
+//   the files on it directly), trade-detail-*, trade-change-confirmation-dialog,
 //   trade-change-confirm-btn, trade-row-action-cancellation, trade-change-reason-select, trade-change-comments-textarea;
 // - the comments field of the confirmation dialog is, as on the real system, an sc-text-input host with
 //   data-slot="textarea": a fill on the host fails, the control to fill is the [part="input"] in its shadow root.
@@ -329,7 +330,7 @@ const newTradePage = `${pageHead}
   <div class="row"><label>Portfolio</label><sc-combobox data-testid="create-trade-portfolio-combobox" options="ABS_EQF|ABS_CR_UK_ETFBB|MOCK_PORTFOLIO_2"></sc-combobox></div>
   <div class="row"><label>Product ID</label><sc-combobox data-testid="create-trade-product-id-input" options="FX_PSCRIPT|FX_TRF|FX_PSCRIPT_FSKO|FX_OPT"></sc-combobox></div>
   <div class="row"><label>Direction</label><sc-combobox data-testid="create-trade-direction-select" options="Buy|Sell"></sc-combobox></div>
-  <div class="row"><label>Trade file (.dat)</label><div data-testid="trade-file-upload" style="border:1px dashed #aaa;padding:12px;font-size:13px">Drag and drop or click to upload file <input type="file" accept=".dat"></div></div>
+  <div class="row"><label>Trade file (.dat)</label><div style="border:1px dashed #aaa;padding:12px;font-size:13px">Drag and drop or click to upload file <input type="file" accept=".dat" data-testid="trade-file-upload"></div></div>
   <div class="row"><label>StepIn</label><input type="checkbox" data-testid="create-trade-stepin-toggle"></div>
   <div id="stepin" hidden>
     <div class="row"><label>StepIn type</label>
@@ -348,7 +349,7 @@ const $ = (id) => document.querySelector('[data-testid=' + id + ']');
 const err = document.getElementById('err'), dialog = $('trade-change-confirmation-dialog');
 $('create-trade-stepin-toggle').addEventListener('change', (e) => { document.getElementById('stepin').hidden = !e.target.checked; });
 function collect() {
-  const file = $('trade-file-upload').querySelector('input').files[0];
+  const file = $('trade-file-upload').files[0];
   const stepIn = $('create-trade-stepin-toggle').checked;
   return {
     counterparty: $('create-trade-counterparty-combobox').value, portfolio: $('create-trade-portfolio-combobox').value,
@@ -373,7 +374,7 @@ $('trade-change-confirm-btn').addEventListener('click', async () => {
   // like the real system: multipart/form-data that carries the uploaded file itself
   const form = new FormData();
   form.append('trade', JSON.stringify(collect()));
-  form.append('file', $('trade-file-upload').querySelector('input').files[0]);
+  form.append('file', $('trade-file-upload').files[0]);
   const r = await fetch('/api/v1/trades/create?tradeAction=SUBMIT', { method: 'POST', body: form, headers: { 'X-User-Id': sessionStorage.getItem('userEmail') } });
   const body = await r.json();
   dialog.hidden = true;
