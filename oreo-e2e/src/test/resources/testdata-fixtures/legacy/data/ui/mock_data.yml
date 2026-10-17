@@ -1,0 +1,49 @@
+RESP-TPL-MOCK-DATA-UI-001:
+  response: |
+    {
+      "code": 200,
+      "status": "SUCCESS",
+      "msg": "",
+      "data": {}
+    }
+
+UI-SETUP-RISK-CALC-NEW-SUCCESS:
+  responseRef: RESP-TPL-MOCK-DATA-UI-001
+  response: |
+    {
+      "data": {
+        "calculationTimestamp": "2026-08-21T08:35:21.383923927Z",
+        "pnl": -18726.25346898106,
+        "riskEngine": "Cortex-QR"
+      }
+    }
+
+UI-SETUP-RISK-CALC-PARTIAL-SUCCESS:
+  responseRef: RESP-TPL-MOCK-DATA-UI-001
+  response: |
+    {
+      "data": {
+        "originalTradeRisk": {
+          "calculationTimestamp": "2026-08-24T03:52:12.262040692Z",
+          "pnl": 5277.967807918399,
+          "riskEngine": "Cortex-QR"
+        },
+        "reducedOriginalTradeRisk": {
+          "calculationTimestamp": "2026-08-24T03:52:12.253952647Z",
+          "pnl": -3182.5550381959206,
+          "riskEngine": "Cortex-QR"
+        },
+        "newTradeRisk": {
+          "calculationTimestamp": "2026-08-24T03:52:11.936774084Z",
+          "pnl": 23333.396078571335,
+          "riskEngine": "Cortex-QR"
+        },
+        "combinedRisk": {
+          "pnl": 20150.8410403754144
+        },
+        "deltaVsOriginal": {
+          "pnl": 14872.8732324570154
+        },
+        "riskBreachFlag": false
+      }
+    }
