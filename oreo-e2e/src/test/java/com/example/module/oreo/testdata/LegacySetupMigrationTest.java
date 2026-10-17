@@ -66,6 +66,14 @@ public class LegacySetupMigrationTest {
     }
 
     @Test
+    public void productIdRemovalIsListed() throws IOException {
+        LegacyMigration.SetupPlan plan = LegacyMigration.planSetup(new LegacyMigration.Sources(FIXTURE, project()));
+        assertEquals(List.of("trade-create: FX_TRF", "trade-create-stepin-partial: FX_TRF",
+                "trade-create-stepin-full: FX_TRF"), plan.productIds());
+        assertTrue(plan.report(), plan.report().contains("basic.productId removed"));
+    }
+
+    @Test
     public void fixtureKeepsTheHandMigratedFiles() throws IOException {
         Path project = project();
         try (Stream<Path> files = Files.list(repositorySetupFiles())) {

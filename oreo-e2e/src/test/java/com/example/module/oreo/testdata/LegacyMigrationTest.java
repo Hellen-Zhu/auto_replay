@@ -362,6 +362,43 @@ public class LegacyMigrationTest {
     }
 
     @Test
+    public void knownRegexRuleIsNotReused() throws IOException {
+        Path project = project();
+        json(project, "data/api/trade_y.json", "{\"defaults\":{\"dynamicFields\":{\"msg\":\"regex:Done\\\\..*\"}}}");
+        Path old = tmp.newFolder("old").toPath();
+        yaml(old, "api/trade_x.yml", apiEntry("TC-TRADE-X-API-001", "{\"a\":1}",
+                "{\"msg\":\"${json-unit.any-string}\"}"));
+        feature(project, "api", "trade_x", scenario("TC-TRADE-X-API-001", "posts x"));
+        LegacyMigration.Plan plan = plan(LegacyData.in(old), project, "trade_x");
+        assertEquals(List.of(), plan.stops());
+        LegacyMigration.Channel api = channel(plan, "api");
+        assertFalse(api.eventFile().path("defaults").has("dynamicFields"));
+        assertEquals(1, api.placeholdersWithoutRule().size());
+        String line = api.placeholdersWithoutRule().get(0);
+        assertTrue(line, line.startsWith("msg "));
+        assertTrue(line, line.contains("regex:Done") && line.contains("trade_y.json"));
+    }
+
+    @Test
+    public void existingExpectedFileStops() throws IOException {
+        Path project = project();
+        Files.createDirectories(project.resolve("src/test/resources/data/api/expected/trade_creation"));
+        json(project, "data/api/expected/trade_creation/TC-TRADE-CREATION-FX_TRF-API-001.json", "{}");
+        LegacyMigration.Plan plan = plan(FIXTURE, project, "trade_creation");
+        assertTrue(stops(plan), stops(plan).contains("data/api/expected/trade_creation/"));
+        assertTrue(stops(plan), stops(plan).contains("TC-TRADE-CREATION-FX_TRF-API-001.json"));
+        assertEquals(List.of(), plan.files());
+    }
+
+    @Test
+    public void productIdRemovalIsListed() throws IOException {
+        LegacyMigration.Plan plan = plan(FIXTURE, project(), "trade_creation");
+        assertEquals(List.of("FX_TRF in 12 case(s)", "FX_PSCRIPT_TRF in 3 case(s)"), channel(plan, "api").productIds());
+        assertEquals(List.of("FX_TRF in 12 case(s)"), channel(plan, "ui").productIds());
+        assertTrue(plan.report(), plan.report().contains("basic.productId removed"));
+    }
+
+    @Test
     public void expectedFilesAreTheOldResponses() throws IOException {
         LegacyMigration.Sources sources = new LegacyMigration.Sources(FIXTURE, project());
         LegacyMigration.Plan plan = LegacyMigration.plan(sources, "trade_creation");

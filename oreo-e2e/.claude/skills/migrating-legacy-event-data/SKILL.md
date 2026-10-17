@@ -48,7 +48,9 @@ Ask the user to paste the written event files, not the expected files. Check the
   - values the template could not know. These become exact values at the first real recording.
 
   The placeholder's type does not tell the two apart ("any-string, so `type`" is a guess). The user decides. Otherwise the second recording run shows it, as in README "Recorded responses". Until then they are offline warnings.
+  A `regex:` rule of another event is never reused; its line names it.
 - **Portfolio values kept** (any portfolio other than `ABS_EQF`): ask whether each is case data, such as a reassignment target.
+- **`basic.productId` removed** (feature and setup reports): only the steps that take the product put it back (`set multi-part form parameter ... for product ...`, the Live trade provisioning). A step that sends the body as it is (`set request body from ...`, `set json request body ...`) then sends none. Find the steps of this feature that send these requests and tell the user which send none. Putting the value back (`byProduct.<P>.request.basic.productId`) is the user's decision. The equivalence test ignores `basic.productId`.
 - **Setup**: the names (a different name is a line in `LegacyMigration.SETUP_NAMES`), the renamed uses (file:line), and `KNOWN_MISSING`.
 - **Capability proposals**: the user adds the `Capability` constant, the `@capability#` tag and the products' capability by hand. After that, `SyncProductExamples` must say `unchanged` for that Outline. Any other answer means the registry and the old `Examples` disagree, and the user decides.
 
@@ -62,6 +64,7 @@ Show each stop, with its options and what each option costs. Change nothing for 
 | An API case without old data | Give it data in the YAML, or remove the case |
 | The old loader fails (reference, cycle, duplicate key, invalid JSON, a request that is not an object) | Fix that key in the YAML, on the company machine |
 | `data/<channel>/<feature>.json exists` | It was migrated before. Delete the file to migrate again, or leave it |
+| `data/api/expected/<feature>/ has n file(s) of its cases already` | Files recorded before the migration. The tool writes the old responses there, so the user deletes them to migrate, or keeps the feature in YAML for now |
 | `self-check: ...` | Report it as printed: a value the layers cannot express, or a tool bug. Never write the file by hand instead |
 | `... still calls TestDataLoader` | Move that code to `TestData` first |
 | Setup: two keys for one name, a bad name, `exists with another payload` | Add a line to `SETUP_NAMES`, or compare the two payloads and keep one |

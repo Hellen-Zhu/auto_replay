@@ -49,6 +49,8 @@ final class LegacyMigration {
     private static final String OLD_UI_PORTFOLIO = "CM_OIL_CRU_OPT";
     private static final String UI_PORTFOLIO = "ABS_EQF";
     private static final String PLACEHOLDER = "${json-unit.";
+    private static final String PRODUCT_ID_REMOVED = "basic.productId removed (only the steps that take the product"
+            + " set it again; a step that sends the body as it is sends none: check the steps)";
 
     /** The test data design's section 6 table, old key -> setup name. Another name for a key is a line here. */
     static final Map<String, String> SETUP_NAMES;
@@ -109,10 +111,11 @@ final class LegacyMigration {
      * @param orphans                 old keys of this event and channel that no case matches, {@code <key> (<file>)}
      * @param placeholdersWithoutRule placeholder paths of the old responses that get no rule (API)
      * @param portfolios              portfolio values kept, {@code <case ID>: <path> = <value>}
+     * @param productIds              {@code basic.productId} values removed (spec 3.3), {@code <value> in <n> case(s)}
      */
     record Channel(String dir, String featureFile, ObjectNode eventFile, Map<String, String> expected,
                    List<String> caseLines, List<String> orphans, List<String> placeholdersWithoutRule,
-                   List<String> portfolios) {}
+                   List<String> portfolios, List<String> productIds) {}
 
     /**
      * @param name         the feature name, e.g. {@code trade_creation}
@@ -163,6 +166,7 @@ final class LegacyMigration {
                 list(out, "  ", "orphans, not migrated", c.orphans());
                 list(out, "  ", "placeholders without a rule", c.placeholdersWithoutRule());
                 list(out, "  ", "portfolio values kept", c.portfolios());
+                list(out, "  ", PRODUCT_ID_REMOVED, c.productIds());
             }
             list(out, "", "capability proposals", capabilities);
             list(out, "", "stops", stops);
@@ -182,18 +186,22 @@ final class LegacyMigration {
 
     /**
      * A case with its request (spec 3.3), its rules as a flat object path -> rule (spec 3.5) and its old response
-     * (API, else null); {@code hasData}: the old YAML has a record for it.
+     * (API, else null); {@code hasData}: the old YAML has a record for it; {@code productId}: the old request's
+     * {@code basic.productId}, removed, or null.
      */
     private record Item(FeatureCases.FeatureCase featureCase, String product, ObjectNode request, ObjectNode rules,
-                        JsonNode response, List<Unruled> unruled, boolean hasData) {
+                        JsonNode response, List<Unruled> unruled, boolean hasData, String productId) {
 
         String caseId() {
             return featureCase.caseId();
         }
     }
 
-    /** A placeholder of an old response that gets no rule; {@code conflict}: the known rules that disagree, or null. */
-    private record Unruled(String path, String placeholder, String conflict) {}
+    /**
+     * A placeholder of an old response that gets no rule; {@code note}: the known rules that disagree or the regex not
+     * reused, or null.
+     */
+    private record Unruled(String path, String placeholder, String note) {}
 
     /** A rule of an event file migrated before: {@code dynamicFields} path, rule, file name. */
     private record KnownRule(String path, String rule, String file) {
@@ -288,6 +296,18 @@ final class LegacyMigration {
             if (Files.exists(sources.resources().resolve(target))) {
                 stops.add(target + " exists: migrated before; delete it to migrate again");
             }
+            if (dir.equals("api")) {
+                Path expectedDir = sources.data().resolve("api/expected").resolve(name);
+                List<String> recorded = cases.stream().map(c -> c.caseId() + ".json")
+                        .filter(f -> Files.exists(expectedDir.resolve(f))).toList();
+                if (!recorded.isEmpty()) {
+                    String shown = String.join(", ", recorded.subList(0, Math.min(3, recorded.size())))
+                            + (recorded.size() > 3 ? ", ..." : "");
+                    stops.add("data/api/expected/" + name + "/ has " + recorded.size() + " file(s) of its cases"
+                            + " already (" + shown + "), recorded before the migration: the tool writes the old"
+                            + " responses there; delete them to migrate, your decision");
+                }
+            }
             found.add(new Source(dir, featureFile, feature, cases));
         }
         if (found.isEmpty() && stops.isEmpty()) {
@@ -342,7 +362,7 @@ final class LegacyMigration {
                             + " old YAML or remove the case first");
                 } else {
                     items.add(new Item(c, product, Json.MAPPER.createObjectNode(), Json.MAPPER.createObjectNode(),
-                            null, List.of(), false));
+                            null, List.of(), false, null));
                 }
                 continue;
             }
@@ -370,7 +390,8 @@ final class LegacyMigration {
                 if (response == null) continue;
                 rules(response, "", known, rules, unruled);
             }
-            items.add(new Item(c, product, request(old, source.dir()), rules, response, unruled, true));
+            items.add(new Item(c, product, request(old, source.dir()), rules, response, unruled, true,
+                    productId(old)));
         }
         return items;
     }
@@ -421,7 +442,8 @@ final class LegacyMigration {
 
     /**
      * Spec 3.5: per placeholder ({@code ${json-unit....}} text) of an old response a rule: a regex as itself, else the
-     * one known rule whose path matches; else an {@link Unruled}.
+     * one known rule whose path matches; else an {@link Unruled}. A known {@code regex:} rule is not reused: it matches
+     * one event's text, and a wrong one fails the first recording; it is named on the placeholder's line.
      */
     private static void rules(JsonNode node, String path, List<KnownRule> known, ObjectNode rules,
                               List<Unruled> unruled) {
@@ -441,16 +463,43 @@ final class LegacyMigration {
                 return;
             }
             List<KnownRule> matching = known.stream().filter(k -> k.matches(path)).toList();
+            List<KnownRule> reusable = matching.stream().filter(k -> !k.rule().startsWith("regex:")).toList();
             Set<String> distinct = new LinkedHashSet<>();
-            matching.forEach(k -> distinct.add(k.path() + " = " + k.rule()));
+            reusable.forEach(k -> distinct.add(k.path() + " = " + k.rule()));
             if (distinct.size() == 1) {
-                rules.put(matching.get(0).path(), matching.get(0).rule());
-            } else {
-                unruled.add(new Unruled(path, placeholder, distinct.isEmpty() ? null : "known rules disagree: "
-                        + matching.stream().map(k -> k.path() + " = " + k.rule() + " (" + k.file() + ")").distinct()
-                        .collect(Collectors.joining(", "))));
+                rules.put(reusable.get(0).path(), reusable.get(0).rule());
+                return;
             }
+            List<String> notes = new ArrayList<>();
+            if (!distinct.isEmpty()) notes.add("known rules disagree: " + described(reusable));
+            List<KnownRule> regexes = matching.stream().filter(k -> k.rule().startsWith("regex:")).toList();
+            if (!regexes.isEmpty()) notes.add("not reused, a regex of another event: " + described(regexes));
+            unruled.add(new Unruled(path, placeholder, notes.isEmpty() ? null : String.join("; ", notes)));
         }
+    }
+
+    /** The request's {@code basic.productId} as text, or null. */
+    private static String productId(ObjectNode request) {
+        JsonNode value = request.path("basic").get("productId");
+        if (value == null) return null;
+        return value.isTextual() ? value.textValue() : Json.compact(value);
+    }
+
+    /** {@code <value> in <n> case(s)}, values in the order of the cases. */
+    private static List<String> productIds(List<Item> items) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        items.forEach(item -> {
+            if (item.productId() != null) counts.merge(item.productId(), 1, Integer::sum);
+        });
+        List<String> lines = new ArrayList<>();
+        counts.forEach((value, n) -> lines.add(value + " in " + n + " case(s)"));
+        return lines;
+    }
+
+    /** {@code <path> = <rule> (<file>)}, distinct, joined. */
+    private static String described(List<KnownRule> rules) {
+        return rules.stream().map(k -> k.path() + " = " + k.rule() + " (" + k.file() + ")").distinct()
+                .collect(Collectors.joining(", "));
     }
 
     /** Spec 3.3: without {@code basic.productId}; in the UI channel the old portfolio replaced. */
@@ -476,7 +525,7 @@ final class LegacyMigration {
         if (source.dir().equals("ui") && items.stream().noneMatch(Item::hasData)) {
             items.forEach(item -> caseLines.add(item.caseId() + ": " + NO_DATA));
             return new Channel(source.dir(), source.featureFile(), null, Map.of(), caseLines, orphans, List.of(),
-                    portfolios);
+                    portfolios, productIds(items));
         }
         Map<String, String> expected = new LinkedHashMap<>();
         items.forEach(item -> {
@@ -488,7 +537,7 @@ final class LegacyMigration {
         ObjectNode eventFile = eventFile(source, items, requests, rules, expectedBase(source));
         stops.addAll(selfCheck(name, source.dir(), eventFile, items, expected, caseLines));
         return new Channel(source.dir(), source.featureFile(), eventFile, expected, caseLines, orphans,
-                placeholdersWithoutRule(items), portfolios);
+                placeholdersWithoutRule(items), portfolios, productIds(items));
     }
 
     private static List<Layering.Case> cases(List<Item> items, Function<Item, ObjectNode> value) {
@@ -508,13 +557,13 @@ final class LegacyMigration {
 
     /** The placeholders of one path that get no rule. */
     private record Listing(Set<String> placeholders, Set<String> products, Set<String> caseIds,
-                           Set<String> conflicts) {
+                           Set<String> notes) {
         Listing() {
             this(new LinkedHashSet<>(), new LinkedHashSet<>(), new LinkedHashSet<>(), new LinkedHashSet<>());
         }
     }
 
-    /** One line per path: {@code <path> (<placeholders>): <products, then case IDs without product>[; conflicts]}. */
+    /** One line per path: {@code <path> (<placeholders>): <products, then case IDs without product>[; notes]}. */
     private static List<String> placeholdersWithoutRule(List<Item> items) {
         Map<String, Listing> listings = new LinkedHashMap<>();
         for (Item item : items) {
@@ -526,7 +575,7 @@ final class LegacyMigration {
                 } else {
                     listing.caseIds().add(item.caseId());
                 }
-                if (unruled.conflict() != null) listing.conflicts().add(unruled.conflict());
+                if (unruled.note() != null) listing.notes().add(unruled.note());
             }
         }
         List<String> lines = new ArrayList<>();
@@ -535,7 +584,7 @@ final class LegacyMigration {
             who.addAll(listing.caseIds());
             StringBuilder line = new StringBuilder(path).append(" (")
                     .append(String.join(", ", listing.placeholders())).append("): ").append(String.join(", ", who));
-            listing.conflicts().forEach(conflict -> line.append("; ").append(conflict));
+            listing.notes().forEach(note -> line.append("; ").append(note));
             lines.add(line.toString());
         });
         return lines;
@@ -783,9 +832,11 @@ final class LegacyMigration {
      * @param rewrites     file -> its whole new text (renamed uses, the KNOWN_MISSING line)
      * @param knownMissing the names left in KNOWN_MISSING of TestDataValidationTest
      * @param portfolios   portfolio values of the payloads, {@code <name>: <path> = <value>}
+     * @param productIds   {@code basic.productId} values removed from the requests, {@code <name>: <value>}
      */
     record SetupPlan(List<SetupFile> files, List<Rename> renames, Map<Path, String> rewrites,
-                     List<String> knownMissing, List<String> portfolios, List<String> stops) {
+                     List<String> knownMissing, List<String> portfolios, List<String> productIds,
+                     List<String> stops) {
 
         SetupPlan {
             files = List.copyOf(files);
@@ -793,6 +844,7 @@ final class LegacyMigration {
             rewrites = Collections.unmodifiableMap(new LinkedHashMap<>(rewrites));
             knownMissing = List.copyOf(knownMissing);
             portfolios = List.copyOf(portfolios);
+            productIds = List.copyOf(productIds);
             stops = List.copyOf(stops);
         }
 
@@ -816,6 +868,7 @@ final class LegacyMigration {
             out.append("KNOWN_MISSING: ").append(knownMissing.isEmpty() ? "(empty)" : String.join(", ", knownMissing))
                     .append('\n');
             Plan.list(out, "", "portfolio values kept", portfolios);
+            Plan.list(out, "", PRODUCT_ID_REMOVED, productIds);
             Plan.list(out, "", "stops", stops);
             if (!written) out.append("Plan only: nothing written.\n");
             return out.toString();
@@ -853,7 +906,8 @@ final class LegacyMigration {
         try {
             oldKeys = legacy.keys();
         } catch (IllegalStateException e) {
-            return new SetupPlan(List.of(), List.of(), Map.of(), List.of(), List.of(), List.of(e.getMessage()));
+            return new SetupPlan(List.of(), List.of(), Map.of(), List.of(), List.of(), List.of(),
+                    List.of(e.getMessage()));
         }
         Set<String> candidates = new LinkedHashSet<>();
         oldKeys.stream().filter(k -> !k.substring(k.lastIndexOf('.') + 1).startsWith("TC-")).forEach(candidates::add);
@@ -893,11 +947,12 @@ final class LegacyMigration {
 
         List<SetupFile> files = new ArrayList<>();
         List<String> portfolios = new ArrayList<>();
+        List<String> productIds = new ArrayList<>();
         withClasspath(sources.resources(), () -> {
             TestDataRepository repository = new TestDataRepository("data/");
             keysByName.forEach((name, keys) -> {
                 if (keys.size() == 1) {
-                    setupFile(sources, legacy, repository, keys.get(0), name, files, portfolios, stops);
+                    setupFile(sources, legacy, repository, keys.get(0), name, files, portfolios, productIds, stops);
                 }
             });
             return null;
@@ -914,12 +969,13 @@ final class LegacyMigration {
 
         List<String> knownMissing = knownMissing(sources.project().resolve(VALIDATION_TEST),
                 new LinkedHashSet<>(names.values()), rewrites, stops);
-        return new SetupPlan(files, renames, rewrites, knownMissing, portfolios, stops);
+        return new SetupPlan(files, renames, rewrites, knownMissing, portfolios, productIds, stops);
     }
 
     /** The planned file of one setup key: new, kept (same payload) or a stop. */
     private static void setupFile(Sources sources, LegacyData legacy, TestDataRepository repository, String key,
-                                  String name, List<SetupFile> files, List<String> portfolios, List<String> stops) {
+                                  String name, List<SetupFile> files, List<String> portfolios,
+                                  List<String> productIds, List<String> stops) {
         String where = key + " (" + legacy.fileOf(key) + ")";
         LegacyData.Record entry = legacy.forKey(key);
         if (!entry.hasRequest() && !entry.hasResponse()) {
@@ -936,8 +992,9 @@ final class LegacyMigration {
                 stops.add("the " + part + " of " + where + " is not a JSON object");
                 return;
             }
-            if (part.equals("request") && object.get("basic") instanceof ObjectNode basic) {
-                basic.remove("productId");
+            if (part.equals("request") && productId(object) != null) {
+                productIds.add(name + ": " + productId(object));
+                ((ObjectNode) object.get("basic")).remove("productId");
             }
             payload.set(part, object);
         }

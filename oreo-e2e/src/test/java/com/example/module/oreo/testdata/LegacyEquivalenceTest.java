@@ -93,6 +93,19 @@ public class LegacyEquivalenceTest {
     }
 
     @Test
+    public void aProductIdPutBackIsNotADifference() throws IOException {
+        LegacyMigration.Sources sources = migrated("setup", "trade_creation");
+        for (String file : List.of("ui/trade_creation.json", "setup/trade-create.json")) {
+            Path path = sources.data().resolve(file);
+            ObjectNode root = (ObjectNode) Json.parse(Files.readString(path, StandardCharsets.UTF_8));
+            ObjectNode request = (ObjectNode) (file.startsWith("ui/") ? root.get("defaults") : root).get("request");
+            ((ObjectNode) request.get("basic")).put("productId", "FX_TRF");
+            Files.writeString(path, Json.pretty(root), StandardCharsets.UTF_8);
+        }
+        assertEquals(List.of(), differences(FIXTURE, sources.resources(), new ArrayList<>()));
+    }
+
+    @Test
     public void eventsWithoutEventFileAreNotMigrated() throws IOException {
         LegacyMigration.Sources sources = migrated("trade_early_termination");
         List<String> notMigrated = new ArrayList<>();
@@ -164,7 +177,7 @@ public class LegacyEquivalenceTest {
             return caseId + ": the request of the old key " + key.get() + " is not a JSON object";
         }
         String difference = difference(viaDouble(LegacyMigration.request(object, id.channelDir())),
-                viaDouble(Json.parse(now.request())), "");
+                viaDouble(withoutProductId(Json.parse(now.request()))), "");
         return difference == null ? null : caseId + ": " + difference + layers;
     }
 
@@ -197,8 +210,9 @@ public class LegacyEquivalenceTest {
                 lines.add(prefix + "the old " + part + " is not valid JSON: " + e.getMessage());
                 continue;
             }
-            if (part.equals("request") && oldNode.get("basic") instanceof ObjectNode basic) {
-                basic.remove("productId");
+            if (part.equals("request")) {
+                oldNode = withoutProductId(oldNode);
+                newNode = withoutProductId(newNode);
             }
             String difference = difference(viaDouble(oldNode), viaDouble(newNode), "");
             if (difference != null) lines.add(prefix + "the " + part + " differs at " + difference);
@@ -229,6 +243,16 @@ public class LegacyEquivalenceTest {
         }
         String at = path.isEmpty() ? "the whole value" : path;
         return at + ": old " + Json.compact(old) + ", new " + Json.compact(now);
+    }
+
+    /**
+     * A copy without {@code basic.productId}: not case data (spec 3.3) on either side, so a review that puts it back
+     * for a step that does not set it is not a difference.
+     */
+    private static JsonNode withoutProductId(JsonNode request) {
+        JsonNode copy = request.deepCopy();
+        if (copy.get("basic") instanceof ObjectNode basic) basic.remove("productId");
+        return copy;
     }
 
     /** A copy with every floating-point number as a double (see the class comment). */
