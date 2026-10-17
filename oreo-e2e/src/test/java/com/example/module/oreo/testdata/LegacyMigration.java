@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -453,7 +454,7 @@ final class LegacyMigration {
     }
 
     /** Spec 3.3: without {@code basic.productId}; in the UI channel the old portfolio replaced. */
-    private static ObjectNode request(ObjectNode old, String dir) {
+    static ObjectNode request(ObjectNode old, String dir) {
         ObjectNode request = old.deepCopy();
         if (request.get("basic") instanceof ObjectNode basic) {
             basic.remove("productId");
@@ -730,15 +731,24 @@ final class LegacyMigration {
         }
     }
 
-    /** The names of the feature files lacking their event file in a channel they are in, sorted. */
+    /**
+     * The names of the feature files without an event file in any channel they are in, sorted. {@link #write} writes
+     * a feature's channels together, so one event file means migrated (its other channel had no old data).
+     */
     static List<String> featureNames(Sources sources) {
         Set<String> names = new TreeSet<>();
+        Set<String> migrated = new HashSet<>();
         for (String dir : CHANNELS) {
             for (Path file : filesEndingWith(sources.features().resolve(dir), ".feature")) {
                 String name = baseName(file);
-                if (!Files.exists(sources.data().resolve(dir).resolve(name + ".json"))) names.add(name);
+                if (Files.exists(sources.data().resolve(dir).resolve(name + ".json"))) {
+                    migrated.add(name);
+                } else {
+                    names.add(name);
+                }
             }
         }
+        names.removeAll(migrated);
         return List.copyOf(names);
     }
 
