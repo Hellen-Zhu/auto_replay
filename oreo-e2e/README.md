@@ -50,7 +50,6 @@ src/main/java/com/example/module/oreo/
   testdata/Capability.java        what a product can be tested for: the @capability# tag names
   testdata/TestData, TestDataRepository, CaseData, SetupData, CaseId, JsonLayers, Json,
           ExpectedResponses, ResponseMasker, ProjectPaths, TradeRequests   test data and recording ("Test data")
-  testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
   utils/DateUtil.java, RestApiUtil.java   transcribed from the E2E project
 src/main/resources/
   META-INF/services/com.example.genie.module.GenieModule   placeholder (named after the GenieModule interface there)

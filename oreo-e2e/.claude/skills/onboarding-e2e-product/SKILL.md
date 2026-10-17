@@ -42,7 +42,6 @@ mvn test -Dtest=SyncProductExamples -Doreo.sync=all
 Leave alone:
 - steps, snippets, hooks, `expected/` files, `expectedBase`, `Capability.java` and the `@capability#` tags;
 - scenarios without `<product_type>` (negative and permission cases are written for one product);
-- `Products.java` while `grep -rnw "Products\." src` finds no caller (add a line there only if it has one).
 
 Coverage QA asks for that no Outline has (a capability no Outline carries, an event without a feature in that channel, a negative case for the product) is a new scenario, not onboarding: list it in the report.
 
@@ -93,7 +92,6 @@ In the user's language:
 | A row commented out to skip the product for a while | Take the capability off its constant, then the tool; a comment inside a product table stops the tool |
 | QA's real dat file committed to the public copy | The placeholder line |
 | `-Dcucumber.filter.name=...`, `-Doreo.risk.engine.mode=...` | Ask how the user runs a subset; the mode is in `genie.properties` |
-| `Products.java` edited "to keep the registry complete" | No caller: leave it |
 | `dynamicFields` guessed before a recording | A rule whose path is not in the response fails the recording |
 | Expected files written by hand | Record them |
 | The product added to negative scenarios | They are written for one product |
