@@ -120,7 +120,9 @@ It prints one line per Outline (`unchanged`, `add X`, `remove Y`, `reordered`, `
 feature file has a problem: an Outline without a tag or with two, an unknown name, a tag anywhere else, a table other
 than one `product_type` column, a capability no product has. The offline check `productExamplesMatchTheRegistry` fails
 on those problems and on every Outline the tool would change; a capability no Outline carries is only a warning.
-Scenarios without `<product_type>` (negative and permission cases) carry no tag and are not touched.
+Scenarios without `<product_type>` (negative and permission cases) carry no tag and are not touched. To leave a product
+out of an Outline for a while, take the capability off the product in `ProductDatFiles` and run the tool: a row
+commented out, or a blank line, inside a product table stops the tool and fails the check.
 
 ### Case data
 

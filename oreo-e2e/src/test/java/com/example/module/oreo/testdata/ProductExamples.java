@@ -173,13 +173,18 @@ final class ProductExamples {
             errors.add(where + ": Examples must be one table with the single column " + PRODUCT_COLUMN);
             return null;
         }
+        FeatureFile.Table table = block.examples().get(0);
+        List<String> oldLines = List.copyOf(feature.lines().subList(table.headerLine(), table.lastLine() + 1));
+        if (oldLines.stream().anyMatch(line -> !line.strip().startsWith("|"))) {
+            errors.add(where + ": a comment or blank line inside the product table; the registry decides the rows"
+                    + " (remove the line, or take the capability off the product in ProductDatFiles)");
+            return null;
+        }
         List<String> products = productsOf.apply(capability);
         if (products.isEmpty()) {
             errors.add(where + ": no product has capability " + capability.tagName() + " (ProductDatFiles)");
             return null;
         }
-        FeatureFile.Table table = block.examples().get(0);
-        List<String> oldLines = List.copyOf(feature.lines().subList(table.headerLine(), table.lastLine() + 1));
         return new Entry(file, block.rowId(), capability, table.column(PRODUCT_COLUMN), List.copyOf(products),
                 oldLines, tableLines(table.indent(), products));
     }

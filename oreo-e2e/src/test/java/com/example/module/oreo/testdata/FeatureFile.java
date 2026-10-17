@@ -117,6 +117,8 @@ final class FeatureFile {
                     table.add(i, lines.get(i), cells(line));
                     continue;
                 }
+                // Gherkin allows blank and comment lines inside a table, also before its header
+                if (line.isEmpty() || line.startsWith("#")) continue;
                 table = null;
             }
             if (line.isEmpty() || line.startsWith("#")) {

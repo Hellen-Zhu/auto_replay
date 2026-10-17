@@ -90,6 +90,7 @@ In the user's language:
 | Every capability "like the other products" | Only the capabilities QA confirmed |
 | `Examples` rows typed by hand | The tool writes them; a row the registry does not back fails `productExamplesMatchTheRegistry` |
 | A new `Capability` constant or `@capability#` tag for the product | A new scenario: report it |
+| A row commented out to skip the product for a while | Take the capability off its constant, then the tool; a comment inside a product table stops the tool |
 | QA's real dat file committed to the public copy | The placeholder line |
 | `-Dcucumber.filter.name=...`, `-Doreo.risk.engine.mode=...` | Ask how the user runs a subset; the mode is in `genie.properties` |
 | `Products.java` edited "to keep the registry complete" | No caller: leave it |

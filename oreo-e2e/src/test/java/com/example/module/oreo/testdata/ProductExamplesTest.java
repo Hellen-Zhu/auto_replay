@@ -293,4 +293,24 @@ public class ProductExamplesTest {
         }
         assertEquals("FX_TRF", ProductExamples.registryProducts(CREATE).get(0));
     }
+
+    @Test
+    public void commentOrBlankLineInsideAProductTableIsAnError() throws IOException {
+        ProductExamples.Plan plan = planOf(HEAD
+                + "      | product_type   |\n"
+                + "      | FX_TRF         |\n"
+                + "      # | FX_PSCRIPT   |\n"
+                + "      | FX_PSCRIPT_TRF |\n", registry(Map.of(CREATE, THREE)));
+        assertEquals(List.of(FILE + ": " + ID + ": a comment or blank line inside the product table; the registry"
+                + " decides the rows (remove the line, or take the capability off the product in ProductDatFiles)"),
+                plan.errors());
+        assertTrue(plan.rewrites().isEmpty());
+    }
+
+    @Test
+    public void blankLineBeforeTheHeaderIsFine() throws IOException {
+        ProductExamples.Plan plan = planOf(HEAD + "\n" + EXAMPLES.substring("    Examples:\n".length()), TRF_ONLY);
+        assertEquals(List.of(), plan.errors());
+        assertEquals("unchanged", plan.entries().get(0).note());
+    }
 }

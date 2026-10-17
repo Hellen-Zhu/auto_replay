@@ -117,4 +117,28 @@ public class FeatureFileTest {
         assertTrue(f.render(f.lines()).startsWith("﻿"));
         assertEquals(text, f.render(f.lines()));
     }
+
+    @Test
+    public void commentAndBlankLinesDoNotEndATable() {
+        FeatureFile f = parse(""
+                + "Feature: X\n"
+                + "  Scenario Outline: [TC-X-<product_type>-API-001] t\n"
+                + "    Given s\n"
+                + "    Examples:\n"
+                + "\n"
+                + "      | product_type    |\n"
+                + "      | FX_TRF          |\n"
+                + "      # | FX_PSCRIPT    |\n"
+                + "      | FX_PSCRIPT_FSKO |\n"
+                + "\n"
+                + "      | FX_PSCRIPT_TRF  |\n"
+                + "\n"
+                + "  @next\n"
+                + "  Scenario: [TC-X-API-002] u\n");
+        FeatureFile.Table table = f.blocks().get(1).examples().get(0);
+        assertEquals(5, table.headerLine());
+        assertEquals(10, table.lastLine());
+        assertEquals(List.of("FX_TRF", "FX_PSCRIPT_FSKO", "FX_PSCRIPT_TRF"), table.column("product_type"));
+        assertEquals(List.of("@next"), f.blocks().get(2).tags());
+    }
 }

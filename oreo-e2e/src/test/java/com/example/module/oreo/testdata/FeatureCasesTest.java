@@ -70,4 +70,20 @@ public class FeatureCasesTest {
                 + "    Given a step\n");
         assertTrue(FeatureCases.load(root()).isEmpty());
     }
+
+    @Test
+    public void rowsAfterACommentOrBlankLineAreCases() throws IOException {
+        feature("api", "x", ""
+                + "Feature: X\n"
+                + "  Scenario Outline: [TC-X-<product_type>-API-001] t\n"
+                + "    Given s\n"
+                + "    Examples:\n"
+                + "      | product_type   |\n"
+                + "      | FX_TRF         |\n"
+                + "      # | FX_PSCRIPT   |\n"
+                + "\n"
+                + "      | FX_PSCRIPT_TRF |\n");
+        assertEquals(List.of("TC-X-FX_TRF-API-001", "TC-X-FX_PSCRIPT_TRF-API-001"),
+                FeatureCases.load(root()).stream().map(FeatureCases.FeatureCase::caseId).toList());
+    }
 }
