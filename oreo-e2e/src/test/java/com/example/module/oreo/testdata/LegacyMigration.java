@@ -23,8 +23,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -42,6 +44,7 @@ final class LegacyMigration {
     private static final Pattern OLD_LOADER_CALL = Pattern.compile("\\bTestDataLoader\\s*\\.");
     private static final String OLD_UI_PORTFOLIO = "CM_OIL_CRU_OPT";
     private static final String UI_PORTFOLIO = "ABS_EQF";
+    private static final String PLACEHOLDER = "${json-unit.";
 
     /**
      * @param legacy  the old YAML
@@ -102,8 +105,12 @@ final class LegacyMigration {
         /** What {@link #write} creates, below the resources; empty when stopped. */
         List<String> files() {
             if (stopped()) return List.of();
-            return channels.stream().filter(c -> c.eventFile() != null)
-                    .map(c -> "data/" + c.dir() + "/" + name + ".json").toList();
+            List<String> files = new ArrayList<>();
+            for (Channel c : channels) {
+                if (c.eventFile() != null) files.add("data/" + c.dir() + "/" + name + ".json");
+                c.expected().keySet().forEach(id -> files.add("data/api/expected/" + name + "/" + id + ".json"));
+            }
+            return files;
         }
 
         /** The report of the plan, which has written nothing. */
@@ -119,6 +126,10 @@ final class LegacyMigration {
                         ? "no event file (" + NO_DATA + ")"
                         : "data/" + c.dir() + "/" + name + ".json").append('\n');
                 if (c.eventFile() != null) out.append("  leaves: ").append(leafCounts(c.eventFile())).append('\n');
+                if (!c.expected().isEmpty()) {
+                    out.append("  expected files: data/api/expected/").append(name).append("/ (")
+                            .append(c.expected().size()).append(")\n");
+                }
                 c.caseLines().forEach(line -> out.append("  ").append(line).append('\n'));
                 list(out, "  ", "orphans, not migrated", c.orphans());
                 list(out, "  ", "placeholders without a rule", c.placeholdersWithoutRule());
@@ -140,11 +151,29 @@ final class LegacyMigration {
     /** A feature file of one channel, read. */
     private record Source(String dir, String featureFile, FeatureFile feature, List<FeatureCases.FeatureCase> cases) {}
 
-    /** A case with its request (spec 3.3); {@code hasData}: the old YAML has a record for it. */
-    private record Item(FeatureCases.FeatureCase featureCase, String product, ObjectNode request, boolean hasData) {
+    /**
+     * A case with its request (spec 3.3), its rules as a flat object path -> rule (spec 3.5) and its old response
+     * (API, else null); {@code hasData}: the old YAML has a record for it.
+     */
+    private record Item(FeatureCases.FeatureCase featureCase, String product, ObjectNode request, ObjectNode rules,
+                        JsonNode response, List<Unruled> unruled, boolean hasData) {
 
         String caseId() {
             return featureCase.caseId();
+        }
+    }
+
+    /** A placeholder of an old response that gets no rule; {@code conflict}: the known rules that disagree, or null. */
+    private record Unruled(String path, String placeholder, String conflict) {}
+
+    /** A rule of an event file migrated before: {@code dynamicFields} path, rule, file name. */
+    private record KnownRule(String path, String rule, String file) {
+
+        /** {@code [*]} in the rule's path matches any index of {@code concrete}. */
+        boolean matches(String concrete) {
+            String regex = Arrays.stream(path.split("\\[\\*]", -1)).map(Pattern::quote)
+                    .collect(Collectors.joining("\\[\\d+]"));
+            return concrete.matches(regex);
         }
     }
 
@@ -160,9 +189,12 @@ final class LegacyMigration {
         List<Source> features = features(sources, name, capabilities, stops);
         if (!stops.isEmpty()) return new Plan(name, List.of(), capabilities, stops);
 
+        List<KnownRule> known = knownRules(sources.data().resolve("api"), stops);
+        if (!stops.isEmpty()) return new Plan(name, List.of(), capabilities, stops);
+
         Map<Source, List<Item>> items = new LinkedHashMap<>();
         for (Source source : features) {
-            items.put(source, items(sources.legacy(), source, stops));
+            items.put(source, items(sources.legacy(), source, known, stops));
         }
         if (!stops.isEmpty()) return new Plan(name, List.of(), capabilities, stops);
 
@@ -262,8 +294,9 @@ final class LegacyMigration {
         return out.toString();
     }
 
-    /** The cases with their old requests; stop 3 and unreadable requests. */
-    private static List<Item> items(LegacyData legacy, Source source, List<String> stops) {
+    /** The cases with their old data; stops 2 and 3, unreadable requests and responses. */
+    private static List<Item> items(LegacyData legacy, Source source, List<KnownRule> known, List<String> stops) {
+        boolean api = source.dir().equals("api");
         List<Item> items = new ArrayList<>();
         for (FeatureCases.FeatureCase c : source.cases()) {
             String product = CaseId.parse(c.caseId()).product();
@@ -275,32 +308,120 @@ final class LegacyMigration {
                 continue;
             }
             if (key.isEmpty()) {
-                items.add(new Item(c, product, Json.MAPPER.createObjectNode(), false));
+                if (api) {
+                    stops.add(c.caseId() + ": " + NO_DATA + ", so it would have no expected file: give it data in the"
+                            + " old YAML or remove the case first");
+                } else {
+                    items.add(new Item(c, product, Json.MAPPER.createObjectNode(), Json.MAPPER.createObjectNode(),
+                            null, List.of(), false));
+                }
                 continue;
             }
-            String text = legacy.forKey(key.get()).request();
+            String where = "the old key " + key.get() + " (" + legacy.fileOf(key.get()) + ")";
+            LegacyData.Record entry = legacy.forKey(key.get());
             ObjectNode old = Json.MAPPER.createObjectNode();
-            if (text != null && !text.isBlank()) {
-                String problem = null;
-                try {
-                    JsonNode parsed = Json.parse(text);
-                    if (parsed instanceof ObjectNode object) {
-                        old = object;
-                    } else {
-                        problem = "is not a JSON object";
-                    }
-                } catch (IllegalStateException e) {
-                    problem = "is not valid JSON: " + e.getMessage();
-                }
-                if (problem != null) {
-                    stops.add(c.caseId() + ": the request of the old key " + key.get() + " ("
-                            + legacy.fileOf(key.get()) + ") " + problem);
+            if (entry.request() != null && !entry.request().isBlank()) {
+                JsonNode parsed = parse(entry.request(), c.caseId() + ": the request of " + where, stops);
+                if (parsed == null) continue;
+                if (!(parsed instanceof ObjectNode object)) {
+                    stops.add(c.caseId() + ": the request of " + where + " is not a JSON object");
                     continue;
                 }
+                old = object;
             }
-            items.add(new Item(c, product, request(old, source.dir()), true));
+            ObjectNode rules = Json.MAPPER.createObjectNode();
+            List<Unruled> unruled = new ArrayList<>();
+            JsonNode response = null;
+            if (api) {
+                if (entry.response() == null || entry.response().isBlank()) {
+                    stops.add(c.caseId() + ": " + where + " has no response, so it would have no expected file");
+                    continue;
+                }
+                response = parse(entry.response(), c.caseId() + ": the response of " + where, stops);
+                if (response == null) continue;
+                rules(response, "", known, rules, unruled);
+            }
+            items.add(new Item(c, product, request(old, source.dir()), rules, response, unruled, true));
         }
         return items;
+    }
+
+    /** The parsed text; null after the stop {@code <what> is not valid JSON}. */
+    private static JsonNode parse(String text, String what, List<String> stops) {
+        try {
+            return Json.parse(text);
+        } catch (IllegalStateException e) {
+            stops.add(what + " is not valid JSON: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** Plan decision 4: the rules of every {@code dynamicFields} of {@code data/api/*.json} but {@code common.json}. */
+    private static List<KnownRule> knownRules(Path apiDir, List<String> stops) {
+        List<KnownRule> known = new ArrayList<>();
+        if (!Files.isDirectory(apiDir)) return known;
+        List<Path> files;
+        try (Stream<Path> list = Files.list(apiDir)) {
+            files = list.filter(f -> f.getFileName().toString().endsWith(".json") && Files.isRegularFile(f)
+                    && !f.getFileName().toString().equals("common.json")).sorted().toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException("[LegacyMigration] cannot list " + apiDir, e);
+        }
+        for (Path file : files) {
+            String fileName = file.getFileName().toString();
+            JsonNode parsed = parse(read(file), "data/api/" + fileName, stops);
+            if (parsed == null) continue;
+            JsonNode json = JsonLayers.withoutComments(parsed);
+            List<JsonNode> layers = new ArrayList<>();
+            layers.add(json.path("defaults"));
+            json.path("byProduct").forEach(layers::add);
+            for (JsonNode row : json.path("cases")) {
+                layers.add(row);
+                row.path("byProduct").forEach(layers::add);
+            }
+            for (JsonNode layer : layers) {
+                for (Map.Entry<String, JsonNode> rule : layer.path("dynamicFields").properties()) {
+                    if (rule.getValue().isTextual()) {
+                        known.add(new KnownRule(rule.getKey(), rule.getValue().textValue(), fileName));
+                    }
+                }
+            }
+        }
+        return known;
+    }
+
+    /**
+     * Spec 3.5: per placeholder ({@code ${json-unit....}} text) of an old response a rule: a regex as itself, else the
+     * one known rule whose path matches; else an {@link Unruled}.
+     */
+    private static void rules(JsonNode node, String path, List<KnownRule> known, ObjectNode rules,
+                              List<Unruled> unruled) {
+        if (node.isObject()) {
+            for (Map.Entry<String, JsonNode> field : node.properties()) {
+                String at = path.isEmpty() ? field.getKey() : path + "." + field.getKey();
+                rules(field.getValue(), at, known, rules, unruled);
+            }
+        } else if (node.isArray()) {
+            for (int i = 0; i < node.size(); i++) {
+                rules(node.get(i), path + "[" + i + "]", known, rules, unruled);
+            }
+        } else if (node.isTextual() && node.textValue().startsWith(PLACEHOLDER)) {
+            String placeholder = node.textValue();
+            if (placeholder.startsWith(ResponseMasker.REGEX)) {
+                rules.put(path, "regex:" + placeholder.substring(ResponseMasker.REGEX.length()));
+                return;
+            }
+            List<KnownRule> matching = known.stream().filter(k -> k.matches(path)).toList();
+            Set<String> distinct = new LinkedHashSet<>();
+            matching.forEach(k -> distinct.add(k.path() + " = " + k.rule()));
+            if (distinct.size() == 1) {
+                rules.put(matching.get(0).path(), matching.get(0).rule());
+            } else {
+                unruled.add(new Unruled(path, placeholder, distinct.isEmpty() ? null : "known rules disagree: "
+                        + matching.stream().map(k -> k.path() + " = " + k.rule() + " (" + k.file() + ")").distinct()
+                        .collect(Collectors.joining(", "))));
+            }
+        }
     }
 
     /** Spec 3.3: without {@code basic.productId}; in the UI channel the old portfolio replaced. */
@@ -328,12 +449,67 @@ final class LegacyMigration {
             return new Channel(source.dir(), source.featureFile(), null, Map.of(), caseLines, orphans, List.of(),
                     portfolios);
         }
-        List<Layering.Case> cases = items.stream().map(item -> new Layering.Case(item.caseId(),
-                item.featureCase().rowId(), item.product(), item.request(), item.hasData())).toList();
-        ObjectNode eventFile = eventFile(source, items, Layering.layer(cases, PRODUCTS, false));
-        stops.addAll(selfCheck(name, source.dir(), eventFile, items, caseLines));
-        return new Channel(source.dir(), source.featureFile(), eventFile, Map.of(), caseLines, orphans, List.of(),
-                portfolios);
+        Map<String, String> expected = new LinkedHashMap<>();
+        items.forEach(item -> {
+            if (item.response() != null) expected.put(item.caseId(), Json.pretty(item.response()));
+        });
+        Layering.Layers requests = Layering.layer(cases(items, Item::request), PRODUCTS, false);
+        Layering.Layers rules = source.dir().equals("api")
+                ? Layering.layer(cases(items, Item::rules), PRODUCTS, true) : null;
+        ObjectNode eventFile = eventFile(source, items, requests, rules, expectedBase(source));
+        stops.addAll(selfCheck(name, source.dir(), eventFile, items, expected, caseLines));
+        return new Channel(source.dir(), source.featureFile(), eventFile, expected, caseLines, orphans,
+                placeholdersWithoutRule(items), portfolios);
+    }
+
+    private static List<Layering.Case> cases(List<Item> items, Function<Item, ObjectNode> value) {
+        return items.stream().map(item -> new Layering.Case(item.caseId(), item.featureCase().rowId(), item.product(),
+                value.apply(item), item.hasData())).toList();
+    }
+
+    /** Spec 3.6: with two or more product Outlines in the API feature, the first one's row ID; else null. */
+    private static String expectedBase(Source source) {
+        if (!source.dir().equals("api")) return null;
+        List<String> outlines = source.feature().blocks().stream()
+                .filter(b -> b.kind() == FeatureFile.Kind.OUTLINE && b.rowId() != null
+                        && b.rowId().contains(FeatureCases.PRODUCT_PLACEHOLDER))
+                .map(FeatureFile.Block::rowId).toList();
+        return outlines.size() >= 2 ? outlines.get(0) : null;
+    }
+
+    /** The placeholders of one path that get no rule. */
+    private record Listing(Set<String> placeholders, Set<String> products, Set<String> caseIds,
+                           Set<String> conflicts) {
+        Listing() {
+            this(new LinkedHashSet<>(), new LinkedHashSet<>(), new LinkedHashSet<>(), new LinkedHashSet<>());
+        }
+    }
+
+    /** One line per path: {@code <path> (<placeholders>): <products, then case IDs without product>[; conflicts]}. */
+    private static List<String> placeholdersWithoutRule(List<Item> items) {
+        Map<String, Listing> listings = new LinkedHashMap<>();
+        for (Item item : items) {
+            for (Unruled unruled : item.unruled()) {
+                Listing listing = listings.computeIfAbsent(unruled.path(), path -> new Listing());
+                listing.placeholders().add(unruled.placeholder());
+                if (item.product() != null) {
+                    listing.products().add(item.product());
+                } else {
+                    listing.caseIds().add(item.caseId());
+                }
+                if (unruled.conflict() != null) listing.conflicts().add(unruled.conflict());
+            }
+        }
+        List<String> lines = new ArrayList<>();
+        listings.forEach((path, listing) -> {
+            List<String> who = new ArrayList<>(PRODUCTS.stream().filter(listing.products()::contains).toList());
+            who.addAll(listing.caseIds());
+            StringBuilder line = new StringBuilder(path).append(" (")
+                    .append(String.join(", ", listing.placeholders())).append("): ").append(String.join(", ", who));
+            listing.conflicts().forEach(conflict -> line.append("; ").append(conflict));
+            lines.add(line.toString());
+        });
+        return lines;
     }
 
     /** Plan decision 6: every leaf whose key contains "portfolio" with a value other than the UI portfolio. */
@@ -376,43 +552,65 @@ final class LegacyMigration {
         return orphans;
     }
 
-    /** The event file: parts in the loader's order, empty parts left out, rows in feature order. */
-    private static ObjectNode eventFile(Source source, List<Item> items, Layering.Layers layers) {
+    /**
+     * The event file: parts in the loader's order, empty parts left out, rows in feature order. {@code rules} null:
+     * the channel has none (UI); {@code expectedBase} null: none.
+     */
+    private static ObjectNode eventFile(Source source, List<Item> items, Layering.Layers requests,
+                                        Layering.Layers rules, String expectedBase) {
         ObjectNode file = Json.MAPPER.createObjectNode();
         file.put(JsonLayers.COMMENT, source.featureFile());
-        if (!layers.defaults().isEmpty()) {
-            file.putObject("defaults").set("request", layers.defaults());
+        ObjectNode defaults = Json.MAPPER.createObjectNode();
+        if (!requests.defaults().isEmpty()) defaults.set("request", requests.defaults());
+        if (rules != null && !rules.defaults().isEmpty()) defaults.set("dynamicFields", rules.defaults());
+        if (expectedBase != null) defaults.put("expectedBase", expectedBase);
+        if (!defaults.isEmpty()) file.set("defaults", defaults);
+
+        ObjectNode byProduct = Json.MAPPER.createObjectNode();
+        for (String product : PRODUCTS) {
+            ObjectNode layer = Json.MAPPER.createObjectNode();
+            part(layer, "request", requests.byProduct().get(product));
+            part(layer, "dynamicFields", rules == null ? null : rules.byProduct().get(product));
+            if (!layer.isEmpty()) byProduct.set(product, layer);
         }
-        if (!layers.byProduct().isEmpty()) {
-            ObjectNode byProduct = file.putObject("byProduct");
-            layers.byProduct().forEach((product, patch) -> byProduct.putObject(product).set("request", patch));
-        }
+        if (!byProduct.isEmpty()) file.set("byProduct", byProduct);
+
         ArrayNode rows = Json.MAPPER.createArrayNode();
         for (String rowId : items.stream().map(i -> i.featureCase().rowId()).distinct().toList()) {
-            JsonNode row = layers.rows().get(rowId);
-            Map<String, JsonNode> rest = layers.rowByProduct().getOrDefault(rowId, Map.of());
-            if (row == null && rest.isEmpty()) continue;
+            JsonNode requestRow = requests.rows().get(rowId);
+            JsonNode rulesRow = rules == null ? null : rules.rows().get(rowId);
+            Map<String, JsonNode> requestRest = requests.rowByProduct().getOrDefault(rowId, Map.of());
+            Map<String, JsonNode> rulesRest = rules == null ? Map.of()
+                    : rules.rowByProduct().getOrDefault(rowId, Map.of());
+            if (requestRow == null && rulesRow == null && requestRest.isEmpty() && rulesRest.isEmpty()) continue;
             List<Item> mine = items.stream().filter(i -> i.featureCase().rowId().equals(rowId)).toList();
             String scenario = scenarioName(source.feature(), rowId);
-            boolean nullsNoData = row != null && mine.stream().anyMatch(i -> !i.hasData());
-            ObjectNode out = rows.addObject();
-            out.put("id", rowId);
-            out.put(JsonLayers.COMMENT, !nullsNoData ? scenario
+            boolean nullsNoData = requestRow != null && mine.stream().anyMatch(i -> !i.hasData());
+            ObjectNode row = rows.addObject();
+            row.put("id", rowId);
+            row.put(JsonLayers.COMMENT, !nullsNoData ? scenario
                     : scenario.isEmpty() ? NO_DATA : scenario + "; " + NO_DATA);
-            if (row != null) out.set("request", row);
-            if (!rest.isEmpty()) {
-                ObjectNode byProduct = out.putObject("byProduct");
-                rest.forEach((product, patch) -> {
-                    ObjectNode entry = byProduct.putObject(product);
-                    if (mine.stream().anyMatch(i -> product.equals(i.product()) && !i.hasData())) {
-                        entry.put(JsonLayers.COMMENT, NO_DATA);
-                    }
-                    entry.set("request", patch);
-                });
+            part(row, "request", requestRow);
+            part(row, "dynamicFields", rulesRow);
+            ObjectNode rowByProduct = Json.MAPPER.createObjectNode();
+            for (String product : PRODUCTS) {
+                ObjectNode layer = Json.MAPPER.createObjectNode();
+                if (requestRest.containsKey(product)
+                        && mine.stream().anyMatch(i -> product.equals(i.product()) && !i.hasData())) {
+                    layer.put(JsonLayers.COMMENT, NO_DATA);
+                }
+                part(layer, "request", requestRest.get(product));
+                part(layer, "dynamicFields", rulesRest.get(product));
+                if (!layer.isEmpty()) rowByProduct.set(product, layer);
             }
+            if (!rowByProduct.isEmpty()) row.set("byProduct", rowByProduct);
         }
         if (!rows.isEmpty()) file.set("cases", rows);
         return file;
+    }
+
+    private static void part(ObjectNode layer, String key, JsonNode value) {
+        if (value != null) layer.set(key, value);
     }
 
     /** The scenario line's text after {@code [<row ID>]}, trimmed. */
@@ -428,10 +626,11 @@ final class LegacyMigration {
 
     /**
      * Spec 3.8: the event file loaded by the real loader from a temporary folder; each case's request and rules
-     * compared with the planned ones. Fills {@code caseLines}; returns the differences as stops.
+     * compared with the planned ones, each expected file with the old response. Fills {@code caseLines}; returns the
+     * differences as stops.
      */
     private static List<String> selfCheck(String name, String dir, ObjectNode eventFile, List<Item> items,
-                                          List<String> caseLines) {
+                                          Map<String, String> expected, List<String> caseLines) {
         Path root = null;
         try {
             root = Files.createTempDirectory("legacy-migration");
@@ -456,9 +655,15 @@ final class LegacyMigration {
                         stops.add("self-check: " + item.caseId() + " (" + layers + "): the request should be "
                                 + Json.compact(item.request()) + ", the layers give " + data.request());
                     }
-                    if (!data.dynamicFields().isEmpty()) {
-                        stops.add("self-check: " + item.caseId() + " (" + layers + "): dynamicFields should be {},"
-                                + " the layers give " + data.dynamicFields());
+                    Map<String, String> rules = new LinkedHashMap<>();
+                    item.rules().properties().forEach(rule -> rules.put(rule.getKey(), rule.getValue().asText()));
+                    if (!data.dynamicFields().equals(rules)) {
+                        stops.add("self-check: " + item.caseId() + " (" + layers + "): dynamicFields should be "
+                                + rules + ", the layers give " + data.dynamicFields());
+                    }
+                    String text = expected.get(item.caseId());
+                    if (text != null && !Json.parse(text).equals(item.response())) {
+                        stops.add("self-check: " + item.caseId() + ": the expected file differs from the old response");
                     }
                 }
                 return stops;
@@ -483,7 +688,9 @@ final class LegacyMigration {
         if (!existing.isEmpty()) {
             throw new IllegalStateException("[LegacyMigration] " + existing + " exist, nothing written");
         }
+        ExpectedResponses responses = new ExpectedResponses(sources.data().resolve("api/expected"));
         for (Channel channel : plan.channels()) {
+            channel.expected().forEach((id, text) -> responses.write(CaseId.parse(id), text));
             if (channel.eventFile() == null) continue;
             Path file = sources.data().resolve(channel.dir()).resolve(plan.name() + ".json");
             try {

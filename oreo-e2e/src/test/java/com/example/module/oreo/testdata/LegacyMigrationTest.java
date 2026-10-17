@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
@@ -288,6 +289,123 @@ public class LegacyMigrationTest {
         assertEquals(List.of("trade_creation"), LegacyMigration.featureNames(sources));
     }
 
+    @Test
+    public void regexPlaceholderBecomesARule() throws IOException {
+        LegacyMigration.Channel api = channel(plan(FIXTURE, project(), "trade_creation"), "api");
+        String msg = Json.parse(FIXTURE.forKey("TC-TRADE-CREATION-FX_TRF-API-001").response()).get("msg").asText();
+        assertTrue(msg, msg.startsWith("${json-unit.regex}"));
+        assertEquals(Json.MAPPER.createObjectNode().put("msg", "regex:" + msg.substring("${json-unit.regex}".length())),
+                api.eventFile().path("defaults").path("dynamicFields"));
+        assertEquals(Json.parse("{\"msg\":null}"),
+                api.eventFile().path("byProduct").path("FX_PSCRIPT_TRF").path("dynamicFields"));
+        for (String id : List.of("TC-TRADE-CREATION-API-004", "TC-TRADE-CREATION-API-005",
+                "TC-TRADE-CREATION-API-006")) {
+            assertTrue(id, row(api, id).has("dynamicFields") && row(api, id).get("dynamicFields").isNull());
+        }
+        assertEquals(List.of("id", "_comment", "dynamicFields"), keys(row(api, "TC-TRADE-CREATION-API-006")));
+    }
+
+    @Test
+    public void otherPlaceholdersAreListed() throws IOException {
+        LegacyMigration.Channel api = channel(plan(FIXTURE, project(), "trade_creation"), "api");
+        assertEquals(1, api.placeholdersWithoutRule().stream().filter(l -> l.startsWith("data.trade.id ")).count());
+        assertFalse(Json.compact(api.eventFile()).contains("\"data.trade.id\""));
+    }
+
+    @Test
+    public void knownRulePathIsReused() throws IOException {
+        Path project = project();
+        json(project, "data/api/trade_cancellation.json",
+                "{\"defaults\":{\"dynamicFields\":{\"data.trade.id\":\"type\"}}}");
+        LegacyMigration.Plan plan = plan(FIXTURE, project, "trade_creation");
+        assertEquals(List.of(), plan.stops());
+        LegacyMigration.Channel api = channel(plan, "api");
+        assertEquals("type", api.eventFile().path("defaults").path("dynamicFields").path("data.trade.id").asText());
+        assertTrue(api.placeholdersWithoutRule().stream().noneMatch(l -> l.startsWith("data.trade.id ")));
+    }
+
+    @Test
+    public void knownRuleWithAnyIndexMatches() throws IOException {
+        Path project = project();
+        json(project, "data/api/trade_y.json", "{\"defaults\":{\"dynamicFields\":{\"data.items[*].id\":\"type\"}}}");
+        Path old = tmp.newFolder("old").toPath();
+        yaml(old, "api/trade_x.yml", apiEntry("TC-TRADE-X-API-001", "{\"a\":1}",
+                "{\"data\":{\"items\":[{\"id\":\"${json-unit.any-string}\"},{\"id\":\"${json-unit.any-string}\"}]}}"));
+        feature(project, "api", "trade_x", scenario("TC-TRADE-X-API-001", "posts x"));
+        LegacyMigration.Plan plan = plan(LegacyData.in(old), project, "trade_x");
+        assertEquals(List.of(), plan.stops());
+        LegacyMigration.Channel api = channel(plan, "api");
+        assertEquals(Json.parse("{\"data.items[*].id\":\"type\"}"),
+                api.eventFile().path("defaults").path("dynamicFields"));
+        assertEquals(List.of(), api.placeholdersWithoutRule());
+    }
+
+    @Test
+    public void conflictingKnownRulesGiveNone() throws IOException {
+        Path project = project();
+        json(project, "data/api/trade_y.json", "{\"defaults\":{\"dynamicFields\":{\"data.trade.id\":\"type\"}}}");
+        json(project, "data/api/trade_z.json",
+                "{\"cases\":[{\"id\":\"TC-TRADE-Z-API-001\",\"dynamicFields\":{\"data.trade.id\":\"ignore\"}}]}");
+        Path old = tmp.newFolder("old").toPath();
+        yaml(old, "api/trade_x.yml", apiEntry("TC-TRADE-X-API-001", "{\"a\":1}",
+                "{\"data\":{\"trade\":{\"id\":\"${json-unit.any-string}\"}}}"));
+        feature(project, "api", "trade_x", scenario("TC-TRADE-X-API-001", "posts x"));
+        LegacyMigration.Plan plan = plan(LegacyData.in(old), project, "trade_x");
+        assertEquals(List.of(), plan.stops());
+        LegacyMigration.Channel api = channel(plan, "api");
+        assertFalse(api.eventFile().path("defaults").has("dynamicFields"));
+        assertEquals(1, api.placeholdersWithoutRule().size());
+        String line = api.placeholdersWithoutRule().get(0);
+        assertTrue(line, line.startsWith("data.trade.id "));
+        assertTrue(line, line.contains("= type"));
+        assertTrue(line, line.contains("= ignore"));
+    }
+
+    @Test
+    public void expectedFilesAreTheOldResponses() throws IOException {
+        LegacyMigration.Sources sources = new LegacyMigration.Sources(FIXTURE, project());
+        LegacyMigration.Plan plan = LegacyMigration.plan(sources, "trade_creation");
+        LegacyMigration.Channel api = channel(plan, "api");
+        assertEquals(15, api.expected().size());
+        api.expected().forEach((id, text) ->
+                assertEquals(id, Json.parse(FIXTURE.forKey(id).response()), Json.parse(text)));
+        LegacyMigration.write(sources, plan);
+        try (Stream<Path> files = Files.list(sources.data().resolve("api/expected/trade_creation"))) {
+            assertEquals(15, files.count());
+        }
+        assertTrue(Files.isRegularFile(
+                sources.data().resolve("api/expected/trade_creation/TC-TRADE-CREATION-API-004.json")));
+    }
+
+    @Test
+    public void expectedBaseIsTheFirstProductOutline() throws IOException {
+        Path project = project();
+        LegacyMigration.Channel creation = channel(plan(FIXTURE, project, "trade_creation"), "api");
+        assertEquals("TC-TRADE-CREATION-<product_type>-API-001",
+                creation.eventFile().path("defaults").path("expectedBase").asText());
+
+        Path old = tmp.newFolder("old").toPath();
+        yaml(old, "api/trade_x.yml", apiEntry("TC-TRADE-X-FX_TRF-API-001", "{\"a\":1}", "{\"code\":200}")
+                + apiEntry("TC-TRADE-X-FX_PSCRIPT-API-001", "{\"a\":1}", "{\"code\":200}"));
+        feature(project, "api", "trade_x", outline("TC-TRADE-X-<product_type>-API-001", "FX_TRF", "FX_PSCRIPT"));
+        LegacyMigration.Plan plan = plan(LegacyData.in(old), project, "trade_x");
+        assertEquals(List.of(), plan.stops());
+        assertFalse(channel(plan, "api").eventFile().path("defaults").has("expectedBase"));
+    }
+
+    @Test
+    public void apiCaseWithoutOldDataStops() throws IOException {
+        Path project = project();
+        Path old = tmp.newFolder("old").toPath();
+        yaml(old, "api/trade_x.yml", apiEntry("TC-TRADE-X-API-001", "{\"a\":1}", "{\"code\":200}"));
+        feature(project, "api", "trade_x", scenario("TC-TRADE-X-API-001", "posts x")
+                + scenario("TC-TRADE-X-API-002", "posts y"));
+        LegacyMigration.Plan plan = plan(LegacyData.in(old), project, "trade_x");
+        assertTrue(stops(plan), stops(plan).contains("TC-TRADE-X-API-002"));
+        assertTrue(stops(plan), stops(plan).contains("expected file"));
+        assertEquals(List.of(), plan.files());
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /** A project folder: the fixture features, empty {@code data/api}, {@code data/ui} and {@code src/main/java}. */
@@ -352,6 +470,18 @@ public class LegacyMigrationTest {
         return key + ":\n  request: |\n    " + request + "\n";
     }
 
+    private static String apiEntry(String key, String request, String response) {
+        return entry(key, request) + "  response: |\n    " + response + "\n";
+    }
+
+    private static void json(Path project, String file, String text) throws IOException {
+        Files.writeString(project.resolve("src/test/resources").resolve(file), text, StandardCharsets.UTF_8);
+    }
+
+    private static List<String> keys(JsonNode node) {
+        return node.properties().stream().map(Map.Entry::getKey).toList();
+    }
+
     private static void yaml(Path dir, String file, String text) throws IOException {
         Path path = dir.resolve(file);
         Files.createDirectories(path.getParent());
@@ -360,6 +490,13 @@ public class LegacyMigrationTest {
 
     private static String scenario(String id, String name) {
         return "  Scenario: [" + id + "] " + name + "\n    Given a step\n\n";
+    }
+
+    private static String outline(String rowId, String... products) {
+        StringBuilder text = new StringBuilder("  Scenario Outline: [" + rowId + "] does it\n    Given a step\n\n"
+                + "    Examples:\n      | product_type |\n");
+        for (String product : products) text.append("      | ").append(product).append(" |\n");
+        return text.append('\n').toString();
     }
 
     private static void feature(Path project, String dir, String name, String scenarios) throws IOException {
