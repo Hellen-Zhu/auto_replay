@@ -7,7 +7,7 @@ description: Use when a new OREO product type has to be covered by the Java + Cu
 
 ## Overview
 
-A product is a row, not code. Steps, snippets, the test data hook and the response check already take the product as a parameter, and `expectedBase` (`<product_type>`) already covers every product. Onboarding is: one `ProductDatFiles` constant, its dat file, one Examples row in each Scenario Outline the product supports, `byProduct` entries only for values that differ, and API responses recorded on the real system.
+A product is a row, not code. Steps, snippets, the test data hook and the response check already take the product as a parameter, and `expectedBase` (`<product_type>`) already covers every product. Onboarding is: one `ProductDatFiles` constant listing the capabilities the product supports, its dat file, `byProduct` entries only for values that differ, a tool run that writes the product into the `Examples` of the Outlines tagged with those capabilities, and API responses recorded on the real system.
 
 **Nothing is invented**: no capability, data value, dat content, masking rule or command-line flag. A value nobody gave is an open item in the report.
 
@@ -15,13 +15,13 @@ Paths below are relative to the oreo-e2e root.
 
 ## 1. Ask QA first
 
-One message, in the user's language. Make no change while a **required** item is open. When QA cannot be reached, change nothing: report the questions and the exact change you will make once they answer.
+One message, in the user's language. Make no change while a **required** item is open (one exception: item 3). When QA cannot be reached and a required item is open, change nothing: report the questions and the exact change you will make once they answer.
 
 1. **required** The product type exactly as the system knows it: sent as `basic.productId`, typed into the New Trade Product ID field. New names only (`FX_PSCRIPT`, never `FX_CO`).
-2. **required** Yes / no for every Scenario Outline with `<product_type>`. List them for QA as a table (case ID, title) from:
-   `grep -rn "Scenario Outline" src/test/resources/features`
-   The answer comes from the requirement or the BA, not from "like the other products".
-3. **required** The dat file: the default one the business uses, a real trade template. A file of a few bytes or test text is not one: ask again.
+2. **required** Yes / no for every capability (the constants of `Capability.java`). List them for QA as a table: capability, then the Outlines that carry its tag (case ID, title), from:
+   `grep -rn -A1 "@capability#" src/test/resources/features`
+   A capability covers all its Outlines, API and UI: a yes for only some of them is a question for the user, not a registry line. The answer comes from the requirement or the BA, not from "like the other products".
+3. **required** The dat file: the default one the business uses, a real trade template. A file of a few bytes or test text is not one: ask again. In the public copy (its `.dat` files are one-line placeholders, section 2) the change does not use the file: make it with the placeholder, and keep the real file open in the report; the company copy needs it before any run.
 4. Values that may differ for this product. Show QA the current values: the `defaults` of each event file under `src/test/resources/data/api|ui/` whose feature the product joins, and the `shared` blocks those defaults `use` (`api/common.json`, `ui/common.json`). Example: `earlyTermination.amount` must fit the dat file's notional. Not blocking: the product runs on the defaults until QA answers; a wrong default fails the case (the status check runs before any recording).
 5. Whether the New Trade form, the trade detail page or the setup trade (`data/setup/trade-create*.json`, one body for every product) needs anything the current products do not have. Yes is a code change of its own: report it, do not guess it.
 
@@ -29,17 +29,22 @@ One message, in the user's language. Make no change while a **required** item is
 
 | File | Change |
 |---|---|
-| `src/main/java/com/example/module/oreo/testdata/ProductDatFiles.java` | One constant `<P>("data/<P>.dat")`, inserted before `FX_OPT`, never first (`values()[0]` is the data checks' example product). Its comment: the product's name as QA gives it, else none. The class comment's step "add a new `@When` step in `NewTradeSteps`" is outdated: no step is needed |
+| `src/main/java/com/example/module/oreo/testdata/ProductDatFiles.java` | One constant `<P>("data/<P>.dat", <the capabilities QA confirmed>)`, e.g. `("data/<P>.dat", CREATE, EARLY_TERMINATION)`, inserted before `FX_OPT`, never first (`values()[0]` is the data checks' example product; the order of the constants is the order of the `Examples` rows). Its comment: the product's name as QA gives it, else none |
 | `src/test/resources/data/<P>.dat` | If the committed `.dat` files are one-line placeholders (`# Placeholder: copy <P>.dat from the E2E project.`), this is the public copy: write the same line for `<P>`, never the real file, and add `<P>` to the placeholder list in `README.md`. Otherwise copy QA's file byte for byte |
-| Each supported Outline's `Examples` | One row `\| <P> \|`. An unsupported Outline gets no row; the report says who confirmed it |
 | `byProduct.<P>` of an event file | Only values QA gave that differ from the defaults. `dynamicFields` only after a recording shows them (section 4) |
 
+Then the `Examples`, never by hand: the tool writes the row `| <P> |` into every Outline tagged with one of the product's capabilities, in registry order, and prints one line per Outline (`add <P>`). It writes nothing when a feature file has a problem. Run it where oreo-e2e builds (section 3); elsewhere hand the command over:
+
+```bash
+mvn test -Dtest=SyncProductExamples -Doreo.sync=all
+```
+
 Leave alone:
-- steps, snippets, hooks, `expected/` files, `expectedBase`;
+- steps, snippets, hooks, `expected/` files, `expectedBase`, `Capability.java` and the `@capability#` tags;
 - scenarios without `<product_type>` (negative and permission cases are written for one product);
 - `Products.java` while `grep -rnw "Products\." src` finds no caller (add a line there only if it has one).
 
-Coverage QA asks for that no Outline has (an event without a feature in that channel, a negative case for the product) is a new scenario, not onboarding: list it in the report.
+Coverage QA asks for that no Outline has (a capability no Outline carries, an event without a feature in that channel, a negative case for the product) is a new scenario, not onboarding: list it in the report.
 
 ## 3. Offline check
 
@@ -49,7 +54,7 @@ Run Maven only where the user says oreo-e2e builds (the company machine); elsewh
 mvn test -Dtest='com.example.module.oreo.testdata.*Test'
 ```
 
-Expected before the recording: only `everyApiCaseHasItsExpectedFile` fails, one `no expected file` line per new API case. Any other error (a product that is not in `ProductDatFiles`, a `byProduct` without a dat file) is a mistake in section 2.
+Expected before the tool runs: `productExamplesMatchTheRegistry` fails with one `add <P>` line per Outline of the product's capabilities. After it, until the recordings: only `everyApiCaseHasItsExpectedFile` fails, one `no expected file` line per new API case. Any other error (a product that is not in `ProductDatFiles`, a `byProduct` without a dat file, a `remove` line) is a mistake in section 2.
 
 ```bash
 mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-<P>-API-001
@@ -73,16 +78,18 @@ Every run books real UAT trades. The project does not document how to run a subs
 ## 5. Report
 
 In the user's language:
-1. **Coverage**: one line per Outline, as case ID with `<P>`: added / left out (why, who confirmed).
+1. **Coverage**: one line per capability: yes (its Outlines, as case IDs with `<P>`) / no (who confirmed).
 2. **Files** created and changed.
 3. **Open**: required items still missing, values still on the defaults, recordings pending, anything inferred.
-4. **Commands** for the company machine: sections 3 and 4, in order.
+4. **Commands** for the company machine: the tool (section 2), then sections 3 and 4, in order.
 
 ## Common mistakes
 
 | Mistake | Instead |
 |---|---|
-| A row in every Outline "like the other products" | Only the Outlines QA confirmed |
+| Every capability "like the other products" | Only the capabilities QA confirmed |
+| `Examples` rows typed by hand | The tool writes them; a row the registry does not back fails `productExamplesMatchTheRegistry` |
+| A new `Capability` constant or `@capability#` tag for the product | A new scenario: report it |
 | QA's real dat file committed to the public copy | The placeholder line |
 | `-Dcucumber.filter.name=...`, `-Doreo.risk.engine.mode=...` | Ask how the user runs a subset; the mode is in `genie.properties` |
 | `Products.java` edited "to keep the registry complete" | No caller: leave it |

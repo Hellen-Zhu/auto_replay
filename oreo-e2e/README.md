@@ -46,7 +46,8 @@ src/main/java/com/example/module/oreo/
   glue/ui/TradeLifecycleEventSteps.java    lifecycle_event / common_trade_action / trade_early_termination snippets
   glue/ui/CommonE2EAssertion, CommonE2EInteraction, CommonHelpers, PlaywrightServiceResolver,
           ToastSteps, TradeDetailSteps, TradePortalSteps            placeholders
-  testdata/ProductDatFiles.java   transcribed from the E2E project
+  testdata/ProductDatFiles.java   the products: dat file and capabilities ("Products and capabilities")
+  testdata/Capability.java        what a product can be tested for: the @capability# tag names
   testdata/TestData, TestDataRepository, CaseData, SetupData, CaseId, JsonLayers, Json,
           ExpectedResponses, ResponseMasker, ProjectPaths, TradeRequests   test data and recording ("Test data")
   testdata/Products.java          product registry: old name -> product ID (FX_CO -> FX_PSCRIPT, FX_FSB -> FX_PSCRIPT_FSKO)
@@ -61,6 +62,8 @@ src/main/resources/
 src/test/java/com/example/module/oreo/
   OreoTest.java                   the Cucumber run (features/; glue and report set here)
   testdata/*Test.java, FeatureCases.java, CaseDataLookup.java   unit tests, offline checks, case lookup
+  testdata/FeatureFile.java       a feature file parsed once: blocks, tags, Examples tables
+  testdata/ProductExamples.java, SyncProductExamples.java   the product Outlines' Examples, from the registry
 src/test/resources/
   data/api/, data/ui/, data/setup/   the test data ("Test data")
   data/common.json                left from an earlier design; nothing reads it (kept on purpose)
@@ -100,6 +103,24 @@ src/test/resources/data/
 ```
 
 API and UI data never read each other; only the code is shared.
+
+### Products and capabilities
+
+`ProductDatFiles` lists every product with its dat file and the capabilities it supports (`Capability`: `create`,
+`stepInFull`, `stepInPartial`, `earlyTermination`, named as in the replay project's `framework/products.ts`). Each
+Scenario Outline whose case ID has `<product_type>` carries one tag `@capability#<name>` next to its other tags, and its
+`Examples` is one table with the single column `product_type`: one row per product of that capability, in registry
+order. Nobody edits those rows; the tool writes them:
+
+```bash
+mvn test -Dtest=SyncProductExamples -Doreo.sync=all
+```
+
+It prints one line per Outline (`unchanged`, `add X`, `remove Y`, `reordered`, `reformatted`) and writes nothing when a
+feature file has a problem: an Outline without a tag or with two, an unknown name, a tag anywhere else, a table other
+than one `product_type` column, a capability no product has. The offline check `productExamplesMatchTheRegistry` fails
+on those problems and on every Outline the tool would change; a capability no Outline carries is only a warning.
+Scenarios without `<product_type>` (negative and permission cases) carry no tag and are not touched.
 
 ### Case data
 
@@ -209,7 +230,14 @@ mvn test -Dtest='com.example.module.oreo.testdata.*Test'
 The unit tests and the offline checks of `TestDataValidationTest` (no environment needed): every data file loads,
 every case of every feature resolves, every row and event file has its feature, every API case has its expected file
 and every expected file its case, the rules agree with the expected files, every setup name used exists, the expected
-files resolve and are compacted (a file the compaction would still change is a warning).
+files resolve and are compacted (a file the compaction would still change is a warning), the product Outlines'
+`Examples` match the registry.
+
+```bash
+mvn test -Dtest=SyncProductExamples -Doreo.sync=all
+```
+
+Writes the product Outlines' `Examples` from `ProductDatFiles` ("Products and capabilities").
 
 ```bash
 mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-002
@@ -225,10 +253,10 @@ without the vintage engine), add `org.junit.vintage:junit-vintage-engine` in tes
 
 | Task | What to change |
 |---|---|
-| New product | `ProductDatFiles` constant and `data/<P>.dat`; the product in each feature's Examples; `byProduct` only where its data or dynamic fields differ; run the API cases, compact, review the recorded files, commit (no base to declare: `defaults` covers every product). The skill `.claude/skills/onboarding-e2e-product` walks through it |
+| New product | `ProductDatFiles` constant with its capabilities, and `data/<P>.dat`; `SyncProductExamples` writes it into the Outlines' Examples; `byProduct` only where its data or dynamic fields differ; run the API cases, compact, review the recorded files, commit (no base to declare: `defaults` covers every product). The skill `.claude/skills/onboarding-e2e-product` walks through it |
 | New positive case | nothing when it runs on the defaults; otherwise a row with the feature's ID; after the recording, compact |
 | New negative case | a row with the `request` change and `"dynamicFields": null` |
-| New event | `data/<channel>/<event>.json`, named after the feature file; shared blocks through `use` |
+| New event | `data/<channel>/<event>.json`, named after the feature file; shared blocks through `use`. For its Outlines with `<product_type>`: a `Capability` constant named as in the replay project's `framework/products.ts`, the tag `@capability#<name>` on them, the capability on the products that support it, then `SyncProductExamples` |
 | A field turns out dynamic | its rule in the event file (`defaults` or `byProduct`), then record again |
 | Change the default counterparty | `api/common.json`, `ui/common.json`, `setup/trade-create*.json` (three places, on purpose); record the API cases again |
 | New setup payload | `data/setup/<what-it-prepares>.json`, referenced by that name |

@@ -3,6 +3,8 @@
 Status: design approved by the user on 2026-10-17 (the three recommendations: registry in `ProductDatFiles`, a tag on
 each Outline, capability names as in `framework/products.ts`). Branch: `feature/testdata-refactor`, after the test data
 refactor (`2026-10-16-oreo-e2e-test-data-design.md`), whose `FeatureCases` and `TestDataValidationTest` this builds on.
+Implemented on 2026-10-17 (plan `docs/superpowers/plans/2026-10-17-oreo-e2e-product-capabilities.md`), checked by
+reading only: to verify on the company machine.
 
 ## 1. Problem
 
