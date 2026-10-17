@@ -5,8 +5,15 @@
 //
 // What is real and what is only this mock's guess:
 // - real testids: login-*, layout-*, create-trade-*, trade-file-upload (on the file input itself: the Java step sets
-//   the files on it directly), trade-detail-*, trade-change-confirmation-dialog,
-//   trade-change-confirm-btn, trade-row-action-cancellation, trade-change-reason-select, trade-change-comments-textarea;
+//   the files on it directly), trade-detail-*, trade-change-confirmation-dialog, trade-change-confirm-btn,
+//   trade-change-reason-select, trade-change-comments-textarea, and on the Trades page the search box
+//   (transaction-search-input), the all-trades blotter (blotter-table-new-today, each row new-today-row), the nav tab
+//   (nav-trades-tab), the entries of a row's action menu (trade-row-action-cancellation, -earlytermination, -approve,
+//   -reject), the checker's dialog (checker-action-dialog, -dialog-confirm-btn, -dialog-cancel-btn), the early
+//   termination dialog (dynamic-action-dialog, -direction-select, -amount-input, -ccy-input, -confirm-btn, -cancel-btn)
+//   and the toast (toast-notification-item): all from the element files of oreo-e2e;
+// - a blotter cell names its column in data-col: the keys status and eventStatus are the ones the Java steps read,
+//   the others (id, productId, counterpartyName) are this mock's own;
 // - the comments field of the confirmation dialog is, as on the real system, an sc-text-input host with
 //   data-slot="textarea": a fill on the host fails, the control to fill is the [part="input"] in its shadow root.
 //   Whether the real component renders a <textarea> or an <input> there is not known (the mock renders a <textarea>);
@@ -14,24 +21,28 @@
 //   entries have the role menuitem;
 // - the rule that an uploaded dat file is named after its product (it starts with the product ID and ends with
 //   ".dat") is this mock's own.
-// - testids made up here because the real ones are not known yet (search box, all-trades blotter, the checker's
-//   Approve / Reject menu entries, their dialog and its confirm button): they are marked
-//   "mock testid" below. Point the element names at them with a scratch elements folder (OREO_ELEMENTS_DIR) when
-//   running a case against the mock;
-// - the toast only copies the two attributes the E2E project reads (data-title, data-description); the titles
-//   "Trade approved successfully" / "Trade rejected successfully" and the cancellation's message are the real texts;
+// - the toast only copies its testid and the two attributes the E2E project reads (data-title, data-description); the
+//   titles "Trade approved successfully" / "Trade rejected successfully" and the messages "Cancellation completed
+//   successfully" / "EarlyTermination completed successfully" are the real texts;
 // - the checker's decision in the browser: the Approve / Reject entries are in the row's action menu and open a
 //   dialog with a confirm button, as the E2E project's steps use them; how that dialog looks is this mock's own.
 //   What a decision does to a trade: an approved cancellation gives DEAD / Cancelled and a rejected one LIVE / New,
 //   as in the E2E project; an approved new trade is LIVE (real); a rejected new trade is shown as DRFT (the text is
 //   real; that it stays in this blotter is this mock's own). The "udf" list of a StepIn trade is accepted and ignored;
+// - early termination: the row menu entry (a LIVE trade only) opens the dynamic action dialog; its confirm sends POST
+//   trades/<id>/calculate-risk (the path the Java step waits for, or answers itself with riskEngine mock), then the
+//   trade change confirmation opens and its confirm sends trigger-event. The dialog's fields (direction Pay / Receive
+//   in an sc-select, amount and currency in sc-text-inputs), the rule that all three are needed (so that a case whose
+//   values did not reach the controls fails), the body { tradeId, event: 'EarlyTermination', direction, amount, ccy }
+//   and that the trade is DEAD / Terminated at once, without a checker (what the Java case checks right after the
+//   event), are this mock's own;
 // - API, served under /api/v1 (so apiBaseUrl for the mock is http://localhost:4173/api/v1): create (path, X-User-Id
 //   header, multipart parts "trade" + "datFile", data.trade.id and data.checkerContext.taskId in the response) and
 //   the checker's approve / reject of a task (path, a JSON body or none, { code, status: 'SUCCESS', data: <the trade> } in the
 //   response) are like the real ones, and so is the status LIVE of an approved trade in the blotter. The body of
 //   trigger-event and the rule that the submitter cannot decide on the own task are this mock's
-//   own. The two risk calculation requests (POST trades/<id>/calculate-risk before a cancellation, POST
-//   trades/calculate-risk-for-new before a new trade is booked) have the real paths; that the page sends them
+//   own. The two risk calculation requests (POST trades/<id>/calculate-risk before a cancellation or an early
+//   termination, POST trades/calculate-risk-for-new before a new trade is booked) have the real paths; that the page sends them
 //   without a body, what it does with the answer and the answer itself are this mock's own. Started with
 //   MOCK_RISK_ENGINE=down the mock answers them with 503, like a risk engine that is not available: a case then
 //   passes only with riskEngine "mock" in the local config. So is the rule that a cancellation needs comments (the real dialog marks them optional): it is there so
@@ -196,36 +207,43 @@ const tradesPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
 <style>body{font-family:system-ui;margin:0}header{display:flex;justify-content:space-between;align-items:center;padding:10px 24px;border-bottom:1px solid #ddd}
 .actions{display:flex;gap:8px}sc-button{display:inline-block}table{border-collapse:collapse;margin:8px 24px 24px;font-size:13px}td,th{padding:6px 12px;border-bottom:1px solid #eee;text-align:left}
 h3{margin:24px 24px 0}.search{margin:16px 24px 0}.row{display:flex;align-items:center;gap:16px;margin-bottom:14px}.row>label{width:90px;font-size:13px}
-#err{color:#b91c1c;font-size:13px;margin:8px 0}#rowmenu{position:fixed;z-index:9;background:#fff;border:1px solid #ccc;box-shadow:0 2px 8px #0003;font-size:13px}
+#err,#dynamic-err{color:#b91c1c;font-size:13px;margin:8px 0}header nav a{font-size:14px;color:#1e3a8a}#rowmenu{position:fixed;z-index:9;background:#fff;border:1px solid #ccc;box-shadow:0 2px 8px #0003;font-size:13px}
 #rowmenu[hidden]{display:none}#rowmenu [role=menuitem]{padding:8px 16px;cursor:pointer}#rowmenu [role=menuitem]:hover{background:#e0e7ff}
 #toaster{position:fixed;right:16px;bottom:16px;list-style:none;margin:0;padding:0}#toaster li{background:#fff;border:1px solid #16a34a;border-radius:8px;padding:10px 16px;margin-top:8px;font-size:13px;box-shadow:0 2px 8px #0003}</style></head>
 <body><header data-testid="layout-topnav-container"><b>OREO 0.2.17</b>
+<nav><a data-testid="nav-trades-tab" href="/trades">Trades</a></nav>
 <div class="actions">
   <sc-button data-testid="layout-new-trade-btn">+ New Trade</sc-button>
   <sc-button data-testid="layout-ai-reader-btn">+ AI Reader</sc-button>
   <sc-button data-testid="layout-theme-toggle-btn" title="Switch to dark mode">Dark</sc-button>
   <sc-button class="relative" data-testid="layout-user-menu-btn"><span class="hidden sm:inline" id="uname"></span></sc-button>
 </div></header>
-<!-- mock testid -->
-<div class="search"><sc-text-input data-testid="trade-portal-search-input" placeholder="Search by Trade ID..."></sc-text-input></div>
+<div class="search"><sc-text-input data-testid="transaction-search-input" placeholder="Search by Trade ID..."></sc-text-input></div>
 <h3>Validation Blotter</h3>
 <table><thead><tr><th>Trade ID</th><th>Product ID</th><th>Portfolio</th><th>Deal Date</th><th>Currency</th></tr></thead>
 <tbody><tr><td>TRD-MOCK-0001</td><td>FX_TRF</td><td>ABS_EQF</td><td>10/07/2026</td><td>USDJPY</td></tr></tbody></table>
-<h3>All Trades</h3>
-<!-- mock testid -->
-<div data-testid="trade-portal-all-trades-blotter">
-<table><thead><tr><th>Trade ID</th><th>Product ID</th><th>Counterparty</th><th>Status</th><th>Event Status</th></tr></thead><tbody></tbody></table></div>
+<h3>New Today</h3>
+<div data-testid="blotter-table-new-today">
+<table><thead><tr><th data-col="id">Trade ID</th><th data-col="productId">Product ID</th><th data-col="counterpartyName">Counterparty</th><th data-col="status">Status</th><th data-col="eventStatus">Event Status</th></tr></thead><tbody></tbody></table></div>
 <!-- the action menu of a row: opens on a right-click -->
 <div id="rowmenu" role="menu" hidden>
   <div role="menuitem">View Details</div>
   <div role="menuitem" data-testid="trade-row-action-cancellation">Cancellation</div>
-  <!-- mock testids -->
-  <div role="menuitem" data-testid="checker-action-approve-btn">Approve</div>
-  <div role="menuitem" data-testid="checker-action-reject-btn">Reject</div>
+  <div role="menuitem" data-testid="trade-row-action-earlytermination">Early Termination</div>
+  <div role="menuitem" data-testid="trade-row-action-approve">Approve</div>
+  <div role="menuitem" data-testid="trade-row-action-reject">Reject</div>
 </div>
-<!-- mock testids -->
 <sc-modal data-testid="checker-action-dialog" hidden><div slot="header"><h2 id="decision-title"></h2></div>
-  <div><sc-button data-testid="checker-action-confirm-btn">Confirm</sc-button></div></sc-modal>
+  <div><sc-button data-testid="checker-action-dialog-cancel-btn">Cancel</sc-button>
+    <sc-button data-testid="checker-action-dialog-confirm-btn">Confirm</sc-button></div></sc-modal>
+<!-- the form of a lifecycle event; only the early termination's fields -->
+<sc-modal data-testid="dynamic-action-dialog" hidden><div slot="header"><h2>Early Termination</h2><p id="dynamic-trade"></p></div>
+  <div><div class="row"><label>Direction *</label><sc-select data-testid="dynamic-action-direction-select" options="Pay|Receive"></sc-select></div>
+    <div class="row"><label>Amount *</label><sc-text-input data-testid="dynamic-action-amount-input"></sc-text-input></div>
+    <div class="row"><label>Currency *</label><sc-text-input data-testid="dynamic-action-ccy-input"></sc-text-input></div>
+    <div id="dynamic-err"></div>
+    <sc-button data-testid="dynamic-action-cancel-btn">Cancel</sc-button>
+    <sc-button data-testid="dynamic-action-confirm-btn">Confirm</sc-button></div></sc-modal>
 <sc-modal data-testid="trade-change-confirmation-dialog" hidden><div slot="header"><h2>Confirm Trade Changes</h2>
   <p>Review the changes and risk impact before saving</p></div>
   <div><h2>Updated Risk Calculation</h2>
@@ -243,24 +261,35 @@ const $ = (id) => document.querySelector('[data-testid=' + id + ']');
 $('layout-new-trade-btn').addEventListener('click', () => { location.href = '/trades/new'; });
 
 const api = (path, init) => fetch(path, { ...init, headers: { 'X-User-Id': email } });
-const search = $('trade-portal-search-input'), tbody = $('trade-portal-all-trades-blotter').querySelector('tbody');
+const search = $('transaction-search-input'), tbody = $('blotter-table-new-today').querySelector('tbody');
 const menu = document.getElementById('rowmenu'), cancelEntry = $('trade-row-action-cancellation');
+const terminateEntry = $('trade-row-action-earlytermination');
 const dialog = $('trade-change-confirmation-dialog'), err = document.getElementById('err');
 const reason = $('trade-change-reason-select'), comments = $('trade-change-comments-textarea');
-const approveEntry = $('checker-action-approve-btn'), rejectEntry = $('checker-action-reject-btn');
+const approveEntry = $('trade-row-action-approve'), rejectEntry = $('trade-row-action-reject');
 const checkerDialog = $('checker-action-dialog');
-let trades = [], current = null, decision = '';
+const eventDialog = $('dynamic-action-dialog'), eventErr = document.getElementById('dynamic-err');
+const direction = $('dynamic-action-direction-select'), amount = $('dynamic-action-amount-input'), ccy = $('dynamic-action-ccy-input');
+// change: what the trade change confirmation sends to trigger-event, besides the trade ID, the reason and the comments
+let trades = [], current = null, decision = '', change = null;
+// already on the trade portal: the nav tab does not reload the page
+$('nav-trades-tab').addEventListener('click', (e) => e.preventDefault());
 
 function render() {
   const q = search.value.trim().toLowerCase();
   tbody.innerHTML = '';
   for (const t of trades.filter((x) => x.id.toLowerCase().includes(q))) {
     const tr = document.createElement('tr');
-    for (const v of [t.id, t.productId, t.counterparty, t.status, t.eventStatus]) tr.appendChild(Object.assign(document.createElement('td'), { textContent: v }));
+    tr.setAttribute('data-testid', 'new-today-row');
+    for (const [col, v] of [['id', t.id], ['productId', t.productId], ['counterpartyName', t.counterparty], ['status', t.status], ['eventStatus', t.eventStatus]]) {
+      const td = Object.assign(document.createElement('td'), { textContent: v });
+      td.setAttribute('data-col', col);
+      tr.appendChild(td);
+    }
     tr.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       current = t;
-      cancelEntry.hidden = t.status !== 'LIVE'; // only a live trade can be cancelled
+      cancelEntry.hidden = terminateEntry.hidden = t.status !== 'LIVE'; // only a live trade can be cancelled or terminated
       approveEntry.hidden = rejectEntry.hidden = !t.taskId; // only a trade with an open approval task can be decided on
       menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
       menu.hidden = false;
@@ -276,7 +305,7 @@ document.addEventListener('mousedown', (e) => { if (!menu.contains(e.target)) me
 // Like Sonner: one <li> per toast, its texts in [data-title] and [data-description], gone after a few seconds
 function toast(type, title, description) {
   const li = document.createElement('li');
-  li.setAttribute('data-sonner-toast', ''); li.setAttribute('data-type', type);
+  li.setAttribute('data-testid', 'toast-notification-item'); li.setAttribute('data-sonner-toast', ''); li.setAttribute('data-type', type);
   li.innerHTML = '<div data-content><div data-title></div><div data-description></div></div>';
   li.querySelector('[data-title]').textContent = title;
   li.querySelector('[data-description]').textContent = description;
@@ -284,13 +313,28 @@ function toast(type, title, description) {
   setTimeout(() => li.remove(), 5000);
 }
 
-cancelEntry.addEventListener('click', async () => {
-  menu.hidden = true;
+// The risk calculation runs before the trade change confirmation: without its answer the dialog does not open
+async function confirmAfterRisk(event) {
   reason.reset(); comments.value = ''; err.textContent = '';
-  // the risk calculation runs before the confirmation dialog: without its answer the dialog does not open
   const r = await api('/api/v1/trades/' + current.id + '/calculate-risk', { method: 'POST' });
-  if (!r.ok) { toast('error', 'Error', 'Risk calculation failed'); return; }
+  if (!r.ok) { toast('error', 'Error', 'Risk calculation failed'); return false; }
+  change = event;
   dialog.hidden = false;
+  return true;
+}
+cancelEntry.addEventListener('click', () => { menu.hidden = true; confirmAfterRisk({ event: 'CANCEL' }); });
+terminateEntry.addEventListener('click', () => {
+  menu.hidden = true;
+  direction.reset(); amount.value = ''; ccy.value = ''; eventErr.textContent = '';
+  document.getElementById('dynamic-trade').textContent = current.id;
+  eventDialog.hidden = false;
+});
+$('dynamic-action-cancel-btn').addEventListener('click', () => { eventDialog.hidden = true; });
+$('dynamic-action-confirm-btn').addEventListener('click', async () => {
+  const e = { event: 'EarlyTermination', direction: direction.value, amount: amount.value.trim(), ccy: ccy.value.trim() };
+  // this mock's own rule: all three are needed, so a case whose values did not reach the controls stops here
+  if (!e.direction || !e.amount || !e.ccy) { eventErr.textContent = 'Direction, amount and currency are required'; return; }
+  if (await confirmAfterRisk(e)) eventDialog.hidden = true;
 });
 for (const [entry, what] of [[approveEntry, 'approve'], [rejectEntry, 'reject']]) {
   entry.addEventListener('click', () => {
@@ -300,7 +344,8 @@ for (const [entry, what] of [[approveEntry, 'approve'], [rejectEntry, 'reject']]
     checkerDialog.hidden = false;
   });
 }
-$('checker-action-confirm-btn').addEventListener('click', async () => {
+$('checker-action-dialog-cancel-btn').addEventListener('click', () => { checkerDialog.hidden = true; });
+$('checker-action-dialog-confirm-btn').addEventListener('click', async () => {
   const r = await fetch('/api/v1/checker/tasks/' + current.taskId + '/' + decision,
     { method: 'POST', headers: { 'X-User-Id': email, 'content-type': 'application/json' }, body: '{}' });
   const body = await r.json();
@@ -311,11 +356,11 @@ $('checker-action-confirm-btn').addEventListener('click', async () => {
 });
 $('trade-change-confirm-btn').addEventListener('click', async () => {
   const r = await api('/api/v1/trades/trigger-event', { method: 'POST',
-    body: JSON.stringify({ tradeId: current.id, event: 'CANCEL', reason: reason.value, comments: comments.value }) });
+    body: JSON.stringify({ tradeId: current.id, ...change, reason: reason.value, comments: comments.value }) });
   const body = await r.json();
   if (!r.ok) { err.textContent = body.message; return; }
   dialog.hidden = true;
-  toast('success', 'Success', 'Cancellation completed successfully');
+  toast('success', 'Success', (change.event === 'CANCEL' ? 'Cancellation' : change.event) + ' completed successfully');
   load();
 });
 </script></body></html>`;
@@ -325,7 +370,7 @@ const pageHead = `<!doctype html><html lang="en"><head><meta charset="utf-8"><ti
 .row{display:flex;align-items:center;gap:16px;margin-bottom:14px}.row>label:first-child{width:150px;font-size:13px}sc-button{display:inline-block}
 #err{color:#b91c1c;font-size:13px;margin:8px 0}.overlay{position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center}
 .overlay[hidden]{display:none}.box{background:#fff;padding:24px;border-radius:8px;width:360px}.card{border:1px solid #ddd;border-radius:8px;padding:16px;font-size:14px}</style></head>
-<body><header data-testid="layout-topnav-container"><b>OREO 0.2.17</b></header>
+<body><header data-testid="layout-topnav-container"><b>OREO 0.2.17</b> <a data-testid="nav-trades-tab" href="/trades">Trades</a></header>
 <script>if (!sessionStorage.getItem('user')) location.href = '/login';</script>`;
 
 const COUNTERPARTIES = '10 AM NY|10 AM JAK|MOCK BANK A|MOCK BANK B|MOCK CORP C';
@@ -588,6 +633,14 @@ http.createServer((req, res) => {
     return readBody((body) => {
       const e = JSON.parse(body || '{}'), t = TRADES[e.tradeId];
       if (!t) return json(res, 404, { message: 'Trade not found' });
+      if (e.event === 'EarlyTermination') {
+        if (t.status !== 'LIVE') return json(res, 409, { message: 'Only a live trade can be terminated' });
+        if (!e.direction || !e.amount || !e.ccy) return json(res, 400, { message: 'Direction, amount and currency are required' });
+        // done at once, without a checker: the Java case checks DEAD / Terminated right after the event
+        Object.assign(t, { status: 'DEAD', eventStatus: 'Terminated', earlyTermination: { direction: e.direction, amount: e.amount, ccy: e.ccy } });
+        return json(res, 200, { code: 200, status: 'SUCCESS', msg: 'EarlyTermination completed successfully', data: { trade: t } });
+      }
+      if (e.event !== undefined && e.event !== 'CANCEL') return json(res, 400, { message: 'Unknown event ' + e.event });
       if (t.status !== 'LIVE') return json(res, 409, { message: 'Only a live trade can be cancelled' });
       if (!e.reason || !e.comments) return json(res, 400, { message: 'Reason and comments are required' });
       const taskId = 'CHK-' + Date.now() + Math.random().toString(16).slice(2, 10).toUpperCase();
