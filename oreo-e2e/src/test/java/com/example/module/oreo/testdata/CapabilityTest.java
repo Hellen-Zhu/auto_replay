@@ -13,8 +13,17 @@ public class CapabilityTest {
 
     @Test
     public void tagNamesFollowThePlaywrightRegistry() {
-        assertEquals(List.of("create", "stepInFull", "stepInPartial", "earlyTermination"),
-                Arrays.stream(Capability.values()).map(Capability::tagName).toList());
+        assertEquals("create", Capability.CREATE.tagName());
+        assertEquals("stepInFull", Capability.STEP_IN_FULL.tagName());
+        assertEquals("stepInPartial", Capability.STEP_IN_PARTIAL.tagName());
+        assertEquals("earlyTermination", Capability.EARLY_TERMINATION.tagName());
+    }
+
+    @Test
+    public void tagNamesAreDistinctLowerCamelCase() {
+        List<String> names = Arrays.stream(Capability.values()).map(Capability::tagName).toList();
+        assertEquals(names.size(), names.stream().distinct().count());
+        names.forEach(n -> assertTrue(n, n.matches("[a-z][A-Za-z0-9]*")));
     }
 
     @Test

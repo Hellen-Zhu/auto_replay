@@ -4,33 +4,40 @@ import org.junit.Test;
 
 import java.util.List;
 
-import static com.example.module.oreo.testdata.ProductDatFiles.FX_OPT;
-import static com.example.module.oreo.testdata.ProductDatFiles.FX_PSCRIPT;
-import static com.example.module.oreo.testdata.ProductDatFiles.FX_PSCRIPT_FSKO;
-import static com.example.module.oreo.testdata.ProductDatFiles.FX_PSCRIPT_TRF;
 import static com.example.module.oreo.testdata.ProductDatFiles.FX_TRF;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+/** Properties of the registry that hold whatever products and capabilities it lists: onboarding edits no test. */
 public class ProductDatFilesTest {
 
-    private static final List<ProductDatFiles> FOUR = List.of(FX_TRF, FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF);
-
     @Test
-    public void withKeepsRegistryOrder() {
-        assertEquals(FOUR, ProductDatFiles.with(Capability.CREATE));
-    }
-
-    @Test
-    public void everyCapabilityHasTheFourProductsToday() {
+    public void withHasExactlyTheProductsOfTheCapability() {
         for (Capability c : Capability.values()) {
-            assertEquals(c.tagName(), FOUR, ProductDatFiles.with(c));
+            for (ProductDatFiles p : ProductDatFiles.values()) {
+                assertEquals(c + " / " + p, p.capabilities().contains(c), ProductDatFiles.with(c).contains(p));
+            }
         }
     }
 
     @Test
-    public void fxOptSupportsNothing() {
-        assertTrue(FX_OPT.capabilities().isEmpty());
+    public void withKeepsRegistryOrder() {
+        for (Capability c : Capability.values()) {
+            List<ProductDatFiles> products = ProductDatFiles.with(c);
+            for (int i = 1; i < products.size(); i++) {
+                assertTrue(c + ": " + products, products.get(i - 1).ordinal() < products.get(i).ordinal());
+            }
+        }
+    }
+
+    @Test
+    public void everyProductWithACapabilityHasItsDatFile() {
+        for (ProductDatFiles p : ProductDatFiles.values()) {
+            if (p.capabilities().isEmpty()) continue;
+            assertNotNull(p + " has capabilities but no dat file " + p.path(),
+                    Thread.currentThread().getContextClassLoader().getResource(p.path()));
+        }
     }
 
     @Test(expected = UnsupportedOperationException.class)
