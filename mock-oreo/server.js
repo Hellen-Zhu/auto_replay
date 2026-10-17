@@ -204,7 +204,7 @@ h3{margin:24px 24px 0}.search{margin:16px 24px 0}.row{display:flex;align-items:c
 <div class="search"><sc-text-input data-testid="trade-portal-search-input" placeholder="Search by Trade ID..."></sc-text-input></div>
 <h3>Validation Blotter</h3>
 <table><thead><tr><th>Trade ID</th><th>Product ID</th><th>Portfolio</th><th>Deal Date</th><th>Currency</th></tr></thead>
-<tbody><tr><td>TRD-1791369475907O6B14DDE</td><td>FX_TRF</td><td>ABS_CR_UK_ETFBB</td><td>10/07/2026</td><td>USDJPY</td></tr></tbody></table>
+<tbody><tr><td>TRD-MOCK-0001</td><td>FX_TRF</td><td>ABS_EQF</td><td>10/07/2026</td><td>USDJPY</td></tr></tbody></table>
 <h3>All Trades</h3>
 <!-- mock testid -->
 <div data-testid="trade-portal-all-trades-blotter">
