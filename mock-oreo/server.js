@@ -41,6 +41,9 @@
 //   on the pages is this mock's own);
 // - POST /api/v1/blotter/trades: path and method are real (the Java E2E steps wait for its response after the login,
 //   the booking and a refresh); the Trades page loads its rows with it; its body and answer are this mock's own;
+// - the trade detail page has the elements the Java UI creation cases check after the booking (header card, status
+//   badge with the status in an sl-badge inside, basic info card, risk metrics, instrument and schedule sections,
+//   history events and audit trail cards): their testids are real, what they show is this mock's own;
 // - for the Java API cases (oreo-e2e): a create request through the API is answered with the response that case
 //   recorded (oreo-e2e/src/test/resources/data/api/expected/trade_creation/, read at start, patch files applied;
 //   the case from the product and the udf entry stepInType), its placeholders filled in and this trade's IDs and
@@ -386,6 +389,13 @@ $('trade-change-confirm-btn').addEventListener('click', async () => {
 const tradeDetailPage = `${pageHead}
 <main data-testid="trade-detail-container"><h3>Trade Detail</h3>
 <div class="card" data-testid="trade-detail-header-card">Loading...</div>
+<div class="card" data-testid="trade-detail-status-badge">Status <sl-badge></sl-badge></div>
+<div class="card" data-testid="trade-detail-basic-info-card">Basic info <span></span></div>
+<div class="card" data-testid="trade-detail-risk-metrics-section">Risk metrics</div>
+<div class="card" data-testid="trade-detail-instrument-section">Instrument</div>
+<div class="card" data-testid="trade-detail-schedule-section">Schedule</div>
+<div class="card" data-testid="trade-detail-history-events-card">History events</div>
+<div class="card" data-testid="trade-detail-audit-trail-card">Audit trail</div>
 <script>
 // simulate async loading of the trade
 setTimeout(async () => {
@@ -397,6 +407,9 @@ setTimeout(async () => {
   card.querySelector('b').textContent = t.id;
   card.querySelector('span').textContent = [t.productId, t.counterparty, t.portfolio, t.direction,
     t.stepIn ? 'StepIn ' + t.stepIn + ' from ' + t.oldCounterparty : '', t.status].filter(Boolean).join(' · ');
+  document.querySelector('[data-testid=trade-detail-status-badge] sl-badge').textContent = t.status;
+  document.querySelector('[data-testid=trade-detail-basic-info-card] span').textContent =
+    [t.counterparty, t.portfolio, t.direction].filter(Boolean).join(' · ');
 }, 300);
 </script></main></body></html>`;
 
