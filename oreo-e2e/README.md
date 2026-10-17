@@ -29,6 +29,7 @@ there so the tree matches; copy the real file over them from the E2E project.
 ```
 pom.xml, .gitignore
 .gitattributes, .mcp.json, azure-pipelines-maven.yml, .claude/, docs/   placeholders
+.claude/skills/onboarding-e2e-product/, migrating-legacy-event-data/   skills: a new product, an event still in YAML
 src/main/java/com/example/module/oreo/
   OreoModule.java, OreoModuleConfiguration.java   transcribed from the E2E project
   glue/ScenarioContext.java       transcribed from the E2E project
@@ -63,10 +64,13 @@ src/test/java/com/example/module/oreo/
   testdata/*Test.java, FeatureCases.java, CaseDataLookup.java   unit tests, offline checks, case lookup
   testdata/FeatureFile.java       a feature file parsed once: blocks, tags, Examples tables
   testdata/ProductExamples.java, SyncProductExamples.java   the product Outlines' Examples, from the registry
+  testdata/LegacyData, Layering, LegacyMigration, MigrateLegacyData, LegacyEquivalenceTest
+                                  the migration of the old YAML ("An event still in YAML"); removed at its end
 src/test/resources/
   data/api/, data/ui/, data/setup/   the test data ("Test data")
   data/common.json                left from an earlier design; nothing reads it (kept on purpose)
   testdata-fixtures/data/         small data files for the loader's unit tests
+  testdata-fixtures/legacy/       old YAML and features from this repository's history, for the migration's tests
   data/<PRODUCT ID>.dat           placeholders: FX_PSCRIPT, FX_PSCRIPT_FSKO, FX_PSCRIPT_TRF, FX_TRF
   elements/components|pages/*.json       the files the replay project has (../elements/) copied; the others []
   features/ui/trading/            trade_creation.feature, trade_early_termination.feature, as in the E2E project
@@ -247,6 +251,18 @@ mvn test -Dtest=CaseDataLookup -Doreo.case=TC-TRADE-CREATION-FX_PSCRIPT_TRF-API-
 Prints the merged data of one case: the applied layers, the request, the `dynamicFields`, the `expectedBase`, the
 expected file (full, or patch on which base) and the expected response in full.
 
+```bash
+mvn test -Dtest=MigrateLegacyData -Doreo.migrate=setup                  # once, first
+mvn test -Dtest=MigrateLegacyData -Doreo.migrate=all                    # the inventory: plans only
+mvn test -Dtest=MigrateLegacyData -Doreo.migrate=trade_cancellation     # one feature
+```
+
+Migrates the old YAML under `data/` (only on the company machine, while the YAML is there) to the files above: the
+setup payloads, or one feature file's event files and expected files. It prints the plan and writes only with
+`-Doreo.migrate.write=true`, never while the plan has a stop. Per feature: plan, write, review, `SyncProductExamples`,
+`CompactExpectedFiles` (API), the offline tests (which include `LegacyEquivalenceTest`: each case gets the request its
+old key gave), commit. See "An event still in YAML" below.
+
 The offline tests are JUnit 4. Should `mvn test -Dtest=TestDataValidationTest` report no tests (a JUnit Platform
 without the vintage engine), add `org.junit.vintage:junit-vintage-engine` in test scope.
 
@@ -261,3 +277,5 @@ without the vintage engine), add `org.junit.vintage:junit-vintage-engine` in tes
 | A field turns out dynamic | its rule in the event file (`defaults` or `byProduct`), then record again |
 | Change the default counterparty | `api/common.json`, `ui/common.json`, `setup/trade-create*.json` (three places, on purpose); record the API cases again |
 | New setup payload | `data/setup/<what-it-prepares>.json`, referenced by that name |
+| An event still in YAML | `MigrateLegacyData` (setup once, then one feature at a time) and the review of what it writes. The skill `.claude/skills/migrating-legacy-event-data` walks through it; spec `docs/superpowers/specs/2026-10-17-oreo-e2e-legacy-data-migration-design.md` |
+| End of the migration | when `-Doreo.migrate=all` prints `0 to migrate, 0 stopped`: remove the YAML files, `LegacyData`, `Layering`, `LegacyMigration`, `MigrateLegacyData`, `LegacyEquivalenceTest`, their tests, `testdata-fixtures/legacy/` and the skill, and these two rows; then the first real recording of the migrated API events (`OREO_EXPECTED=update`, compact, review) |
