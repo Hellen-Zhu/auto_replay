@@ -431,6 +431,27 @@ public class TestDataValidationTest {
         while (m.find()) out.add(m.group(1));
     }
 
+    // ── 10.8 ─────────────────────────────────────────────────────────────────
+
+    /** Each product Outline's Examples are the products of its capability tag (ProductExamples). */
+    @Test
+    public void productExamplesMatchTheRegistry() {
+        ProductExamples.Plan plan = ProductExamples.plan(project.resolve("src/test/resources/features"),
+                ProductExamples::registryProducts);
+        List<String> errors = new ArrayList<>(plan.errors());
+        for (ProductExamples.Entry entry : plan.entries()) {
+            if (entry.changed()) {
+                errors.add(entry.file() + " " + entry.rowId() + ": " + entry.note()
+                        + "; run mvn test -Dtest=SyncProductExamples -Doreo.sync=all");
+            }
+        }
+        if (!plan.warnings().isEmpty()) {
+            System.out.println("[TestDataValidation] " + plan.warnings().size() + " capability warning(s):");
+            plan.warnings().forEach(w -> System.out.println("  [warn] " + w));
+        }
+        failOn(errors);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static List<Path> jsonFiles(Path dir) throws IOException {
