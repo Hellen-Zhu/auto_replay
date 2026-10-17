@@ -27,7 +27,7 @@
 //   real; that it stays in this blotter is this mock's own). The "udf" list of a StepIn trade is accepted and ignored;
 // - API, served under /api/v1 (so apiBaseUrl for the mock is http://localhost:4173/api/v1): create (path, X-User-Id
 //   header, multipart parts "trade" + "datFile", data.trade.id and data.checkerContext.taskId in the response) and
-//   the checker's approve / reject of a task (path, JSON body, { code, status: 'SUCCESS', data: <the trade> } in the
+//   the checker's approve / reject of a task (path, a JSON body or none, { code, status: 'SUCCESS', data: <the trade> } in the
 //   response) are like the real ones, and so is the status LIVE of an approved trade in the blotter. The body of
 //   trigger-event and the rule that the submitter cannot decide on the own task are this mock's
 //   own. The two risk calculation requests (POST trades/<id>/calculate-risk before a cancellation, POST
@@ -565,11 +565,12 @@ http.createServer((req, res) => {
       ? json(res, 503, { code: 503, status: 'ERROR', msg: 'Risk engine is not available' })
       : json(res, 200, { code: 200, status: 'SUCCESS', msg: '', data: { calculationTimestamp: new Date().toISOString(), pnl: -1, riskEngine: 'mock-oreo' } })), 400);
   }
-  // The checker decides on a task, i.e. on a new trade or on a cancellation. The request has a JSON body
+  // The checker decides on a task, i.e. on a new trade or on a cancellation. The request has a JSON body or none (the
+  // Java steps send none, with Content-Type application/json)
   const decide = req.method === 'POST' && req.url.match(/^\/api\/v1\/checker\/tasks\/([^/]+)\/(approve|reject)$/);
   if (decide) {
     return readBody((body) => {
-      try { JSON.parse(body); } catch { return json(res, 400, { message: 'The request body must be JSON' }); }
+      if (body.trim()) { try { JSON.parse(body); } catch { return json(res, 400, { message: 'The request body must be JSON' }); } }
       const task = TASKS[decide[1]];
       if (!task) return json(res, 404, { message: 'Task not found' });
       if (task.submittedBy === caller) return json(res, 403, { message: 'A task cannot be decided by the user who submitted it' });
