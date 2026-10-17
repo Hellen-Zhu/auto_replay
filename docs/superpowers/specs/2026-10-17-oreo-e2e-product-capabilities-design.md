@@ -124,7 +124,8 @@ row per product of its capability. Nothing else in the file changes:
 - the file's line separator (LF or CRLF) and its final newline are kept; files are read and written as UTF-8;
 - a file whose text does not change is not rewritten, so a second run changes nothing.
 
-It prints one line per Outline: `<feature file> <row ID>: unchanged` or `... : +FX_X -FX_Y` (or `reordered`).
+It prints one line per Outline: `<feature file> <row ID>: <note>`, the note being `unchanged`, `add FX_X`,
+`remove FX_Y` (or both, `add FX_X, remove FX_Y`), `reordered` or `reformatted` (same products, other padding).
 
 ### 5.2 What stops it (nothing is written)
 
@@ -146,8 +147,8 @@ New in `TestDataValidationTest` (check 8 of section 10 of the test data design):
 without writing.
 
 - Any error of 5.2 fails the check.
-- A planned change fails the check too, one line per Outline (`<file> <row ID>: add FX_X, remove FX_Y` or `rows out of
-  registry order`), ending with the tool's command. A difference is a coverage difference: the run would test a product
+- A planned change fails the check too, one line per Outline (`<file> <row ID>: <note>` as in 5.1), ending with the
+  tool's command. A difference is a coverage difference: the run would test a product
   the registry says does not support the scenario, or skip one it says does. (The compaction check only warns: a file
   that is not compacted still checks the same thing.)
 - A `Capability` that no Outline carries is printed as a warning (`[warn] capability X: no Outline tests it`); it is
@@ -164,7 +165,7 @@ without writing.
 | `src/test/.../testdata/ProductExamples.java` | new: `plan(featuresRoot)` / `write(plan)` with records `Entry` and `Plan`, as `ExpectedCompaction` |
 | `src/test/.../testdata/SyncProductExamples.java` | new: the tool (5) |
 | `src/test/.../testdata/TestDataValidationTest.java` | `productExamplesMatchTheRegistry` (6) |
-| tests | `CapabilityTest`, `ProductDatFilesTest` (`with` order, unmodifiable set), `FeatureFileTest`, `ProductExamplesTest` (every error of 5.2, padding, CRLF kept, idempotence, nothing written on error), fixtures under `testdata-fixtures/features/` |
+| tests | `CapabilityTest`, `ProductDatFilesTest` (`with` order, unmodifiable set), `FeatureFileTest`, `ProductExamplesTest` (every error of 5.2, padding, CRLF kept, idempotence, nothing written on error), feature texts written to a `TemporaryFolder` as `FeatureCasesTest` does |
 | the 7 Outlines | their capability tag; rows in registry order (written by the tool, checked by reading the plan here) |
 | `.claude/skills/onboarding-e2e-product/SKILL.md` | QA answers per capability; the change is the registry line, the dat file, the tool |
 | `README.md`, `docs/handover-notes.md` | "Products and capabilities" in "Test data"; the Maintenance rows "New product" and "New event"; the tool under Commands |
