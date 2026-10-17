@@ -1,6 +1,6 @@
 # oreo-e2e: migrating the remaining events' test data
 
-Status: draft for the user's review, 2026-10-17.
+Status: approved by the user on 2026-10-17. Plan: `docs/superpowers/plans/2026-10-17-oreo-e2e-legacy-data-migration.md`.
 Scope: `oreo-e2e/` (Java + Cucumber) only. Builds on `2026-10-16-oreo-e2e-test-data-design.md` (the mechanism, "the
 test data design" below) and `2026-10-17-oreo-e2e-product-capabilities-design.md` (capability tags).
 
