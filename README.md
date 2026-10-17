@@ -68,7 +68,7 @@ npx tsc -p .                      # type check
 - Before the first run: copy the dat files to `testdata/dat/<PRODUCT>/<PRODUCT>.dat` (variants of a product go into the same folder under their own names) and run `npm run sync:elements -- <E2E project>`. A case whose dat file is missing is skipped.
 - **Genie report** (the company's Playwright report): `npm install genie-playwright -D` on a machine with the company npm mirror. `playwright.config.ts` adds the reporter by itself once the package is installed (display name `OREO UAT Replay`, labels `playwright`, `oreo-uat`), next to the list and HTML reports; without it nothing changes. It does not affect the case export.
 - Cases do not depend on each other, so they can run side by side. On the real system every case logs in with the same account: start with 2 or 3 workers.
-- To try without the real system: `npm run mock`, then `baseUrl` = `http://localhost:4173`, `apiBaseUrl` = `http://localhost:4173/api/v1`, maker password `maker1`. `MOCK_RISK_ENGINE=down npm run mock` makes its risk calculation fail, to see what `riskEngine` does.
+- To try without the real system: `npm run mock`, then `baseUrl` = `http://localhost:4173`, `apiBaseUrl` = `http://localhost:4173/api/v1`, maker and checker password `admin`. `MOCK_RISK_ENGINE=down npm run mock` makes its risk calculation fail, to see what `riskEngine` does.
 
 ## The cases
 

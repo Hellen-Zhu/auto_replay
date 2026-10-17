@@ -53,9 +53,9 @@ const fs = require('fs');
 const path = require('path');
 const PORT = Number(process.env.PORT || 4173);
 const PREFERENCES = {};
-const USERS = { 'maker@test.com': { pwd: 'maker1', name: 'maker' }, 'checker@test.com': { pwd: 'checker1', name: 'checker' },
+const USERS = { 'maker@test.com': { pwd: 'admin', name: 'maker' }, 'checker@test.com': { pwd: 'admin', name: 'checker' },
   // the accounts of the Java E2E cases (oreo-e2e)
-  'maker@example.com': { pwd: 'maker1', name: 'maker' }, 'checker@example.com': { pwd: 'checker1', name: 'checker' } };
+  'maker@example.com': { pwd: 'admin', name: 'maker' }, 'checker@example.com': { pwd: 'admin', name: 'checker' } };
 
 const components = `
 <script>
@@ -586,4 +586,4 @@ http.createServer((req, res) => {
   const html = url === '/' ? rootPage : url === '/trades/new' ? newTradePage : url.startsWith('/trades/') ? tradeDetailPage : url.startsWith('/trades') ? tradesPage : loginPage;
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
   res.end(html);
-}).listen(PORT, () => console.log(`Mock OREO started: http://localhost:${PORT}  (account maker@test.com / maker1)`));
+}).listen(PORT, () => console.log(`Mock OREO started: http://localhost:${PORT}  (account maker@test.com / admin)`));
