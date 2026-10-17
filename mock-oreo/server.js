@@ -44,6 +44,8 @@
 // - the trade detail page has the elements the Java UI creation cases check after the booking (header card, status
 //   badge with the status in an sl-badge inside, basic info card, risk metrics, instrument and schedule sections,
 //   history events and audit trail cards): their testids are real, what they show is this mock's own;
+// - after the booking the detail page opens 2 s after the create response, as a new document (the real system keeps
+//   the create response readable: the Java step reads its body after the click; a new document right away drops it);
 // - for the Java API cases (oreo-e2e): a create request through the API is answered with the response that case
 //   recorded (oreo-e2e/src/test/resources/data/api/expected/trade_creation/, read at start, patch files applied;
 //   the case from the product and the udf entry stepInType), its placeholders filled in and this trade's IDs and
@@ -382,7 +384,10 @@ $('trade-change-confirm-btn').addEventListener('click', async () => {
   const body = await r.json();
   dialog.hidden = true;
   if (!r.ok) { err.textContent = body.message; return; }
-  location.href = '/trades/' + body.data.trade.id;
+  // The detail page is a new document here, and loading it drops the response bodies of this page: a test that reads
+  // the create response after the click (the Java step does) would get "No resource with given identifier found".
+  // The real system keeps them, so the mock waits a moment before it opens the detail page.
+  setTimeout(() => { location.href = '/trades/' + body.data.trade.id; }, 2000);
 });
 </script></body></html>`;
 
