@@ -4,7 +4,7 @@ Feature: Trade Creation API
   I want to submit new trades via the API
   So that dual-authorised trades enter the live trading creation and unauthorised actions are blocked
 
-  @ADO#positive @ADO#smoke
+  @ADO#positive @ADO#smoke @capability#create
   Scenario Outline: [TC-TRADE-CREATION-<product_type>-API-001] Valid <product_type> trade submission enters Pending Approval state
     Given maker has valid data for '<product_type>' New trade submission
     When performs the Trade Creation action via api
@@ -17,7 +17,7 @@ Feature: Trade Creation API
       | FX_PSCRIPT_FSKO |
       | FX_PSCRIPT_TRF  |
 
-  @ADO#positive @ADO#regression
+  @ADO#positive @ADO#regression @capability#stepInPartial
   Scenario Outline: [TC-TRADE-CREATION-<product_type>-API-002] Valid <product_type> Step In Partial trade submission enters Pending Approval state
     Given maker has valid data for '<product_type>' StepIn Partial trade submission
     When performs the Trade Creation action via api
@@ -30,7 +30,7 @@ Feature: Trade Creation API
       | FX_PSCRIPT_FSKO |
       | FX_PSCRIPT_TRF  |
 
-  @ADO#positive @ADO#regression
+  @ADO#positive @ADO#regression @capability#stepInFull
   Scenario Outline: [TC-TRADE-CREATION-<product_type>-API-003] Valid <product_type> Step In Full trade submission enters Pending Approval state
     Given maker has valid data for '<product_type>' StepIn Full trade submission
     When performs the Trade Creation action via api

@@ -4,7 +4,7 @@ Feature: Trade Early Termination E2E
   I want to view the correct trade status after an EarlyTermination event is processed
   So that I can confirm the trade has been terminated in the system
 
-  @ADO#positive @ADO#smoke
+  @ADO#positive @ADO#smoke @capability#earlyTermination
   Scenario Outline: [TC-TRADE-EARLY-TERMINATION-<product_type>-UI-001] should able to perform EarlyTermination event for <product_type> trade successfully
     Given a Live '<product_type>' trade exists in the blotter
     And maker is logged in to the trade portal
@@ -14,7 +14,7 @@ Feature: Trade Early Termination E2E
 
     Examples:
       | product_type    |
-      | FX_PSCRIPT      |
       | FX_TRF          |
+      | FX_PSCRIPT      |
       | FX_PSCRIPT_FSKO |
       | FX_PSCRIPT_TRF  |
