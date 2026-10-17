@@ -108,7 +108,7 @@ Not every case has been run on the real system, and some were never run at all: 
 
 // testdata/trade-creation.json: values of this spec, and a row only for a case that differs
 {
-  "defaults": { "counterpartyName": "10 AM NY", "portfolioId": "CM_OIL_CRU_OPT", "direction": "Buy", "oldCounterpartyName": "10 AM JAK" },
+  "defaults": { "counterpartyName": "10 AM NY", "portfolioId": "ABS_EQF", "direction": "Buy", "oldCounterpartyName": "10 AM JAK" },
   "cases": [ { "id": "TC-...", "...": "only the values this case changes" } ]
 }
 

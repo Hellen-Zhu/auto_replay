@@ -3,7 +3,6 @@
     "given-trade"
   ],
   "defaults": {
-    "portfolioId": "CM_OIL_CRU_OPT",
     "allocationWays": "2",
     "subTrades": [
       {

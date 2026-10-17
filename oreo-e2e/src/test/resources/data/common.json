@@ -4,7 +4,7 @@
     "trade-basic": {
       "request": {
         "basic": {
-          "portfolioId": "CM_OIL_CRU_OPT",
+          "portfolioId": "ABS_EQF",
           "counterpartyFmId": "300036958",
           "counterpartyName": "10 AM NY",
           "direction": "Buy"
