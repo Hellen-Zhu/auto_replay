@@ -14,17 +14,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -45,6 +48,31 @@ final class LegacyMigration {
     private static final String OLD_UI_PORTFOLIO = "CM_OIL_CRU_OPT";
     private static final String UI_PORTFOLIO = "ABS_EQF";
     private static final String PLACEHOLDER = "${json-unit.";
+
+    /** The test data design's section 6 table, old key -> setup name. Another name for a key is a line here. */
+    static final Map<String, String> SETUP_NAMES;
+
+    static {
+        Map<String, String> names = new LinkedHashMap<>();
+        names.put("API-SETUP-TRADE-CREATE", "trade-create");
+        names.put("API-SETUP-STEPIN-PARTIAL-TRADE-CREATE", "trade-create-stepin-partial");
+        names.put("API-SETUP-STEPIN-FULL-TRADE-CREATE", "trade-create-stepin-full");
+        names.put("SETUP-USER-PREFERENCE-CONFIG-DEFAULTS", "user-preference-defaults");
+        names.put("UI-SETUP-RISK-CALC-NEW-SUCCESS", "risk-calc-success-mock");
+        names.put("UI-SETUP-RISK-CALC-PARTIAL-SUCCESS", "risk-calc-partial-success-mock");
+        names.put("API-SETUP-TRADE-CANCELLATION", "trade-cancellation");
+        names.put("UI-SETUP-AMENDMENT", "trade-amendment");
+        SETUP_NAMES = Collections.unmodifiableMap(names);
+    }
+
+    private static final Pattern SETUP_NAME = Pattern.compile("[a-z0-9][a-z0-9-]*");
+    private static final Pattern JAVA_LITERAL = Pattern.compile("\"([A-Za-z0-9._-]+)\"");
+    private static final Pattern FROM_TEST_DATA = Pattern.compile("from test data '([^']*)'");
+    private static final Pattern KNOWN_MISSING =
+            Pattern.compile("(\\s*private static final Set<String> KNOWN_MISSING = Set\\.of\\()([^)]*)(\\);.*)");
+    private static final Pattern QUOTED = Pattern.compile("\"([^\"]*)\"");
+    private static final String VALIDATION_TEST =
+            "src/test/java/com/example/module/oreo/testdata/TestDataValidationTest.java";
 
     /**
      * @param legacy  the old YAML
@@ -728,6 +756,302 @@ final class LegacyMigration {
         } finally {
             thread.setContextClassLoader(previous);
         }
+    }
+
+    // ── Setup (spec 3.7) ─────────────────────────────────────────────────────
+
+    /**
+     * @param key  the old key
+     * @param text the new file; null: {@code data/setup/<name>.json} exists with the same payload and is kept
+     */
+    record SetupFile(String key, String name, String text) {}
+
+    /** A use of an old key renamed: the file below the project, its line (from 1). */
+    record Rename(String file, int line, String oldKey, String name) {}
+
+    /**
+     * @param rewrites     file -> its whole new text (renamed uses, the KNOWN_MISSING line)
+     * @param knownMissing the names left in KNOWN_MISSING of TestDataValidationTest
+     * @param portfolios   portfolio values of the payloads, {@code <name>: <path> = <value>}
+     */
+    record SetupPlan(List<SetupFile> files, List<Rename> renames, Map<Path, String> rewrites,
+                     List<String> knownMissing, List<String> portfolios, List<String> stops) {
+
+        SetupPlan {
+            files = List.copyOf(files);
+            renames = List.copyOf(renames);
+            rewrites = Collections.unmodifiableMap(new LinkedHashMap<>(rewrites));
+            knownMissing = List.copyOf(knownMissing);
+            portfolios = List.copyOf(portfolios);
+            stops = List.copyOf(stops);
+        }
+
+        boolean stopped() {
+            return !stops.isEmpty();
+        }
+
+        /** The report of the plan, which has written nothing. */
+        String report() {
+            return report(false);
+        }
+
+        /** The report; its last line says that nothing was written unless {@code written}. */
+        String report(boolean written) {
+            StringBuilder out = new StringBuilder("setup\n");
+            files.forEach(f -> out.append("  data/setup/").append(f.name()).append(".json <- ").append(f.key())
+                    .append(f.text() == null ? " (exists with the same payload: kept)" : "").append('\n'));
+            List<String> renamed = renames.stream()
+                    .map(r -> r.file() + ":" + r.line() + " '" + r.oldKey() + "' -> '" + r.name() + "'").toList();
+            Plan.list(out, "", "uses renamed", renamed);
+            out.append("KNOWN_MISSING: ").append(knownMissing.isEmpty() ? "(empty)" : String.join(", ", knownMissing))
+                    .append('\n');
+            Plan.list(out, "", "portfolio values kept", portfolios);
+            Plan.list(out, "", "stops", stops);
+            if (!written) out.append("Plan only: nothing written.\n");
+            return out.toString();
+        }
+    }
+
+    /** The table, else the key in lower case without {@code API-SETUP-}, {@code UI-SETUP-} or {@code SETUP-}. */
+    static String setupName(String oldKey) {
+        String name = SETUP_NAMES.get(oldKey);
+        if (name != null) return name;
+        return oldKey.replaceFirst("^(API-SETUP-|UI-SETUP-|SETUP-)", "").toLowerCase(Locale.ROOT);
+    }
+
+    /** A file where an old key can be used by name: Java (a string literal) or a snippet or feature. */
+    private record UseFile(Path path, String file, boolean java) {
+
+        Pattern pattern() {
+            return java ? JAVA_LITERAL : FROM_TEST_DATA;
+        }
+
+        /** A snippet or feature line that is a tag or an annotation is not a use. */
+        boolean skips(String line) {
+            return !java && line.replace("﻿", "").strip().startsWith("@");
+        }
+    }
+
+    /**
+     * Setup keys: old keys that are not case keys and are in {@link #SETUP_NAMES} or used by name (plan decision 3).
+     * Their payloads, the renamed uses and the KNOWN_MISSING line; problems are stops.
+     */
+    static SetupPlan planSetup(Sources sources) {
+        List<String> stops = new ArrayList<>();
+        LegacyData legacy = sources.legacy();
+        List<String> oldKeys;
+        try {
+            oldKeys = legacy.keys();
+        } catch (IllegalStateException e) {
+            return new SetupPlan(List.of(), List.of(), Map.of(), List.of(), List.of(), List.of(e.getMessage()));
+        }
+        Set<String> candidates = new LinkedHashSet<>();
+        oldKeys.stream().filter(k -> !k.substring(k.lastIndexOf('.') + 1).startsWith("TC-")).forEach(candidates::add);
+
+        List<UseFile> useFiles = useFiles(sources.project());
+        Map<UseFile, String> texts = new LinkedHashMap<>();
+        Set<String> used = new LinkedHashSet<>();
+        for (UseFile useFile : useFiles) {
+            String text = read(useFile.path());
+            texts.put(useFile, text);
+            for (String line : lines(text)) {
+                if (useFile.skips(line)) continue;
+                Matcher m = useFile.pattern().matcher(line);
+                while (m.find()) {
+                    if (candidates.contains(m.group(1))) used.add(m.group(1));
+                }
+            }
+        }
+
+        Map<String, List<String>> keysByName = new LinkedHashMap<>();
+        for (String key : candidates) {
+            if (!SETUP_NAMES.containsKey(key) && !used.contains(key)) continue;
+            String name = setupName(key);
+            if (!SETUP_NAME.matcher(name).matches()) {
+                stops.add(key + ": its setup name '" + name + "' is not lower case, digits and -: add a line for it"
+                        + " to LegacyMigration.SETUP_NAMES");
+                continue;
+            }
+            keysByName.computeIfAbsent(name, n -> new ArrayList<>()).add(key);
+        }
+        keysByName.forEach((name, keys) -> {
+            if (keys.size() > 1) {
+                stops.add("the old keys " + keys + " would all become data/setup/" + name + ".json: give one of them"
+                        + " another name in LegacyMigration.SETUP_NAMES");
+            }
+        });
+
+        List<SetupFile> files = new ArrayList<>();
+        List<String> portfolios = new ArrayList<>();
+        withClasspath(sources.resources(), () -> {
+            TestDataRepository repository = new TestDataRepository("data/");
+            keysByName.forEach((name, keys) -> {
+                if (keys.size() == 1) {
+                    setupFile(sources, legacy, repository, keys.get(0), name, files, portfolios, stops);
+                }
+            });
+            return null;
+        });
+
+        Map<String, String> names = new LinkedHashMap<>();
+        files.forEach(f -> names.put(f.key(), f.name()));
+        List<Rename> renames = new ArrayList<>();
+        Map<Path, String> rewrites = new LinkedHashMap<>();
+        texts.forEach((useFile, text) -> {
+            String renamed = rename(useFile, text, names, renames);
+            if (!renamed.equals(text)) rewrites.put(useFile.path(), renamed);
+        });
+
+        List<String> knownMissing = knownMissing(sources.project().resolve(VALIDATION_TEST),
+                new LinkedHashSet<>(names.values()), rewrites, stops);
+        return new SetupPlan(files, renames, rewrites, knownMissing, portfolios, stops);
+    }
+
+    /** The planned file of one setup key: new, kept (same payload) or a stop. */
+    private static void setupFile(Sources sources, LegacyData legacy, TestDataRepository repository, String key,
+                                  String name, List<SetupFile> files, List<String> portfolios, List<String> stops) {
+        String where = key + " (" + legacy.fileOf(key) + ")";
+        LegacyData.Record entry = legacy.forKey(key);
+        if (!entry.hasRequest() && !entry.hasResponse()) {
+            stops.add(where + " has neither request nor response");
+            return;
+        }
+        ObjectNode payload = Json.MAPPER.createObjectNode();
+        for (String part : List.of("request", "response")) {
+            String text = part.equals("request") ? entry.request() : entry.response();
+            if (text == null || text.isBlank()) continue;
+            JsonNode parsed = parse(text, "the " + part + " of " + where, stops);
+            if (parsed == null) return;
+            if (!(parsed instanceof ObjectNode object)) {
+                stops.add("the " + part + " of " + where + " is not a JSON object");
+                return;
+            }
+            if (part.equals("request") && object.get("basic") instanceof ObjectNode basic) {
+                basic.remove("productId");
+            }
+            payload.set(part, object);
+        }
+        keptPortfolios(name, payload, "", portfolios);
+
+        String file = "data/setup/" + name + ".json";
+        if (!Files.exists(sources.resources().resolve(file))) {
+            ObjectNode content = Json.MAPPER.createObjectNode();
+            content.put(JsonLayers.COMMENT, "Migrated from " + where + " by MigrateLegacyData");
+            content.setAll(payload);
+            files.add(new SetupFile(key, name, Json.pretty(content)));
+            return;
+        }
+        SetupData existing;
+        try {
+            existing = repository.setup(name);
+        } catch (IllegalStateException e) {
+            stops.add(file + ": " + e.getMessage());
+            return;
+        }
+        if (Objects.equals(existing.requestNode(), payload.get("request"))
+                && Objects.equals(existing.responseNode(), payload.get("response"))) {
+            files.add(new SetupFile(key, name, null));
+        } else {
+            stops.add(file + " exists with another payload than " + where + ": compare them and decide (keep the"
+                    + " file and give the key another name in SETUP_NAMES, or delete the file to migrate it again)");
+        }
+    }
+
+    /** Java of {@code src/main/java} outside {@code testdata}, snippets of {@code src/main/resources}, features. */
+    private static List<UseFile> useFiles(Path project) {
+        List<UseFile> files = new ArrayList<>();
+        Path mainJava = project.resolve("src/main/java");
+        for (Path file : filesEndingWith(mainJava, ".java")) {
+            boolean testdata = false;
+            for (Path part : mainJava.relativize(file)) testdata |= part.toString().equals("testdata");
+            if (!testdata) files.add(new UseFile(file, slashes(project.relativize(file)), true));
+        }
+        for (Path file : filesEndingWith(project.resolve("src/main/resources"), ".snippet")) {
+            files.add(new UseFile(file, slashes(project.relativize(file)), false));
+        }
+        for (Path file : filesEndingWith(project.resolve("src/test/resources/features"), ".feature")) {
+            files.add(new UseFile(file, slashes(project.relativize(file)), false));
+        }
+        return files;
+    }
+
+    /** {@code text} with each use of a key of {@code names} renamed; line ends and a byte order mark stay. */
+    private static String rename(UseFile useFile, String text, Map<String, String> names, List<Rename> renames) {
+        StringBuilder out = new StringBuilder();
+        List<String> lines = lines(text);
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (useFile.skips(line)) {
+                out.append(line);
+                continue;
+            }
+            Matcher m = useFile.pattern().matcher(line);
+            while (m.find()) {
+                String name = names.get(m.group(1));
+                if (name == null) continue;
+                m.appendReplacement(out, Matcher.quoteReplacement(m.group().replace(m.group(1), name)));
+                renames.add(new Rename(useFile.file(), i + 1, m.group(1), name));
+            }
+            m.appendTail(out);
+        }
+        return out.toString();
+    }
+
+    /**
+     * The names of the KNOWN_MISSING line minus {@code done}; the line rewritten into {@code rewrites} when that
+     * changes it. No such line: a stop.
+     */
+    private static List<String> knownMissing(Path validationTest, Set<String> done, Map<Path, String> rewrites,
+                                             List<String> stops) {
+        if (Files.isRegularFile(validationTest)) {
+            List<String> lines = lines(read(validationTest));
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                String body = line.replaceFirst("[\r\n]+$", "");
+                Matcher m = KNOWN_MISSING.matcher(body);
+                if (!m.matches()) continue;
+                List<String> names = new ArrayList<>();
+                List<String> left = new ArrayList<>();
+                Matcher quoted = QUOTED.matcher(m.group(2));
+                while (quoted.find()) {
+                    names.add(quoted.group(1));
+                    if (!done.contains(quoted.group(1))) left.add(quoted.group(1));
+                }
+                if (!left.equals(names)) {
+                    String list = left.stream().map(n -> "\"" + n + "\"").collect(Collectors.joining(", "));
+                    lines.set(i, m.group(1) + list + m.group(3) + line.substring(body.length()));
+                    rewrites.put(validationTest, String.join("", lines));
+                }
+                return left;
+            }
+        }
+        stops.add("no KNOWN_MISSING line in " + VALIDATION_TEST);
+        return List.of();
+    }
+
+    /** Writes the planned setup files and rewrites; a stopped plan is an error and nothing is written. */
+    static void writeSetup(Sources sources, SetupPlan plan) {
+        if (plan.stopped()) {
+            throw new IllegalStateException("[LegacyMigration] setup is stopped, nothing written: " + plan.stops());
+        }
+        try {
+            for (SetupFile file : plan.files()) {
+                if (file.text() == null) continue;
+                Path path = sources.data().resolve("setup").resolve(file.name() + ".json");
+                Files.createDirectories(path.getParent());
+                Files.writeString(path, file.text(), StandardCharsets.UTF_8);
+            }
+            for (Map.Entry<Path, String> rewrite : plan.rewrites().entrySet()) {
+                Files.write(rewrite.getKey(), rewrite.getValue().getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("[LegacyMigration] cannot write the setup files", e);
+        }
+    }
+
+    /** The lines of {@code text}, each with its line end; joined they give {@code text} back. */
+    private static List<String> lines(String text) {
+        return new ArrayList<>(Arrays.asList(text.split("(?<=\n)|(?<=\r)(?!\n)", -1)));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
