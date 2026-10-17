@@ -2,7 +2,6 @@ package com.example.module.oreo.testdata;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -42,98 +41,39 @@ final class FeatureCases {
                 throw new UncheckedIOException("[FeatureCases] cannot list " + dir, e);
             }
             for (Path file : files) {
-                cases.addAll(parse(file, channelDir));
+                cases.addAll(cases(FeatureFile.read(file), channelDir));
             }
         }
         return cases;
     }
 
-    private static List<FeatureCase> parse(Path file, String channelDir) {
-        String featureName = file.getFileName().toString().replaceFirst("\\.feature$", "");
-        List<String> lines;
-        try {
-            lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("[FeatureCases] cannot read " + file, e);
-        }
+    private static List<FeatureCase> cases(FeatureFile feature, String channelDir) {
+        String featureName = feature.file().getFileName().toString().replaceFirst("\\.feature$", "");
         List<FeatureCase> cases = new ArrayList<>();
-        Scenario current = null;
-        for (String raw : lines) {
-            String line = raw.trim();
-            if (startsWithAny(line, "Scenario Outline:", "Scenario Template:")) {
-                flush(current, file, channelDir, featureName, cases);
-                current = new Scenario(CaseId.fromScenarioName(line), true);
-            } else if (startsWithAny(line, "Scenario:", "Example:")) {
-                flush(current, file, channelDir, featureName, cases);
-                current = new Scenario(CaseId.fromScenarioName(line), false);
-            } else if (startsWithAny(line, "Feature:", "Background:", "Rule:")) {
-                flush(current, file, channelDir, featureName, cases);
-                current = null;
-            } else if (current != null && startsWithAny(line, "Examples:", "Scenarios:")) {
-                current.inExamples = true;
-                current.productColumn = -2;
-            } else if (current != null && current.inExamples && line.startsWith("|")) {
-                List<String> cells = cells(line);
-                if (current.productColumn == -2) {
-                    current.productColumn = cells.indexOf("product_type");
-                } else if (current.productColumn >= 0 && current.productColumn < cells.size()) {
-                    current.products.add(cells.get(current.productColumn));
+        for (FeatureFile.Block block : feature.blocks()) {
+            boolean outline = block.kind() == FeatureFile.Kind.OUTLINE;
+            if (block.rowId() == null || !(outline || block.kind() == FeatureFile.Kind.SCENARIO)) continue;
+            String rowId = block.rowId();
+            Set<String> ids = new LinkedHashSet<>();
+            if (outline && rowId.contains(PRODUCT_PLACEHOLDER)) {
+                List<String> products = block.examples().stream()
+                        .flatMap(t -> t.column("product_type").stream()).toList();
+                if (products.isEmpty()) {
+                    throw new IllegalStateException("[FeatureCases] " + feature.file() + ": " + rowId
+                            + " has no Examples column product_type to expand " + PRODUCT_PLACEHOLDER);
                 }
+                products.forEach(p -> ids.add(rowId.replace(PRODUCT_PLACEHOLDER, p)));
+            } else {
+                ids.add(rowId);
+            }
+            for (String id : ids) {
+                if (id.contains("<")) {
+                    throw new IllegalStateException("[FeatureCases] " + feature.file() + ": case ID " + id
+                            + " has a placeholder other than " + PRODUCT_PLACEHOLDER);
+                }
+                cases.add(new FeatureCase(id, rowId, channelDir, featureName));
             }
         }
-        flush(current, file, channelDir, featureName, cases);
         return cases;
-    }
-
-    private static void flush(Scenario scenario, Path file, String channelDir, String featureName,
-                              List<FeatureCase> out) {
-        if (scenario == null || scenario.rowId == null) return;
-        String rowId = scenario.rowId;
-        Set<String> ids = new LinkedHashSet<>();
-        if (scenario.outline && rowId.contains(PRODUCT_PLACEHOLDER)) {
-            if (scenario.products.isEmpty()) {
-                throw new IllegalStateException("[FeatureCases] " + file + ": " + rowId
-                        + " has no Examples column product_type to expand " + PRODUCT_PLACEHOLDER);
-            }
-            scenario.products.forEach(p -> ids.add(rowId.replace(PRODUCT_PLACEHOLDER, p)));
-        } else {
-            ids.add(rowId);
-        }
-        for (String id : ids) {
-            if (id.contains("<")) {
-                throw new IllegalStateException("[FeatureCases] " + file + ": case ID " + id
-                        + " has a placeholder other than " + PRODUCT_PLACEHOLDER);
-            }
-            out.add(new FeatureCase(id, rowId, channelDir, featureName));
-        }
-    }
-
-    private static List<String> cells(String tableLine) {
-        String inner = tableLine.substring(1, tableLine.endsWith("|") && tableLine.length() > 1
-                ? tableLine.length() - 1 : tableLine.length());
-        List<String> cells = new ArrayList<>();
-        for (String cell : inner.split("\\|", -1)) cells.add(cell.trim());
-        return cells;
-    }
-
-    private static boolean startsWithAny(String line, String... keywords) {
-        for (String keyword : keywords) {
-            if (line.startsWith(keyword)) return true;
-        }
-        return false;
-    }
-
-    private static final class Scenario {
-        final String rowId;
-        final boolean outline;
-        final List<String> products = new ArrayList<>();
-        boolean inExamples;
-        /** -2: the next table line is a header; -1: the table has no product_type column. */
-        int productColumn = -2;
-
-        Scenario(String rowId, boolean outline) {
-            this.rowId = rowId;
-            this.outline = outline;
-        }
     }
 }
