@@ -47,7 +47,7 @@ final class FeatureCases {
         return cases;
     }
 
-    private static List<FeatureCase> cases(FeatureFile feature, String channelDir) {
+    static List<FeatureCase> cases(FeatureFile feature, String channelDir) {
         String featureName = feature.file().getFileName().toString().replaceFirst("\\.feature$", "");
         List<FeatureCase> cases = new ArrayList<>();
         for (FeatureFile.Block block : feature.blocks()) {
